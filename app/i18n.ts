@@ -111,9 +111,13 @@ const copyByLocale: Record<Locale, Copy> = {
       items: [
         {
           title: "Pensado para un estilo de vida activo.",
+          image: "/slowfit/value-1.jpg",
+          imageAlt: "Pensado para un estilo de vida activo",
         },
         {
           title: "Prendas seleccionadas por calidad.",
+          image: "/slowfit/value-2.jpg",
+          imageAlt: "Prendas seleccionadas por calidad",
         },
         {
           title: "Diseños minimalistas.",
@@ -187,9 +191,13 @@ const copyByLocale: Record<Locale, Copy> = {
       items: [
         {
           title: "Designed for an active lifestyle.",
+          image: "/slowfit/value-1.jpg",
+          imageAlt: "Designed for an active lifestyle",
         },
         {
           title: "Garments selected for quality.",
+          image: "/slowfit/value-2.jpg",
+          imageAlt: "Garments selected for quality",
         },
         {
           title: "Minimalist designs.",
