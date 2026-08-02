@@ -1,14 +1,12 @@
 "use client";
 
 import {
-  ArrowRightOutlined,
   CheckCircleFilled,
   GlobalOutlined,
   InstagramOutlined,
-  PhoneOutlined,
   WhatsAppOutlined,
 } from "@ant-design/icons";
-import { Button, Col, Divider, Flex, Row, Space, Tag, Tooltip, Typography } from "antd";
+import { Button, Col, Row, Space, Typography } from "antd";
 import Image from "next/image";
 import LocaleSwitcher from "./locale-switcher";
 import type { Copy, Locale } from "./i18n";
@@ -57,29 +55,16 @@ export default function HomePage({ copy, locale }: HomePageProps) {
             className="slowfit-cover"
           />
           <div className="slowfit-hero-overlay">
-            <Tag variant="filled" className="slowfit-pill">
-              {copy.hero.eyebrow}
-            </Tag>
-            <Typography.Title className="slowfit-display slowfit-hero-title">
-              {copy.hero.titleLineOne}
-              <br />
-              {copy.hero.titleLineTwo}
-            </Typography.Title>
-            <Typography.Paragraph className="slowfit-lead">{copy.hero.description}</Typography.Paragraph>
-            <Flex gap={12} wrap>
-              <Button
-                type="primary"
-                size="large"
-                href={collectionsHref}
-                icon={<ArrowRightOutlined />}
-                className="slowfit-primary-cta"
-              >
-                {copy.hero.primaryCta}
-              </Button>
-              <Button size="large" href={contactHref} className="slowfit-secondary-cta">
-                {copy.hero.secondaryCta}
-              </Button>
-            </Flex>
+            <Image
+              src="/slowfit/hero-mark.png"
+              alt={copy.hero.markAlt}
+              width={390}
+              height={136}
+              className="slowfit-hero-mark"
+            />
+            <Typography.Paragraph className="slowfit-hero-line">{copy.brandTagline}</Typography.Paragraph>
+            <Typography.Paragraph className="slowfit-hero-line">{copy.hero.eyebrow}</Typography.Paragraph>
+            <Typography.Paragraph className="slowfit-hero-line">{copy.hero.description}</Typography.Paragraph>
           </div>
         </div>
       </section>
@@ -87,18 +72,22 @@ export default function HomePage({ copy, locale }: HomePageProps) {
       <section className="slowfit-manifesto">
         <div className="slowfit-shell">
           <Row gutter={[32, 32]} align="middle">
-            <Col xs={24} md={15}>
+            <Col xs={24} md={12}>
               <Typography.Title level={2} className="slowfit-display slowfit-manifesto-title">
-                {copy.manifesto.title}
+                {copy.hero.titleLineOne}
+                <br />
+                {copy.hero.titleLineTwo}
               </Typography.Title>
+              <div className="slowfit-ring-panel">
+                <Image src="/slowfit/hero-mark.png" alt={copy.manifesto.imageAlt} width={170} height={60} />
+              </div>
+            </Col>
+            <Col xs={24} md={12}>
               <Typography.Paragraph className="slowfit-manifesto-copy">
+                {copy.manifesto.title}
+                <br />
                 {copy.manifesto.description}
               </Typography.Paragraph>
-            </Col>
-            <Col xs={24} md={9}>
-              <div className="slowfit-ring-panel">
-                <Image src="/slowfit/ring.png" alt={copy.manifesto.imageAlt} width={220} height={220} />
-              </div>
             </Col>
           </Row>
         </div>
@@ -177,57 +166,51 @@ export default function HomePage({ copy, locale }: HomePageProps) {
             </div>
           </Col>
           <Col xs={24} lg={14}>
-            <Typography.Text className="slowfit-kicker">{copy.story.kicker}</Typography.Text>
-            <Typography.Title className="slowfit-display slowfit-section-title">
-              {copy.story.title}
-            </Typography.Title>
-            <Typography.Paragraph className="slowfit-lead">{copy.story.description}</Typography.Paragraph>
-            <Divider className="slowfit-divider" />
-            <Space orientation="vertical" size={12} className="w-full">
-              <Button icon={<PhoneOutlined />} size="large" href="tel:+50686437162">
-                8643-7162
-              </Button>
-              <Space size={14} className="slowfit-social-row" wrap>
-                <Tooltip title="WhatsApp">
-                  <Button
-                    icon={<WhatsAppOutlined />}
-                    size="large"
-                    shape="circle"
-                    className="slowfit-social-icon"
-                    href="https://wa.me/50686437162?text=Hola%20Slow%20Fit%2C%20quiero%20mas%20informacion"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="WhatsApp"
-                  />
-                </Tooltip>
-                <Tooltip title="Instagram">
-                  <Button
-                    icon={<InstagramOutlined />}
-                    size="large"
-                    shape="circle"
-                    className="slowfit-social-icon"
-                    href="https://www.instagram.com/slowfitcr/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Instagram"
-                  />
-                </Tooltip>
-                <Tooltip title="TikTok">
-                  <Button
-                    icon={<GlobalOutlined />}
-                    size="large"
-                    shape="circle"
-                    className="slowfit-social-icon"
-                    href="https://www.tiktok.com/@slowfitcr"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="TikTok"
-                  />
-                </Tooltip>
-              </Space>
-            </Space>
+            <Typography.Paragraph className="slowfit-story-quote">{copy.story.title}</Typography.Paragraph>
+            <Typography.Paragraph className="slowfit-story-quote">{copy.story.description}</Typography.Paragraph>
+            <Typography.Paragraph className="slowfit-story-sign">SLOW.</Typography.Paragraph>
           </Col>
         </Row>
+      </section>
+
+      <section className="slowfit-footer-contact">
+        <div className="slowfit-shell">
+          <div className="slowfit-footer-mark">
+            <Image src="/slowfit/hero-mark.png" alt={copy.hero.markAlt} width={420} height={146} />
+          </div>
+          <Space size={42} className="slowfit-footer-links" wrap>
+            <a
+              className="slowfit-footer-link"
+              href="https://wa.me/50686437162?text=Hola%20Slow%20Fit%2C%20quiero%20mas%20informacion"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="WhatsApp"
+            >
+              <WhatsAppOutlined />
+              <span>8643-7162</span>
+            </a>
+            <a
+              className="slowfit-footer-link"
+              href="https://www.instagram.com/slowfitcr/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+            >
+              <InstagramOutlined />
+              <span>slowfitcr</span>
+            </a>
+            <a
+              className="slowfit-footer-link"
+              href="https://www.tiktok.com/@slowfitcr"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="TikTok"
+            >
+              <GlobalOutlined />
+              <span>slowfitcr</span>
+            </a>
+          </Space>
+        </div>
       </section>
     </main>
   );

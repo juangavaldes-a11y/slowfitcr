@@ -130,7 +130,7 @@ const copyByLocale: Record<Locale, Copy> = {
       kicker: "Pensamiento de marca",
       title: "No somos una marca que persigue la velocidad.",
       description:
-        "Somos una marca para quienes entienden que el progreso se construye con paciencia, disciplina y voluntad. SLOW.",
+        "Somos una marca para quienes entienden que el progreso se construye con paciencia, disciplina y voluntad.",
       imageAlt: "Editorial Slow Fit",
     },
   },
@@ -210,7 +210,7 @@ const copyByLocale: Record<Locale, Copy> = {
       kicker: "Brand mindset",
       title: "We are not a brand chasing speed.",
       description:
-        "We are a brand for people who understand that progress is built with patience, discipline, and will. SLOW.",
+        "We are a brand for people who understand that progress is built with patience, discipline, and will.",
       imageAlt: "Slow Fit editorial",
     },
   },
