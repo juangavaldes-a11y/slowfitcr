@@ -28,12 +28,12 @@ export type Copy = {
   collections: {
     kicker: string;
     title: string;
-    cta: string;
     items: Array<{
       title: string;
       description: string;
       image: string;
       imageAlt: string;
+      ctaLabel: string;
     }>;
   };
   values: {
@@ -41,8 +41,8 @@ export type Copy = {
     title: string;
     items: Array<{
       title: string;
-      image: string;
-      imageAlt: string;
+      image?: string;
+      imageAlt?: string;
     }>;
   };
   story: {
@@ -58,29 +58,28 @@ const copyByLocale: Record<Locale, Copy> = {
     brandTagline: "Train with Purpose.",
     nav: {
       collections: "Colecciones",
-      whySlow: "¿Por que SLOW?",
+      whySlow: "¿Por qué SLOW?",
       contact: "Contacto",
     },
     hero: {
-      eyebrow: "No creemos en los resultados rapidos",
+      eyebrow: "No creemos en los resultados rápidos",
       titleLineOne: "Slow is Smooth.",
       titleLineTwo: "Smooth is Fast.",
       description:
-        "Creemos en avanzar todos los dias. El progreso nunca ha sido una linea recta; lo importante es nunca dejar de avanzar.",
-      primaryCta: "Ver coleccion",
-      secondaryCta: "Hablar con SLOW",
-      imageAlt: "Coleccion Slow Fit",
+        "Creemos en avanzar todos los días. El progreso nunca ha sido una línea recta; lo importante es nunca dejar de avanzar.",
+      primaryCta: "VER COLECCIÓN",
+      secondaryCta: "CONTACTO",
+      imageAlt: "Colección Slow Fit",
       markAlt: "Marca Slow",
     },
     manifesto: {
-      title: "El progreso nunca ha sido una linea recta.",
-      description: "Hay dias buenos. Hay dias dificiles. Lo importante es nunca dejar de avanzar.",
+      title: "El progreso nunca ha sido una línea recta.",
+      description: "Hay días buenos. Hay días difíciles. Lo importante es nunca dejar de avanzar.",
       imageAlt: "Detalle de la marca",
     },
     collections: {
       kicker: "Colecciones",
       title: "Performance y estilo para un ritmo sostenible.",
-      cta: "Ver coleccion",
       items: [
         {
           title: "Performance Collection",
@@ -88,34 +87,33 @@ const copyByLocale: Record<Locale, Copy> = {
             "Prendas diseñadas para acompañarte en cada entrenamiento, sin perder comodidad ni estilo.",
           image: "/slowfit/performance-collection.jpg",
           imageAlt: "Performance Collection",
+          ctaLabel: "VER COLECCIÓN",
         },
         {
           title: "Performance for Him",
-          description: "Luce elegante en tu dia a dia con nuestros articulos de ropa casual.",
+          description: "Luce elegante en tu día a día con nuestros artículos de ropa casual.",
           image: "/slowfit/performance-him.jpg",
           imageAlt: "Performance for Him",
+          ctaLabel: "VER COLECCIÓN",
         },
         {
           title: "Accesorios",
           description: "Accesorios diseñados para complementar tu entrenamiento y tu estilo de vida.",
           image: "/slowfit/accessories.jpg",
           imageAlt: "Accesorios Slow Fit",
+          ctaLabel: "VER",
         },
       ],
     },
     values: {
-      kicker: "¿Por que elegir SLOW?",
+      kicker: "¿Por qué elegir SLOW?",
       title: "Minimalismo funcional para una vida activa.",
       items: [
         {
           title: "Pensado para un estilo de vida activo.",
-          image: "/slowfit/value-1.jpg",
-          imageAlt: "Estilo de vida activo",
         },
         {
           title: "Prendas seleccionadas por calidad.",
-          image: "/slowfit/value-2.jpg",
-          imageAlt: "Prendas seleccionadas por calidad",
         },
         {
           title: "Diseños minimalistas.",
@@ -145,8 +143,8 @@ const copyByLocale: Record<Locale, Copy> = {
       titleLineTwo: "Smooth is Fast.",
       description:
         "We believe in moving forward every day. Progress has never been a straight line; what matters is to keep moving.",
-      primaryCta: "View collection",
-      secondaryCta: "Talk to SLOW",
+      primaryCta: "VIEW COLLECTION",
+      secondaryCta: "CONTACT",
       imageAlt: "Slow Fit collection",
       markAlt: "Slow brand mark",
     },
@@ -158,7 +156,6 @@ const copyByLocale: Record<Locale, Copy> = {
     collections: {
       kicker: "Collections",
       title: "Performance and style for a sustainable pace.",
-      cta: "View collection",
       items: [
         {
           title: "Performance Collection",
@@ -166,18 +163,21 @@ const copyByLocale: Record<Locale, Copy> = {
             "Garments designed to support every workout without giving up comfort or style.",
           image: "/slowfit/performance-collection.jpg",
           imageAlt: "Performance Collection",
+          ctaLabel: "VIEW COLLECTION",
         },
         {
           title: "Performance for Him",
           description: "Look polished every day with our casual essentials.",
           image: "/slowfit/performance-him.jpg",
           imageAlt: "Performance for Him",
+          ctaLabel: "VIEW COLLECTION",
         },
         {
           title: "Accessories",
           description: "Accessories designed to complement your training and your lifestyle.",
           image: "/slowfit/accessories.jpg",
           imageAlt: "Slow Fit accessories",
+          ctaLabel: "VIEW",
         },
       ],
     },
@@ -187,13 +187,9 @@ const copyByLocale: Record<Locale, Copy> = {
       items: [
         {
           title: "Designed for an active lifestyle.",
-          image: "/slowfit/value-1.jpg",
-          imageAlt: "Active lifestyle",
         },
         {
           title: "Garments selected for quality.",
-          image: "/slowfit/value-2.jpg",
-          imageAlt: "Quality garments",
         },
         {
           title: "Minimalist designs.",

@@ -31,13 +31,13 @@ export default function HomePage({ copy, locale }: HomePageProps) {
         </div>
         <div className="slowfit-nav-actions">
           <Space size={12} wrap>
-            <Button type="text" href={collectionsHref}>
+            <Button type="text" href={collectionsHref} className="slowfit-nav-button">
               {copy.nav.collections}
             </Button>
-            <Button type="text" href={whySlowHref}>
+            <Button type="text" href={whySlowHref} className="slowfit-nav-button">
               {copy.nav.whySlow}
             </Button>
-            <Button type="primary" href={contactHref}>
+            <Button type="primary" href={contactHref} className="slowfit-secondary-cta">
               {copy.nav.contact}
             </Button>
           </Space>
@@ -48,8 +48,8 @@ export default function HomePage({ copy, locale }: HomePageProps) {
       <section className="slowfit-shell slowfit-hero">
         <Row gutter={[32, 32]} align="middle">
           <Col xs={24} lg={11}>
-            <Space direction="vertical" size={20} className="w-full">
-              <Tag bordered={false} className="slowfit-pill">
+            <Space orientation="vertical" size={20} className="w-full">
+              <Tag variant="filled" className="slowfit-pill">
                 {copy.hero.eyebrow}
               </Tag>
               <Typography.Title className="slowfit-display slowfit-hero-title">
@@ -59,10 +59,16 @@ export default function HomePage({ copy, locale }: HomePageProps) {
               </Typography.Title>
               <Typography.Paragraph className="slowfit-lead">{copy.hero.description}</Typography.Paragraph>
               <Flex gap={12} wrap>
-                <Button type="primary" size="large" href={collectionsHref} icon={<ArrowRightOutlined />}>
+                <Button
+                  type="primary"
+                  size="large"
+                  href={collectionsHref}
+                  icon={<ArrowRightOutlined />}
+                  className="slowfit-primary-cta"
+                >
                   {copy.hero.primaryCta}
                 </Button>
-                <Button size="large" href={contactHref}>
+                <Button size="large" href={contactHref} className="slowfit-secondary-cta">
                   {copy.hero.secondaryCta}
                 </Button>
               </Flex>
@@ -118,7 +124,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
         <Row gutter={[24, 24]}>
           {copy.collections.items.map((collection) => (
             <Col xs={24} md={12} xl={8} key={collection.title}>
-              <Card className="slowfit-card" bordered={false} bodyStyle={{ padding: 24 }}>
+              <Card className="slowfit-card" variant="borderless" styles={{ body: { padding: 24 } }}>
                 <div className="slowfit-card-media">
                   <Image
                     src={collection.image}
@@ -128,15 +134,21 @@ export default function HomePage({ copy, locale }: HomePageProps) {
                     className="slowfit-cover"
                   />
                 </div>
-                <Space direction="vertical" size={12} className="w-full">
+                <Space orientation="vertical" size={12} className="w-full">
                   <Typography.Title level={3} className="slowfit-card-title">
                     {collection.title}
                   </Typography.Title>
                   <Typography.Paragraph className="slowfit-card-copy">
                     {collection.description}
                   </Typography.Paragraph>
-                  <Button type="link" href="https://slowfitcr.com/" target="_blank" icon={<ArrowRightOutlined />}>
-                    {copy.collections.cta}
+                  <Button
+                    type="link"
+                    href="https://slowfitcr.com/"
+                    target="_blank"
+                    icon={<ArrowRightOutlined />}
+                    className="slowfit-card-cta"
+                  >
+                    {collection.ctaLabel}
                   </Button>
                 </Space>
               </Card>
@@ -156,16 +168,22 @@ export default function HomePage({ copy, locale }: HomePageProps) {
           <Row gutter={[20, 20]}>
             {copy.values.items.map((value) => (
               <Col xs={24} md={8} key={value.title}>
-                <Card className="slowfit-value-card" bordered={false} bodyStyle={{ padding: 20 }}>
-                  <div className="slowfit-value-media">
-                    <Image
-                      src={value.image}
-                      alt={value.imageAlt}
-                      fill
-                      sizes="(max-width: 767px) 100vw, 33vw"
-                      className="slowfit-cover"
-                    />
-                  </div>
+                <Card
+                  className={`slowfit-value-card${value.image ? "" : " slowfit-value-card--text-only"}`}
+                  variant="borderless"
+                  styles={{ body: { padding: 20 } }}
+                >
+                  {value.image ? (
+                    <div className="slowfit-value-media">
+                      <Image
+                        src={value.image}
+                        alt={value.imageAlt ?? value.title}
+                        fill
+                        sizes="(max-width: 767px) 100vw, 33vw"
+                        className="slowfit-cover"
+                      />
+                    </div>
+                  ) : null}
                   <Typography.Paragraph className="slowfit-value-copy">
                     <CheckCircleFilled />
                     <span>{value.title}</span>
@@ -197,7 +215,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
             </Typography.Title>
             <Typography.Paragraph className="slowfit-lead">{copy.story.description}</Typography.Paragraph>
             <Divider className="slowfit-divider" />
-            <Space direction="vertical" size={12} className="w-full">
+            <Space orientation="vertical" size={12} className="w-full">
               <Button icon={<PhoneOutlined />} size="large" href="tel:+50686437162">
                 8643-7162
               </Button>

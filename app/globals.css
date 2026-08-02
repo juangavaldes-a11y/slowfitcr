@@ -52,7 +52,7 @@ a {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 20px 0 8px;
+  padding: 28px 0 12px;
 }
 
 .slowfit-brand-block {
@@ -95,6 +95,7 @@ a {
 
 .slowfit-brand-copy {
   color: var(--muted);
+  font-size: 0.98rem;
 }
 
 .slowfit-kicker {
@@ -109,7 +110,7 @@ a {
 }
 
 .slowfit-hero {
-  padding: 32px 0 72px;
+  padding: 52px 0 96px;
 }
 
 .slowfit-display,
@@ -121,16 +122,16 @@ a {
 }
 
 .slowfit-hero-title.ant-typography {
-  font-size: clamp(3rem, 8vw, 5.8rem);
-  line-height: 0.92;
+  font-size: clamp(3.2rem, 8vw, 6.2rem);
+  line-height: 0.88;
   margin: 0;
 }
 
 .slowfit-lead.ant-typography {
   color: var(--muted);
-  font-size: 1.08rem;
-  line-height: 1.8;
-  max-width: 58ch;
+  font-size: 1.04rem;
+  line-height: 1.9;
+  max-width: 54ch;
   margin-bottom: 0;
 }
 
@@ -140,9 +141,44 @@ a {
   background: rgba(255, 255, 255, 0.72);
   color: var(--ink-soft);
   padding: 8px 14px;
-  font-size: 0.75rem;
-  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
+}
+
+.slowfit-nav-button.ant-btn,
+.slowfit-primary-cta.ant-btn,
+.slowfit-secondary-cta.ant-btn,
+.slowfit-card-cta.ant-btn {
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.slowfit-nav-button.ant-btn {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  padding-inline: 6px;
+}
+
+.slowfit-primary-cta.ant-btn,
+.slowfit-secondary-cta.ant-btn {
+  border-radius: 999px;
+  height: 46px;
+  padding-inline: 22px;
+  font-size: 0.76rem;
+}
+
+.slowfit-primary-cta.ant-btn {
+  box-shadow: none;
+}
+
+.slowfit-secondary-cta.ant-btn {
+  border-color: rgba(47, 42, 40, 0.16);
+}
+
+.slowfit-card-cta.ant-btn {
+  padding-inline: 0;
+  font-size: 0.76rem;
 }
 
 .slowfit-hero-media {
@@ -186,7 +222,7 @@ a {
 .slowfit-manifesto {
   background: linear-gradient(135deg, #554c47 0%, #2f2a28 100%);
   color: #fff;
-  padding: 72px 0;
+  padding: 88px 0;
 }
 
 .slowfit-manifesto-title.ant-typography,
@@ -214,14 +250,14 @@ a {
 
 .slowfit-section,
 .slowfit-story {
-  padding: 84px 0;
+  padding: 104px 0;
 }
 
 .slowfit-section-heading {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 32px;
+  gap: 10px;
+  margin-bottom: 40px;
 }
 
 .slowfit-section-heading.centered {
@@ -230,8 +266,8 @@ a {
 }
 
 .slowfit-section-title.ant-typography {
-  font-size: clamp(2.3rem, 5vw, 4.2rem);
-  line-height: 1;
+  font-size: clamp(2.7rem, 5vw, 4.8rem);
+  line-height: 0.96;
   margin: 0;
   max-width: 13ch;
 }
@@ -245,26 +281,26 @@ a {
 }
 
 .slowfit-card-media {
-  min-height: 320px;
+  min-height: 360px;
   border-radius: 22px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .slowfit-card-title.ant-typography {
   font-family: var(--font-display), Georgia, serif;
-  font-size: 2rem;
-  line-height: 1;
+  font-size: 2.25rem;
+  line-height: 0.95;
   margin-bottom: 0 !important;
 }
 
 .slowfit-card-copy.ant-typography {
   color: var(--muted);
-  line-height: 1.7;
+  line-height: 1.85;
   margin-bottom: 0 !important;
 }
 
 .slowfit-values {
-  padding: 84px 0;
+  padding: 96px 0;
   background: linear-gradient(180deg, #3f3834 0%, #2f2a28 100%);
 }
 
@@ -274,12 +310,19 @@ a {
   margin-bottom: 18px;
 }
 
+.slowfit-value-card--text-only.ant-card .ant-card-body {
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .slowfit-value-copy.ant-typography {
   display: flex;
   align-items: center;
   gap: 10px;
   color: #f5f0e8;
-  font-size: 1rem;
+  font-size: 1.02rem;
   line-height: 1.7;
   margin-bottom: 0 !important;
 }
@@ -310,7 +353,8 @@ a {
   }
 
   .slowfit-hero {
-    padding-top: 16px;
+    padding-top: 24px;
+    padding-bottom: 72px;
   }
 
   .slowfit-hero-media,
@@ -340,7 +384,7 @@ a {
   .slowfit-story,
   .slowfit-values,
   .slowfit-manifesto {
-    padding: 64px 0;
+    padding: 72px 0;
   }
 
   .slowfit-hero-media,

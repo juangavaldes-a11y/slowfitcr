@@ -8,26 +8,18 @@
       "command": "npm run dev"
     },
     {
-      "name": "Slow Fit: full stack",
-      "type": "node-terminal",
+      "name": "Slow Fit: Chrome (ES)",
+      "type": "pwa-chrome",
       "request": "launch",
-      "command": "npm run dev",
-      "serverReadyAction": {
-        "pattern": "- Local:.+(https?://.+)",
-        "uriFormat": "%s/es",
-        "action": "debugWithChrome"
-      }
+      "url": "http://localhost:3000/es",
+      "webRoot": "${workspaceFolder}"
     },
     {
-      "name": "Slow Fit: open English route",
-      "type": "node-terminal",
+      "name": "Slow Fit: Chrome (EN)",
+      "type": "pwa-chrome",
       "request": "launch",
-      "command": "npm run dev",
-      "serverReadyAction": {
-        "pattern": "- Local:.+(https?://.+)",
-        "uriFormat": "%s/en",
-        "action": "debugWithChrome"
-      }
+      "url": "http://localhost:3000/en",
+      "webRoot": "${workspaceFolder}"
     }
   ]
 }
