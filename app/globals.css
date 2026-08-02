@@ -1,26 +1,362 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f0e8;
+  --foreground: #2f2a28;
+  --muted: #6d6968;
+  --sand: #d7d2cd;
+  --accent: #b1a497;
+  --surface: #fbf8f2;
+  --ink-soft: #554c47;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-body);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), Arial, sans-serif;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+.slowfit-page {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(177, 164, 151, 0.28), transparent 30%),
+    linear-gradient(180deg, #f9f5ef 0%, #f5f0e8 50%, #efe7dd 100%);
+}
+
+.slowfit-shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.slowfit-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 0 8px;
+}
+
+.slowfit-brand-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slowfit-nav-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.slowfit-locale-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid rgba(109, 105, 104, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.slowfit-locale-switcher .ant-segmented {
+  background: transparent;
+}
+
+.slowfit-locale-switcher .ant-segmented-item-label {
+  min-width: 44px;
+  padding: 2px 10px;
+}
+
+.slowfit-locale-switcher a {
+  display: inline-block;
+  color: inherit;
+}
+
+.slowfit-brand-copy {
+  color: var(--muted);
+}
+
+.slowfit-kicker {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.slowfit-kicker.light {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.slowfit-hero {
+  padding: 32px 0 72px;
+}
+
+.slowfit-display,
+.ant-typography.slowfit-display {
+  font-family: var(--font-display), Georgia, serif;
+  letter-spacing: -0.03em;
+  color: var(--foreground);
+  margin-bottom: 0;
+}
+
+.slowfit-hero-title.ant-typography {
+  font-size: clamp(3rem, 8vw, 5.8rem);
+  line-height: 0.92;
+  margin: 0;
+}
+
+.slowfit-lead.ant-typography {
+  color: var(--muted);
+  font-size: 1.08rem;
+  line-height: 1.8;
+  max-width: 58ch;
+  margin-bottom: 0;
+}
+
+.slowfit-pill.ant-tag {
+  width: fit-content;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink-soft);
+  padding: 8px 14px;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.slowfit-hero-media {
+  position: relative;
+  min-height: 520px;
+}
+
+.slowfit-hero-image-wrap,
+.slowfit-story-media,
+.slowfit-card-media,
+.slowfit-value-media {
+  position: relative;
+  overflow: hidden;
+}
+
+.slowfit-hero-image-wrap {
+  min-height: 520px;
+  border-radius: 32px;
+  box-shadow: 0 24px 80px rgba(62, 53, 49, 0.18);
+}
+
+.slowfit-mark-card {
+  position: absolute;
+  right: 24px;
+  bottom: -28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 168px;
+  height: 168px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 18px 42px rgba(62, 53, 49, 0.16);
+}
+
+.slowfit-cover {
+  object-fit: cover;
+}
+
+.slowfit-manifesto {
+  background: linear-gradient(135deg, #554c47 0%, #2f2a28 100%);
+  color: #fff;
+  padding: 72px 0;
+}
+
+.slowfit-manifesto-title.ant-typography,
+.slowfit-section-title.light.ant-typography {
+  color: #fff !important;
+}
+
+.slowfit-manifesto-copy.ant-typography {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1.05rem;
+  line-height: 1.8;
+  margin-bottom: 0;
+}
+
+.slowfit-ring-panel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 240px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.slowfit-section,
+.slowfit-story {
+  padding: 84px 0;
+}
+
+.slowfit-section-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.slowfit-section-heading.centered {
+  align-items: center;
+  text-align: center;
+}
+
+.slowfit-section-title.ant-typography {
+  font-size: clamp(2.3rem, 5vw, 4.2rem);
+  line-height: 1;
+  margin: 0;
+  max-width: 13ch;
+}
+
+.slowfit-card.ant-card,
+.slowfit-value-card.ant-card {
+  height: 100%;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 18px 60px rgba(62, 53, 49, 0.08);
+}
+
+.slowfit-card-media {
+  min-height: 320px;
+  border-radius: 22px;
+  margin-bottom: 20px;
+}
+
+.slowfit-card-title.ant-typography {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 2rem;
+  line-height: 1;
+  margin-bottom: 0 !important;
+}
+
+.slowfit-card-copy.ant-typography {
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 0 !important;
+}
+
+.slowfit-values {
+  padding: 84px 0;
+  background: linear-gradient(180deg, #3f3834 0%, #2f2a28 100%);
+}
+
+.slowfit-value-media {
+  min-height: 280px;
+  border-radius: 20px;
+  margin-bottom: 18px;
+}
+
+.slowfit-value-copy.ant-typography {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #f5f0e8;
+  font-size: 1rem;
+  line-height: 1.7;
+  margin-bottom: 0 !important;
+}
+
+.slowfit-value-copy .anticon {
+  color: var(--accent);
+}
+
+.slowfit-story-media {
+  min-height: 560px;
+  border-radius: 32px;
+  box-shadow: 0 24px 80px rgba(62, 53, 49, 0.16);
+}
+
+.slowfit-divider.ant-divider {
+  border-color: rgba(109, 105, 104, 0.22);
+}
+
+@media (max-width: 991px) {
+  .slowfit-nav {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .slowfit-nav-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .slowfit-hero {
+    padding-top: 16px;
+  }
+
+  .slowfit-hero-media,
+  .slowfit-hero-image-wrap,
+  .slowfit-story-media {
+    min-height: 420px;
+  }
+
+  .slowfit-mark-card {
+    width: 132px;
+    height: 132px;
+    right: 16px;
+    bottom: -18px;
+  }
+}
+
+@media (max-width: 767px) {
+  .slowfit-shell {
+    width: min(100% - 24px, 1180px);
+  }
+
+  .slowfit-nav-actions {
+    align-items: flex-start;
+  }
+
+  .slowfit-section,
+  .slowfit-story,
+  .slowfit-values,
+  .slowfit-manifesto {
+    padding: 64px 0;
+  }
+
+  .slowfit-hero-media,
+  .slowfit-hero-image-wrap,
+  .slowfit-story-media,
+  .slowfit-card-media,
+  .slowfit-value-media {
+    min-height: 300px;
+  }
+
+  .slowfit-mark-card {
+    position: static;
+    margin: 16px auto 0;
+  }
+
+  .slowfit-section-title.ant-typography {
+    max-width: none;
+  }
 }
