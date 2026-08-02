@@ -4,7 +4,7 @@ import { Cormorant_Garamond, Questrial } from "next/font/google";
 import { headers } from "next/headers";
 import "antd/dist/reset.css";
 import "./globals.css";
-import { defaultLocale, getPreferredLocale, isLocale } from "./i18n";
+import { getPreferredLocale } from "./i18n";
 import Providers from "./providers";
 
 const displayFont = Cormorant_Garamond({
@@ -29,11 +29,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const requestHeaders = await headers();
-  const localeFromPath = requestHeaders.get("x-slowfit-locale");
-  const locale = localeFromPath && isLocale(localeFromPath)
-    ? localeFromPath
-    : getPreferredLocale(requestHeaders.get("accept-language")) ?? defaultLocale;
+  const locale = getPreferredLocale((await headers()).get("accept-language"));
 
   return (
     <html lang={locale} className={`${displayFont.variable} ${bodyFont.variable}`}>

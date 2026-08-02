@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Slow Fit CR
 
-## Getting Started
+Responsive Next.js + Ant Design rebuild of the Slow Fit CR landing page, with locale routes for Spanish and English.
 
-First, run the development server:
+## Local development
+
+Run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000/es` or `http://localhost:3000/en`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project notes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- App Router with locale deep links at `/es` and `/en`
+- Root route redirects by browser language preference
+- Ant Design UI with local image assets under `public/slowfit`
+- Cloudflare Workers deployment via OpenNext
 
-## Learn More
+## Cloudflare deployment
 
-To learn more about Next.js, take a look at the following resources:
+This app is configured for Cloudflare Workers, not static Pages, because it uses server-side locale routing.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Required repo files
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `wrangler.jsonc`
+- `open-next.config.ts`
+- Cloudflare scripts in `package.json`
 
-## Deploy on Vercel
+### Local Cloudflare validation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run preview
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This builds the app with the OpenNext Cloudflare adapter and runs it in the Workers runtime locally.
+
+### Deploy from local machine
+
+```bash
+npm run deploy
+```
+
+### Deploy from Cloudflare dashboard
+
+If your repository is already linked in Cloudflare:
+
+1. Create a Workers project from the Git repo, or use Workers Builds rather than static Pages.
+2. Build command: `npm run deploy`
+3. Install command: `npm install`
+4. Production branch: your default branch
+
+If Cloudflare only allows a build step in the dashboard and handles deploy itself, use:
+
+1. Build command: `npx opennextjs-cloudflare build`
+2. Build output directory: `.open-next/assets`
+3. Worker entrypoint: `.open-next/worker.js`
+
+### Domain
+
+Once the deployment succeeds, attach your DNS/custom domain in the Cloudflare dashboard to the Worker project.
