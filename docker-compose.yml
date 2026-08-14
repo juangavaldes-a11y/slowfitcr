@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: slowfit-postgres
+    environment:
+      - POSTGRES_DB=slowfit
+      - POSTGRES_USER=slowfit
+      - POSTGRES_PASSWORD=slowfit
+    volumes:
+      - slowfit-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U slowfit -d slowfit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: slowfit-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      - PORT=8080
+      - DATABASE_URL=postgresql://slowfit:slowfit@postgres:5432/slowfit?schema=public
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: slowfit-frontend
+    depends_on:
+      - backend
+    env_file:
+      - .env.docker
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - BACKEND_INTERNAL_URL=http://backend:8080
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  slowfit-postgres-data:

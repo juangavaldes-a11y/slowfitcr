@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WebhookStatus {
+  PROCESSED
+  FAILED
+}
+
+model Review {
+  id            String       @id @default(uuid())
+  productHandle String
+  locale        String
+  rating        Int
+  author        String
+  email         String?
+  content       String
+  status        ReviewStatus @default(PENDING)
+  source        String       @default("manual")
+  createdAt     DateTime     @default(now())
+  moderatedAt   DateTime?
+  moderatedBy   String?
+
+  @@index([productHandle, locale, status])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  actor     String
+  details   Json
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+}
+
+model OrderWebhookEvent {
+  id             String        @id @default(uuid())
+  idempotencyKey String        @unique
+  topic          String
+  shop           String
+  orderId        String?
+  payload        Json
+  status         WebhookStatus @default(PROCESSED)
+  errorMessage   String?
+  createdAt      DateTime      @default(now())
+  processedAt    DateTime?
+  replayedAt     DateTime?
+
+  @@index([createdAt])
+  @@index([topic])
+  @@index([status])
+}

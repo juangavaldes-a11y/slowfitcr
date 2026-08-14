@@ -6,6 +6,7 @@ export const defaultLocale: Locale = "es";
 export type Copy = {
   brandTagline: string;
   nav: {
+    shop: string;
     collections: string;
     whySlow: string;
     contact: string;
@@ -51,12 +52,63 @@ export type Copy = {
     description: string;
     imageAlt: string;
   };
+  contactForm: {
+    title: string;
+    subtitle: string;
+    nameLabel: string;
+    emailLabel: string;
+    messageLabel: string;
+    submitLabel: string;
+    successMessage: string;
+    errorMessage: string;
+  };
+  shop: {
+    kicker: string;
+    title: string;
+    description: string;
+    featuredLabel: string;
+    ctaLabel: string;
+    helper: string;
+  };
+  trust: {
+    shippingTitle: string;
+    shippingCopy: string;
+    returnsTitle: string;
+    returnsCopy: string;
+    supportTitle: string;
+    supportCopy: string;
+    secureTitle: string;
+    secureCopy: string;
+  };
+  policies: {
+    privacy: {
+      title: string;
+      intro: string;
+      items: string[];
+    };
+    terms: {
+      title: string;
+      intro: string;
+      items: string[];
+    };
+    shipping: {
+      title: string;
+      intro: string;
+      items: string[];
+    };
+    returns: {
+      title: string;
+      intro: string;
+      items: string[];
+    };
+  };
 };
 
 const copyByLocale: Record<Locale, Copy> = {
   es: {
     brandTagline: "Train with Purpose.",
     nav: {
+      shop: "Tienda",
       collections: "Colecciones",
       whySlow: "¿Por qué SLOW?",
       contact: "Contacto",
@@ -133,10 +185,78 @@ const copyByLocale: Record<Locale, Copy> = {
         "Somos una marca para quienes entienden que el progreso se construye con paciencia, disciplina y voluntad.",
       imageAlt: "Editorial Slow Fit",
     },
+    contactForm: {
+      title: "Hablemos de tu compra",
+      subtitle: "Cuéntanos qué colección te interesa y te ayudamos con talla, disponibilidad y entrega.",
+      nameLabel: "Nombre",
+      emailLabel: "Correo",
+      messageLabel: "Mensaje",
+      submitLabel: "Enviar consulta",
+      successMessage: "Recibimos tu mensaje. Te responderemos pronto.",
+      errorMessage: "No fue posible enviar el mensaje. Intenta de nuevo.",
+    },
+    shop: {
+      kicker: "Tienda Slow",
+      title: "Compra por colección con una experiencia guiada y clara.",
+      description:
+        "Mientras integramos el catálogo completo, esta tienda te dirige a las líneas clave con contexto, prioridades y confianza de compra.",
+      featuredLabel: "Colección destacada",
+      ctaLabel: "Explorar colección",
+      helper: "Muy pronto: productos, carrito y checkout completo dentro de Slow Fit.",
+    },
+    trust: {
+      shippingTitle: "Envíos claros",
+      shippingCopy: "Mostraremos tiempos estimados y cobertura desde el primer paso de compra.",
+      returnsTitle: "Cambios y devoluciones",
+      returnsCopy: "Definiremos una política simple y visible antes del checkout.",
+      supportTitle: "Soporte directo",
+      supportCopy: "WhatsApp y formulario de contacto para resolver dudas de talla, stock o entrega.",
+      secureTitle: "Pago seguro",
+      secureCopy: "La siguiente fase conectará checkout seguro con Shopify y seguimiento de pedidos.",
+    },
+    policies: {
+      privacy: {
+        title: "Política de privacidad",
+        intro: "Explica cómo Slow Fit recopila, usa y protege la información de clientes y visitantes.",
+        items: [
+          "Recolectamos únicamente los datos necesarios para responder consultas, procesar pedidos y mejorar la experiencia del sitio.",
+          "No compartimos información personal con terceros fuera de proveedores operativos necesarios como pagos, logística o mensajería.",
+          "Las solicitudes de acceso, corrección o eliminación de datos podrán gestionarse por los canales oficiales de contacto.",
+        ],
+      },
+      terms: {
+        title: "Términos y condiciones",
+        intro: "Define las condiciones de uso del sitio, disponibilidad de productos y reglas generales de compra.",
+        items: [
+          "Los precios, disponibilidad y promociones pueden cambiar sin previo aviso.",
+          "Las compras estarán sujetas a validación de inventario, pago y datos de entrega.",
+          "El uso del sitio implica aceptación de estas condiciones y de las políticas asociadas.",
+        ],
+      },
+      shipping: {
+        title: "Política de envíos",
+        intro: "Aclara plazos estimados, cobertura y comunicación de pedidos durante la entrega.",
+        items: [
+          "El tiempo de preparación y despacho se comunicará en cada colección o producto.",
+          "Las entregas pueden variar según ubicación, temporadas altas y disponibilidad logística.",
+          "Toda actualización importante del pedido se notificará por los canales de contacto disponibles.",
+        ],
+      },
+      returns: {
+        title: "Política de cambios y devoluciones",
+        intro: "Resume el proceso para solicitar cambios por talla o devoluciones autorizadas.",
+        items: [
+          "Las solicitudes deberán realizarse dentro del plazo informado al momento de la compra.",
+          "Las prendas deberán conservar su estado original, etiquetas y comprobante de compra.",
+          "Cada caso será evaluado conforme a condiciones de higiene, uso y disponibilidad de reemplazo.",
+        ],
+      },
+    },
   },
   en: {
     brandTagline: "Train with Purpose.",
     nav: {
+      shop: "Shop",
       collections: "Collections",
       whySlow: "Why SLOW?",
       contact: "Contact",
@@ -212,6 +332,73 @@ const copyByLocale: Record<Locale, Copy> = {
       description:
         "We are a brand for people who understand that progress is built with patience, discipline, and will.",
       imageAlt: "Slow Fit editorial",
+    },
+    contactForm: {
+      title: "Let us support your purchase",
+      subtitle: "Tell us which collection you want and we will help with sizing, availability, and delivery.",
+      nameLabel: "Name",
+      emailLabel: "Email",
+      messageLabel: "Message",
+      submitLabel: "Send inquiry",
+      successMessage: "We received your message and will reply soon.",
+      errorMessage: "We could not send your message. Please try again.",
+    },
+    shop: {
+      kicker: "Slow Shop",
+      title: "Shop by collection with a clearer, guided storefront experience.",
+      description:
+        "While the full catalog is being integrated, this shop page directs customers into the main lines with context, priorities, and purchase confidence.",
+      featuredLabel: "Featured collection",
+      ctaLabel: "Explore collection",
+      helper: "Coming next: products, cart, and full checkout directly inside Slow Fit.",
+    },
+    trust: {
+      shippingTitle: "Clear shipping",
+      shippingCopy: "Estimated delivery windows and service coverage will be visible from the first buying step.",
+      returnsTitle: "Returns and exchanges",
+      returnsCopy: "A simple, visible policy will be presented before checkout.",
+      supportTitle: "Direct support",
+      supportCopy: "WhatsApp and a contact form will help with sizing, stock, or delivery questions.",
+      secureTitle: "Secure payments",
+      secureCopy: "The next phase connects Shopify-powered secure checkout and order tracking.",
+    },
+    policies: {
+      privacy: {
+        title: "Privacy policy",
+        intro: "Explains how Slow Fit collects, uses, and protects customer and visitor information.",
+        items: [
+          "We collect only the data required to answer inquiries, process orders, and improve the shopping experience.",
+          "We do not share personal information with third parties beyond essential providers such as payments, logistics, or messaging tools.",
+          "Requests to access, correct, or delete personal data can be handled through official support channels.",
+        ],
+      },
+      terms: {
+        title: "Terms and conditions",
+        intro: "Defines site usage terms, product availability expectations, and general purchasing rules.",
+        items: [
+          "Prices, availability, and promotions may change without prior notice.",
+          "Orders remain subject to inventory, payment confirmation, and delivery data validation.",
+          "Using the site implies acceptance of these terms and the related store policies.",
+        ],
+      },
+      shipping: {
+        title: "Shipping policy",
+        intro: "Clarifies estimated timelines, delivery coverage, and communication during fulfillment.",
+        items: [
+          "Preparation and dispatch timelines will be communicated on each collection or product.",
+          "Delivery timing can vary by destination, peak seasons, and logistics availability.",
+          "Important order updates will be shared through the available customer contact channels.",
+        ],
+      },
+      returns: {
+        title: "Returns and exchanges policy",
+        intro: "Summarizes the process for size exchanges and approved returns.",
+        items: [
+          "Requests must be made within the window communicated at the time of purchase.",
+          "Garments must remain in original condition with tags and proof of purchase.",
+          "Each request is reviewed based on hygiene, product use, and replacement availability.",
+        ],
+      },
     },
   },
 };

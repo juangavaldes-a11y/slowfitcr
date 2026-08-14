@@ -29,6 +29,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-body), Arial, sans-serif;
+  overflow-x: hidden;
 }
 
 a {
@@ -41,7 +42,7 @@ a {
 }
 
 .slowfit-shell {
-  width: min(1260px, calc(100% - 40px));
+  width: min(1260px, calc(100% - clamp(24px, 4vw, 40px)));
   margin: 0 auto;
 }
 
@@ -125,6 +126,7 @@ a {
 }
 
 .slowfit-nav-button.ant-btn {
+  min-height: 44px;
   padding-inline: 6px;
   color: var(--ink-soft);
   font-size: 0.76rem;
@@ -132,6 +134,7 @@ a {
 
 .slowfit-primary-cta.ant-btn,
 .slowfit-secondary-cta.ant-btn {
+  min-height: 44px;
   height: 46px;
   padding-inline: 22px;
   border-radius: 999px;
@@ -155,7 +158,7 @@ a {
 .slowfit-hero-media {
   position: relative;
   overflow: hidden;
-  min-height: 92vh;
+  min-height: 80vh;
 }
 
 .slowfit-cover {
@@ -164,31 +167,32 @@ a {
 
 .slowfit-hero-overlay {
   position: absolute;
-  top: 11%;
+  top: 6%;
   left: clamp(24px, 7.6vw, 128px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   max-width: 660px;
+  z-index: 2;
 }
 
 .slowfit-hero-mark {
-  width: clamp(280px, 34vw, 460px);
+  width: clamp(220px, 28vw, 360px);
   height: auto;
-  margin-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .slowfit-hero-line.ant-typography {
-  margin-bottom: 0;
-  max-width: 23ch;
+  margin-bottom: 4px !important;
+  max-width: 34ch;
   color: #6f6d6d;
-  font-size: clamp(1.05rem, 2vw, 1.95rem);
+  font-size: clamp(0.88rem, 1.45vw, 1.36rem);
   font-weight: 400;
-  line-height: 1.34;
+  line-height: 1.28;
 }
 
 .slowfit-hero-line.ant-typography:first-of-type {
-  font-size: clamp(1.15rem, 2.25vw, 2rem);
+  font-size: clamp(0.98rem, 1.6vw, 1.52rem);
 }
 
 .slowfit-manifesto {
@@ -276,6 +280,7 @@ a {
 
 .slowfit-block-cta.ant-btn {
   min-width: 214px;
+  min-height: 44px;
   height: 54px;
   margin-top: 24px;
   border: none;
@@ -390,6 +395,19 @@ a {
   margin-bottom: 46px;
 }
 
+.slowfit-policy-links {
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.slowfit-policy-links a {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.88rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .slowfit-footer-mark img {
   width: clamp(320px, 36vw, 560px);
   height: auto;
@@ -438,6 +456,320 @@ a {
   font-size: 1.1rem;
 }
 
+.slowfit-shop-page,
+.slowfit-policy-page {
+  min-height: 100vh;
+  background: #f7f3ee;
+}
+
+.slowfit-shop-hero,
+.slowfit-policy-hero {
+  padding: 72px 0 32px;
+}
+
+.slowfit-shop-lead.ant-typography,
+.slowfit-policy-lead.ant-typography {
+  max-width: 60ch;
+  margin-bottom: 0 !important;
+  color: var(--ink-soft);
+  font-size: clamp(1rem, 1.8vw, 1.2rem);
+  line-height: 1.6;
+}
+
+.slowfit-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  padding-bottom: 48px;
+}
+
+.slowfit-shop-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  border: 1px solid rgba(47, 42, 40, 0.08);
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.slowfit-shop-card-media {
+  position: relative;
+  min-height: 360px;
+}
+
+.slowfit-shop-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 22px 24px;
+}
+
+.slowfit-shop-card-label {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.slowfit-shop-card-title.ant-typography {
+  margin-bottom: 0 !important;
+  color: var(--foreground);
+  font-size: clamp(1.8rem, 2.8vw, 2.4rem);
+  line-height: 0.95;
+}
+
+.slowfit-shop-card-copy.ant-typography {
+  margin-bottom: 0 !important;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+.slowfit-shop-card .slowfit-block-cta.ant-btn {
+  margin-top: auto;
+}
+
+.slowfit-shop-card .slowfit-block-cta.ant-btn,
+.slowfit-product-card .slowfit-block-cta.ant-btn {
+  width: 100%;
+  min-width: 0;
+}
+
+.slowfit-trust-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  padding-bottom: 84px;
+}
+
+.slowfit-trust-card {
+  padding: 22px;
+  border: 1px solid rgba(47, 42, 40, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.slowfit-trust-card .ant-typography {
+  margin-bottom: 8px !important;
+}
+
+.slowfit-trust-card p.ant-typography {
+  margin-bottom: 0 !important;
+  color: var(--ink-soft);
+}
+
+.slowfit-shop-helper.ant-typography {
+  margin-bottom: 56px !important;
+  color: var(--muted);
+}
+
+.slowfit-policy-section {
+  padding: 0 0 72px;
+}
+
+.slowfit-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.slowfit-policy-card {
+  padding: 24px;
+  border: 1px solid rgba(47, 42, 40, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.slowfit-policy-card ul {
+  margin: 14px 0 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.slowfit-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.slowfit-product-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(47, 42, 40, 0.08);
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.slowfit-product-card-media {
+  position: relative;
+  min-height: 320px;
+}
+
+.slowfit-product-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+}
+
+.slowfit-product-price {
+  color: #6b635c;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.slowfit-product-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 30px;
+  padding: 72px 0;
+}
+
+.slowfit-product-detail-media {
+  position: relative;
+  min-height: 72vh;
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.slowfit-product-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.slowfit-product-detail-title.ant-typography {
+  font-size: clamp(2.2rem, 4vw, 3.4rem);
+  line-height: 0.95;
+}
+
+.slowfit-product-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.slowfit-product-compare-price {
+  color: var(--muted);
+}
+
+.slowfit-product-purchase {
+  width: min(100%, 420px);
+  margin-top: 8px;
+}
+
+.slowfit-review-panel {
+  margin-top: 24px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(47, 42, 40, 0.08);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.slowfit-review-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.slowfit-review-quote.ant-typography {
+  margin-bottom: 8px !important;
+  color: var(--ink-soft);
+}
+
+.slowfit-review-form .ant-form-item {
+  margin-bottom: 10px;
+}
+
+.slowfit-contact-form-wrap {
+  margin-top: 28px;
+  padding: 18px;
+  border: 1px solid rgba(47, 42, 40, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.slowfit-contact-title.ant-typography {
+  margin-bottom: 6px !important;
+  font-size: clamp(1.5rem, 2.4vw, 2rem);
+}
+
+.slowfit-contact-subtitle.ant-typography {
+  margin-bottom: 12px !important;
+  color: var(--ink-soft);
+}
+
+.slowfit-contact-form .ant-form-item {
+  margin-bottom: 10px;
+}
+
+.slowfit-cart-fab.ant-btn {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 55;
+  height: 48px;
+  padding-inline: 16px;
+  border-radius: 999px;
+}
+
+.slowfit-cart-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(47, 42, 40, 0.12);
+}
+
+.slowfit-cart-price.ant-typography {
+  margin-bottom: 0 !important;
+  color: var(--ink-soft);
+}
+
+.slowfit-cart-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 14px 0;
+}
+
+.slowfit-admin-toolbar {
+  width: 100%;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.slowfit-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.slowfit-admin-card-meta {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.slowfit-admin-table {
+  margin-bottom: 28px;
+}
+
+.slowfit-admin-json {
+  margin: 0;
+  max-width: 460px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
 @media (max-width: 991px) {
   .slowfit-nav {
     flex-direction: column;
@@ -455,9 +787,9 @@ a {
   }
 
   .slowfit-hero-overlay {
-    top: 10%;
+    top: 7%;
     left: 20px;
-    max-width: 540px;
+    max-width: 500px;
   }
 
   .slowfit-collection-block,
@@ -476,6 +808,29 @@ a {
   .slowfit-story-quote.ant-typography {
     font-size: clamp(1.05rem, 3.2vw, 1.5rem);
   }
+
+  .slowfit-shop-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .slowfit-trust-grid,
+  .slowfit-policy-grid,
+  .slowfit-product-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .slowfit-admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .slowfit-product-detail {
+    grid-template-columns: 1fr;
+    padding-top: 56px;
+  }
+
+  .slowfit-product-detail-media {
+    min-height: 58vh;
+  }
 }
 
 @media (max-width: 767px) {
@@ -483,8 +838,50 @@ a {
     width: min(100% - 24px, 1260px);
   }
 
+  .slowfit-nav {
+    gap: 12px;
+  }
+
   .slowfit-nav-actions {
-    align-items: flex-start;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .slowfit-nav-actions .ant-space {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px !important;
+  }
+
+  .slowfit-nav-actions .ant-space-item {
+    margin-inline-end: 0 !important;
+  }
+
+  .slowfit-nav-actions .ant-space-item:last-child {
+    grid-column: span 2;
+  }
+
+  .slowfit-nav-actions .ant-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .slowfit-locale-switcher {
+    width: 100%;
+    justify-content: space-between;
+    padding-right: 6px;
+  }
+
+  .slowfit-locale-switcher .ant-segmented {
+    flex: 1;
+  }
+
+  .slowfit-locale-switcher .ant-segmented-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .slowfit-manifesto,
@@ -498,20 +895,23 @@ a {
   }
 
   .slowfit-hero-overlay {
-    top: 8%;
+    top: 6%;
     right: 14px;
     left: 14px;
     max-width: none;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(247, 243, 238, 0.92) 0%, rgba(247, 243, 238, 0.32) 100%);
   }
 
   .slowfit-hero-line.ant-typography {
-    font-size: clamp(0.9rem, 4.4vw, 1.22rem);
-    line-height: 1.3;
+    font-size: clamp(0.84rem, 3.8vw, 1.06rem);
+    line-height: 1.26;
   }
 
   .slowfit-hero-mark {
-    width: clamp(170px, 52vw, 240px);
-    margin-bottom: 8px;
+    width: clamp(155px, 47vw, 215px);
+    margin-bottom: 4px;
   }
 
   .slowfit-collection-block {
@@ -557,6 +957,56 @@ a {
     margin-bottom: 32px;
   }
 
+  .slowfit-policy-links {
+    gap: 12px !important;
+  }
+
+  .slowfit-policy-links a {
+    font-size: 0.74rem;
+  }
+
+  .slowfit-shop-hero,
+  .slowfit-policy-hero {
+    padding-top: 52px;
+  }
+
+  .slowfit-shop-grid,
+  .slowfit-trust-grid,
+  .slowfit-policy-grid,
+  .slowfit-product-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .slowfit-shop-card-media {
+    min-height: 300px;
+  }
+
+  .slowfit-trust-grid {
+    padding-bottom: 64px;
+  }
+
+  .slowfit-policy-card {
+    padding: 20px;
+  }
+
+  .slowfit-product-card-media {
+    min-height: 300px;
+  }
+
+  .slowfit-product-detail {
+    gap: 20px;
+    padding-top: 44px;
+  }
+
+  .slowfit-product-detail-media {
+    min-height: 50vh;
+  }
+
+  .slowfit-cart-fab.ant-btn {
+    right: 12px;
+    bottom: 12px;
+  }
+
   .slowfit-footer-links {
     gap: 20px !important;
   }
@@ -564,12 +1014,32 @@ a {
   .slowfit-footer-link {
     width: 100%;
     justify-content: center;
-    font-size: 1.45rem;
+    font-size: clamp(1.05rem, 4.8vw, 1.28rem);
   }
 
   .slowfit-footer-link .anticon {
-    width: 56px;
-    height: 56px;
-    font-size: 1.7rem;
+    width: 50px;
+    height: 50px;
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 575px) {
+  .slowfit-manifesto-title.ant-typography {
+    font-size: clamp(2.3rem, 14vw, 3.1rem);
+    line-height: 0.92;
+  }
+
+  .slowfit-manifesto-copy.ant-typography {
+    font-size: 1.06rem;
+    line-height: 1.36;
+  }
+
+  .slowfit-collection-content {
+    padding: 28px 20px 34px;
+  }
+
+  .slowfit-value-media {
+    min-height: 320px;
   }
 }

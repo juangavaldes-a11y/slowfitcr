@@ -4,6 +4,7 @@ import { Cormorant_Garamond, Questrial } from "next/font/google";
 import { headers } from "next/headers";
 import "antd/dist/reset.css";
 import "./globals.css";
+import Analytics from "./analytics";
 import { getPreferredLocale } from "./i18n";
 import Providers from "./providers";
 
@@ -20,6 +21,7 @@ const bodyFont = Questrial({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://slowfitcr.com"),
   title: "Slow Fit CR",
   description: "Responsive Ant Design rebuild of the Slow Fit Costa Rica landing page.",
 };
@@ -35,6 +37,7 @@ export default async function RootLayout({
     <html lang={locale} className={`${displayFont.variable} ${bodyFont.variable}`}>
       <body>
         <AntdRegistry>
+          <Analytics />
           <Providers>{children}</Providers>
         </AntdRegistry>
       </body>

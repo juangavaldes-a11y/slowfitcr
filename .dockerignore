@@ -1,0 +1,9 @@
+node_modules
+.next
+.open-next
+.git
+.gitignore
+reference
+.vscode
+backend/node_modules
+backend/.data

@@ -8,7 +8,9 @@ import {
 } from "@ant-design/icons";
 import { Button, Col, Row, Space, Typography } from "antd";
 import Image from "next/image";
+import ContactForm from "./contact-form";
 import LocaleSwitcher from "./locale-switcher";
+import { trackEvent } from "./lib/analytics";
 import type { Copy, Locale } from "./i18n";
 
 type HomePageProps = {
@@ -17,7 +19,8 @@ type HomePageProps = {
 };
 
 export default function HomePage({ copy, locale }: HomePageProps) {
-  const collectionsHref = `/${locale}#collections`;
+  const shopHref = `/${locale}/shop`;
+  const collectionsHref = `${shopHref}#collections`;
   const whySlowHref = `/${locale}#why-slow`;
   const contactHref = `/${locale}#contacto`;
 
@@ -30,6 +33,9 @@ export default function HomePage({ copy, locale }: HomePageProps) {
         </div>
         <div className="slowfit-nav-actions">
           <Space size={12} wrap>
+            <Button type="text" href={shopHref} className="slowfit-nav-button">
+              {copy.nav.shop}
+            </Button>
             <Button type="text" href={collectionsHref} className="slowfit-nav-button">
               {copy.nav.collections}
             </Button>
@@ -115,7 +121,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
               <Typography.Paragraph className="slowfit-collection-copy">
                 {collection.description}
               </Typography.Paragraph>
-              <Button type="primary" href="https://slowfitcr.com/" target="_blank" className="slowfit-block-cta">
+              <Button type="primary" href={shopHref} className="slowfit-block-cta">
                 {collection.ctaLabel}
               </Button>
             </div>
@@ -169,6 +175,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
             <Typography.Paragraph className="slowfit-story-quote">{copy.story.title}</Typography.Paragraph>
             <Typography.Paragraph className="slowfit-story-quote">{copy.story.description}</Typography.Paragraph>
             <Typography.Paragraph className="slowfit-story-sign">SLOW.</Typography.Paragraph>
+            <ContactForm copy={copy.contactForm} locale={locale} />
           </Col>
         </Row>
       </section>
@@ -178,6 +185,12 @@ export default function HomePage({ copy, locale }: HomePageProps) {
           <div className="slowfit-footer-mark">
             <Image src="/slowfit/hero-mark.png" alt={copy.hero.markAlt} width={420} height={146} />
           </div>
+          <Space size={18} className="slowfit-policy-links" wrap>
+            <a href={`/${locale}/shipping`}>{copy.policies.shipping.title}</a>
+            <a href={`/${locale}/returns`}>{copy.policies.returns.title}</a>
+            <a href={`/${locale}/privacy`}>{copy.policies.privacy.title}</a>
+            <a href={`/${locale}/terms`}>{copy.policies.terms.title}</a>
+          </Space>
           <Space size={42} className="slowfit-footer-links" wrap>
             <a
               className="slowfit-footer-link"
@@ -185,6 +198,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="WhatsApp"
+              onClick={() => trackEvent("contact_whatsapp_click", { locale })}
             >
               <WhatsAppOutlined />
               <span>8643-7162</span>
@@ -195,6 +209,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Instagram"
+              onClick={() => trackEvent("social_click", { locale, network: "instagram" })}
             >
               <InstagramOutlined />
               <span>slowfitcr</span>
@@ -205,6 +220,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label="TikTok"
+              onClick={() => trackEvent("social_click", { locale, network: "tiktok" })}
             >
               <GlobalOutlined />
               <span>slowfitcr</span>
