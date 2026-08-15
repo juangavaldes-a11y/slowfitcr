@@ -46,6 +46,8 @@ before(async () => {
 
 beforeEach(async () => {
   await prisma.orderWebhookEvent.deleteMany();
+  await prisma.order.deleteMany();
+  await prisma.customer.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.review.deleteMany();
 });
@@ -73,6 +75,54 @@ test("admin login creates a reusable session and logout clears it", async () => 
   const logout = await route(request("/api/admin/logout", { method: "POST", headers: { Cookie: cookie } }));
   assert.equal(logout.status, 200);
   assert.match(logout.headers.get("set-cookie"), /Max-Age=0/);
+});
+
+test("customers can register, sign in, and access only authenticated account data", async () => {
+  const registration = await route(request("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: "customer@example.com",
+      password: "secure-pass-123",
+      firstName: "Taylor",
+      lastName: "Stone",
+      locale: "en",
+    }),
+  }));
+  assert.equal(registration.status, 201);
+  const registrationPayload = await json(registration);
+  assert.equal(registrationPayload.customer.email, "customer@example.com");
+  assert.equal(registrationPayload.customer.passwordHash, undefined);
+  const cookie = registration.headers.get("set-cookie").split(";")[0];
+
+  const duplicate = await route(request("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "customer@example.com", password: "secure-pass-123", firstName: "Taylor" }),
+  }));
+  assert.equal(duplicate.status, 409);
+
+  const session = await route(request("/api/auth/session", { headers: { Cookie: cookie } }));
+  assert.equal(session.status, 200);
+  assert.equal((await json(session)).authenticated, true);
+  assert.equal((await route(request("/api/account/orders"))).status, 401);
+
+  const logout = await route(request("/api/auth/logout", { method: "POST", headers: { Cookie: cookie } }));
+  assert.match(logout.headers.get("set-cookie"), /Max-Age=0/);
+
+  const invalidLogin = await route(request("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "customer@example.com", password: "wrong-password" }),
+  }));
+  assert.equal(invalidLogin.status, 401);
+
+  const login = await route(request("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "CUSTOMER@example.com", password: "secure-pass-123" }),
+  }));
+  assert.equal(login.status, 200);
 });
 
 test("review history supports status filters, search, and pagination", async () => {
@@ -134,6 +184,47 @@ test("Shopify webhooks verify signatures and ignore duplicate deliveries", async
   const duplicate = await route(request("/api/webhooks/shopify/orders", { method: "POST", headers, body }));
   assert.deepEqual(await json(duplicate), { ok: true, duplicate: true });
   assert.equal(await prisma.orderWebhookEvent.count(), 1);
+});
+
+test("Shopify webhooks expose order status to the matching customer", async () => {
+  const registration = await route(request("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "order@example.com", password: "secure-pass-123", firstName: "Order", locale: "en" }),
+  }));
+  const cookie = registration.headers.get("set-cookie").split(";")[0];
+  const body = JSON.stringify({
+    id: 1199,
+    order_number: 88,
+    name: "#1088",
+    email: "ORDER@example.com",
+    financial_status: "paid",
+    fulfillment_status: "unfulfilled",
+    current_total_price: "79.00",
+    currency: "USD",
+    created_at: "2026-08-15T00:00:00Z",
+    updated_at: "2026-08-15T00:01:00Z",
+    line_items: [{ title: "Performance Top", quantity: 1 }],
+  });
+  const signature = createHmac("sha256", process.env.SHOPIFY_WEBHOOK_SECRET).update(body, "utf8").digest("base64");
+  const webhook = await route(request("/api/webhooks/shopify/orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-shopify-hmac-sha256": signature,
+      "x-shopify-topic": "orders/paid",
+      "x-shopify-shop-domain": "slowfit-test.myshopify.com",
+    },
+    body,
+  }));
+  assert.equal(webhook.status, 200);
+
+  const ordersResponse = await route(request("/api/account/orders", { headers: { Cookie: cookie } }));
+  const ordersPayload = await json(ordersResponse);
+  assert.equal(ordersResponse.status, 200);
+  assert.equal(ordersPayload.orders.length, 1);
+  assert.equal(ordersPayload.orders[0].financialStatus, "paid");
+  assert.equal(ordersPayload.orders[0].fulfillmentStatus, "unfulfilled");
 });
 
 test("authenticated moderators can replay a stored webhook event", async () => {

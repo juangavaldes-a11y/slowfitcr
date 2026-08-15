@@ -10,6 +10,7 @@ export type Copy = {
     collections: string;
     whySlow: string;
     contact: string;
+    account: string;
   };
   hero: {
     eyebrow: string;
@@ -112,6 +113,7 @@ const copyByLocale: Record<Locale, Copy> = {
       collections: "Colecciones",
       whySlow: "¿Por qué SLOW?",
       contact: "Contacto",
+      account: "Cuenta",
     },
     hero: {
       eyebrow: "No creemos en los resultados rápidos",
@@ -260,6 +262,7 @@ const copyByLocale: Record<Locale, Copy> = {
       collections: "Collections",
       whySlow: "Why SLOW?",
       contact: "Contact",
+      account: "Account",
     },
     hero: {
       eyebrow: "We do not believe in quick results",

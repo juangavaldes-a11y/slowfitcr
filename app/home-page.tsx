@@ -4,6 +4,7 @@ import {
   CheckCircleFilled,
   GlobalOutlined,
   InstagramOutlined,
+  UserOutlined,
   WhatsAppOutlined,
 } from "@ant-design/icons";
 import { Button, Col, Row, Space, Typography } from "antd";
@@ -44,6 +45,9 @@ export default function HomePage({ copy, locale }: HomePageProps) {
             </Button>
             <Button type="primary" href={contactHref} className="slowfit-secondary-cta">
               {copy.nav.contact}
+            </Button>
+            <Button type="text" icon={<UserOutlined />} href={`/${locale}/account`} className="slowfit-nav-button">
+              {copy.nav.account}
             </Button>
           </Space>
           <LocaleSwitcher locale={locale} />

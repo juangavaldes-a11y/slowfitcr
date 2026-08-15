@@ -18,6 +18,38 @@ enum WebhookStatus {
   FAILED
 }
 
+model Customer {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String?
+  locale       String   @default("es")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+}
+
+model Order {
+  id             String    @id @default(uuid())
+  shopifyOrderId String    @unique
+  orderNumber    String?
+  name           String?
+  email          String
+  financialStatus String?
+  fulfillmentStatus String?
+  total          String?
+  currency       String?
+  items          Json
+  shopifyCreatedAt DateTime?
+  updatedAt      DateTime   @updatedAt
+  customerId     String?
+  customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([customerId, updatedAt])
+}
+
 model Review {
   id            String       @id @default(uuid())
   productHandle String

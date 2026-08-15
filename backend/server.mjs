@@ -1,7 +1,8 @@
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -12,6 +13,9 @@ const DEFAULT_LOCALE = "es";
 
 const SESSION_COOKIE_NAME = "slowfit_admin_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
+const CUSTOMER_SESSION_COOKIE_NAME = "slowfit_customer_session";
+const CUSTOMER_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+const scryptAsync = promisify(scrypt);
 
 const RATE_LIMIT_WINDOW_MS = Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000", 10);
 const RATE_LIMIT_MAX = Number.parseInt(process.env.RATE_LIMIT_MAX || "120", 10);
@@ -100,6 +104,10 @@ function normalizeLocale(localeRaw) {
 
 function getSessionSecret() {
   return process.env.REVIEW_MODERATION_SESSION_SECRET || process.env.REVIEW_MODERATION_TOKEN || "";
+}
+
+function getCustomerSessionSecret() {
+  return process.env.CUSTOMER_SESSION_SECRET || getSessionSecret();
 }
 
 function toBase64Url(value) {
@@ -195,6 +203,70 @@ function clearSessionCookie() {
   return `${SESSION_COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secure}`;
 }
 
+async function hashPassword(password) {
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = await scryptAsync(password, salt, 64);
+  return `${salt}.${Buffer.from(derivedKey).toString("hex")}`;
+}
+
+async function verifyPassword(password, storedHash) {
+  const [salt, keyHex] = String(storedHash || "").split(".");
+  if (!salt || !keyHex) {
+    return false;
+  }
+
+  const expected = Buffer.from(keyHex, "hex");
+  const actual = Buffer.from(await scryptAsync(password, salt, expected.length));
+  return expected.length === actual.length && timingSafeEqual(expected, actual);
+}
+
+function createCustomerSessionToken(customer) {
+  const secret = getCustomerSessionSecret();
+  if (!secret) {
+    throw new Error("Missing customer session secret");
+  }
+
+  const payload = JSON.stringify({
+    iat: Date.now(),
+    exp: Date.now() + CUSTOMER_SESSION_MAX_AGE_SECONDS * 1000,
+    role: "customer",
+    customerId: customer.id,
+    email: customer.email,
+  });
+  const encoded = toBase64Url(payload);
+  return `${encoded}.${signPayload(encoded, secret)}`;
+}
+
+function getCustomerSessionFromRequest(request) {
+  const token = parseCookie(request.headers.get("cookie") || "")[CUSTOMER_SESSION_COOKIE_NAME];
+  const secret = getCustomerSessionSecret();
+  if (!secret || !token || !token.includes(".")) {
+    return null;
+  }
+
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature || !safeCompare(signPayload(payload, secret), signature)) {
+    return null;
+  }
+
+  try {
+    const decoded = JSON.parse(fromBase64Url(payload));
+    return decoded.exp > Date.now() && decoded.role === "customer" && decoded.customerId ? decoded : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildCustomerSessionCookie(token) {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${CUSTOMER_SESSION_COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${CUSTOMER_SESSION_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
+}
+
+function clearCustomerSessionCookie() {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${CUSTOMER_SESSION_COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+}
+
 function getClientIp(request) {
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
@@ -217,7 +289,9 @@ function applyRateLimit(request) {
   }
 
   const ip = getClientIp(request);
-  const isAuthPath = url.pathname.includes("/admin/login") || url.pathname.includes("/reviews/moderate");
+  const isAuthPath = url.pathname.startsWith("/api/auth/")
+    || url.pathname.includes("/admin/login")
+    || url.pathname.includes("/reviews/moderate");
   const max = isAuthPath ? RATE_LIMIT_AUTH_MAX : RATE_LIMIT_MAX;
   const key = `${ip}:${url.pathname}`;
   const now = Date.now();
@@ -516,6 +590,7 @@ function getTrimmedParam(url, key) {
 }
 
 async function processOrderEvent({ topic, shop, payload }, options = { replay: false }) {
+  const email = String(payload.email || payload.customer?.email || "").trim().toLowerCase();
   const event = {
     topic,
     shop,
@@ -528,6 +603,37 @@ async function processOrderEvent({ topic, shop, payload }, options = { replay: f
     items: payload.line_items || [],
     createdAt: new Date().toISOString(),
   };
+
+  if (payload.id && email) {
+    const customer = await prisma.customer.findUnique({ where: { email }, select: { id: true } });
+    await prisma.order.upsert({
+      where: { shopifyOrderId: String(payload.id) },
+      create: {
+        shopifyOrderId: String(payload.id),
+        orderNumber: payload.order_number ? String(payload.order_number) : null,
+        name: payload.name ? String(payload.name) : null,
+        email,
+        financialStatus: payload.financial_status ? String(payload.financial_status) : null,
+        fulfillmentStatus: payload.fulfillment_status ? String(payload.fulfillment_status) : null,
+        total: payload.current_total_price ? String(payload.current_total_price) : null,
+        currency: payload.currency ? String(payload.currency) : null,
+        items: payload.line_items || [],
+        shopifyCreatedAt: payload.created_at ? new Date(payload.created_at) : null,
+        customerId: customer?.id,
+      },
+      update: {
+        orderNumber: payload.order_number ? String(payload.order_number) : null,
+        name: payload.name ? String(payload.name) : null,
+        email,
+        financialStatus: payload.financial_status ? String(payload.financial_status) : null,
+        fulfillmentStatus: payload.fulfillment_status ? String(payload.fulfillment_status) : null,
+        total: payload.current_total_price ? String(payload.current_total_price) : null,
+        currency: payload.currency ? String(payload.currency) : null,
+        items: payload.line_items || [],
+        customerId: customer?.id,
+      },
+    });
+  }
 
   await forwardJsonWebhook(process.env.ORDER_EVENTS_WEBHOOK_URL, event);
   await forwardJsonWebhook(process.env.CRM_ORDER_WEBHOOK_URL, {
@@ -826,6 +932,107 @@ async function handleAdminLogout() {
   });
 }
 
+function customerResponse(customer) {
+  return {
+    id: customer.id,
+    email: customer.email,
+    firstName: customer.firstName,
+    lastName: customer.lastName,
+    locale: customer.locale,
+  };
+}
+
+async function handleCustomerRegister(request) {
+  const payload = await readJson(request);
+  const email = String(payload.email || "").trim().toLowerCase();
+  const password = String(payload.password || "");
+  const firstName = String(payload.firstName || "").trim();
+  const lastName = String(payload.lastName || "").trim() || null;
+  const locale = normalizeLocale(payload.locale);
+
+  if (!isValidEmail(email) || password.length < 8 || password.length > 128 || !firstName) {
+    return jsonResponse({ error: "Invalid account details" }, 400);
+  }
+
+  try {
+    const customer = await prisma.customer.create({
+      data: { email, passwordHash: await hashPassword(password), firstName, lastName, locale },
+    });
+    await prisma.order.updateMany({ where: { email, customerId: null }, data: { customerId: customer.id } });
+    await appendAudit("customer.registered", { customerId: customer.id }, email);
+    return jsonResponse({ ok: true, customer: customerResponse(customer) }, 201, {
+      "Set-Cookie": buildCustomerSessionCookie(createCustomerSessionToken(customer)),
+    });
+  } catch (error) {
+    if (error?.code === "P2002") {
+      return jsonResponse({ error: "An account already exists for this email" }, 409);
+    }
+    throw error;
+  }
+}
+
+async function handleCustomerLogin(request) {
+  const payload = await readJson(request);
+  const email = String(payload.email || "").trim().toLowerCase();
+  const password = String(payload.password || "");
+  const customer = isValidEmail(email) ? await prisma.customer.findUnique({ where: { email } }) : null;
+
+  if (!customer || !(await verifyPassword(password, customer.passwordHash))) {
+    await appendAudit("customer.login.failed", { email }, "unknown");
+    return jsonResponse({ error: "Invalid email or password" }, 401);
+  }
+
+  await appendAudit("customer.login", { customerId: customer.id }, email);
+  return jsonResponse({ ok: true, customer: customerResponse(customer) }, 200, {
+    "Set-Cookie": buildCustomerSessionCookie(createCustomerSessionToken(customer)),
+  });
+}
+
+async function handleCustomerSession(request) {
+  const session = getCustomerSessionFromRequest(request);
+  if (!session) {
+    return jsonResponse({ authenticated: false }, 401);
+  }
+
+  const customer = await prisma.customer.findUnique({ where: { id: session.customerId } });
+  if (!customer) {
+    return jsonResponse({ authenticated: false }, 401);
+  }
+
+  return jsonResponse({ authenticated: true, customer: customerResponse(customer) });
+}
+
+async function handleCustomerLogout() {
+  return jsonResponse({ ok: true }, 200, {
+    "Set-Cookie": clearCustomerSessionCookie(),
+  });
+}
+
+async function handleCustomerOrders(request) {
+  const session = getCustomerSessionFromRequest(request);
+  if (!session) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  const orders = await prisma.order.findMany({
+    where: { customerId: session.customerId },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      orderNumber: true,
+      name: true,
+      financialStatus: true,
+      fulfillmentStatus: true,
+      total: true,
+      currency: true,
+      items: true,
+      shopifyCreatedAt: true,
+      updatedAt: true,
+    },
+  });
+  return jsonResponse({ orders });
+}
+
 async function handleAdminAuditLogs(request) {
   if (!(await isModeratorAuthorized(request))) {
     return jsonResponse({ error: "Unauthorized" }, 401);
@@ -1050,6 +1257,26 @@ export async function route(request) {
 
   if (pathname === "/api/admin/login" && method === "POST") {
     return handleAdminLogin(request);
+  }
+
+  if (pathname === "/api/auth/register" && method === "POST") {
+    return handleCustomerRegister(request);
+  }
+
+  if (pathname === "/api/auth/login" && method === "POST") {
+    return handleCustomerLogin(request);
+  }
+
+  if (pathname === "/api/auth/session" && method === "GET") {
+    return handleCustomerSession(request);
+  }
+
+  if (pathname === "/api/auth/logout" && method === "POST") {
+    return handleCustomerLogout();
+  }
+
+  if (pathname === "/api/account/orders" && method === "GET") {
+    return handleCustomerOrders(request);
   }
 
   if (pathname === "/api/admin/logout" && method === "POST") {

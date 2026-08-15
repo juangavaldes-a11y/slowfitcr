@@ -588,6 +588,101 @@ a {
   line-height: 1.65;
 }
 
+.slowfit-account-page {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(420px, 1.08fr);
+  min-height: 100vh;
+  background: #f7f3ee;
+}
+
+.slowfit-account-media {
+  position: relative;
+  min-height: 100vh;
+}
+
+.slowfit-account-access {
+  display: flex;
+  align-items: center;
+  padding: clamp(36px, 7vw, 96px);
+}
+
+.slowfit-account-access-inner {
+  width: min(100%, 560px);
+}
+
+.slowfit-account-title.ant-typography {
+  margin: 18px 0 16px !important;
+  font-size: clamp(2.5rem, 5vw, 4.8rem);
+  line-height: 0.95;
+}
+
+.slowfit-account-access .ant-alert {
+  margin: 22px 0 4px;
+}
+
+.slowfit-account-access .ant-tabs {
+  margin-top: 24px;
+}
+
+.slowfit-account-name-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.slowfit-account-loading {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: #f7f3ee;
+}
+
+.slowfit-account-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 64px 0 34px;
+  border-bottom: 1px solid rgba(47, 42, 40, 0.14);
+}
+
+.slowfit-account-dashboard {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: clamp(32px, 6vw, 84px);
+  padding: 48px 0 84px;
+}
+
+.slowfit-account-profile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.slowfit-account-profile > .anticon {
+  font-size: 2rem;
+}
+
+.slowfit-order-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(230px, 1.2fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  padding: 22px 0;
+  border-bottom: 1px solid rgba(47, 42, 40, 0.14);
+}
+
+.slowfit-order-row .ant-typography {
+  margin-bottom: 2px !important;
+}
+
+.slowfit-order-status {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .slowfit-product-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -817,6 +912,22 @@ a {
   .slowfit-nav-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .slowfit-account-page {
+    grid-template-columns: 1fr;
+  }
+
+  .slowfit-account-media {
+    min-height: 34vh;
+  }
+
+  .slowfit-account-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .slowfit-order-row {
+    grid-template-columns: 1fr 1fr;
   }
 
   .slowfit-hero-media,
