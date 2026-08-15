@@ -59,6 +59,7 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
     selectPage: "Seleccionar pagina", selected: "seleccionadas", bulkApprove: "Aprobar seleccionadas",
     bulkReject: "Rechazar seleccionadas", confirmBulk: "Confirma la moderacion de las resenas seleccionadas.",
     details: "Detalles", reset: "Limpiar filtros", bulkSuccess: "Resenas actualizadas",
+    sessionExpired: "La sesion expiro. Inicia sesion de nuevo.",
   } : {
     title: "Review moderation",
     subtitle: "Search reviews, inspect moderation history, and manage pending submissions.",
@@ -71,6 +72,7 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
     selectPage: "Select page", selected: "selected", bulkApprove: "Approve selected",
     bulkReject: "Reject selected", confirmBulk: "Confirm moderation of the selected reviews.",
     details: "Details", reset: "Reset filters", bulkSuccess: "Reviews updated",
+    sessionExpired: "Your session expired. Sign in again.",
   }, [locale]);
 
   const loadReviews = async (nextQuery: ReviewQuery) => {
@@ -153,6 +155,11 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reviewId, action, moderator: "slowfit-admin" }),
     });
+    if (response.status === 401) {
+      setAuthorized(false);
+      api.warning(labels.sessionExpired);
+      return;
+    }
     if (!response.ok) { api.error(labels.actionError); return; }
     await loadReviews(query);
   };
@@ -170,6 +177,11 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reviewIds: selectedIds, action, moderator: "slowfit-admin" }),
           });
+          if (response.status === 401) {
+            setAuthorized(false);
+            api.warning(labels.sessionExpired);
+            return;
+          }
           if (!response.ok) throw new Error("bulk_failed");
           api.success(labels.bulkSuccess);
           await loadReviews(query);

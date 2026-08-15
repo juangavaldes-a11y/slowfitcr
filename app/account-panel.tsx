@@ -43,14 +43,23 @@ type AccountPanelProps = {
   locale: Locale;
 };
 
+class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function apiRequest(path: string, init?: RequestInit) {
   const response = await fetch(path, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
-  const payload = await response.json();
+  const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(payload.error || "Request failed");
+    throw new ApiError(payload.error || "Request failed", response.status);
   }
   return payload;
 }
@@ -64,6 +73,9 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const accountLoadError = locale === "es"
+    ? "No pudimos cargar tu cuenta. Intenta de nuevo."
+    : "We could not load your account. Try again.";
 
   const labels = locale === "es"
     ? {
@@ -101,6 +113,8 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
         shop: "Seguir comprando",
         required: "Este campo es obligatorio.",
         invalidEmail: "Ingresa un correo válido.",
+        sessionExpired: "Tu sesión expiró. Inicia sesión de nuevo.",
+        requestFailed: "No pudimos cargar tu cuenta. Intenta de nuevo.",
       }
     : {
         kicker: "Slow Fit account",
@@ -137,7 +151,22 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
         shop: "Continue shopping",
         required: "This field is required.",
         invalidEmail: "Enter a valid email.",
+        sessionExpired: "Your session expired. Sign in again.",
+        requestFailed: "We could not load your account. Try again.",
       };
+
+  function handleAccountError(requestError: unknown) {
+    if (requestError instanceof ApiError && requestError.status === 401) {
+      setCustomer(null);
+      setOrders([]);
+      setReviews([]);
+      setReviewTotal(0);
+      setError(labels.sessionExpired);
+      return;
+    }
+
+    setError(labels.requestFailed);
+  }
 
   async function loadOrders() {
     const payload = await apiRequest("/api/account/orders");
@@ -171,14 +200,18 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
           setReviewTotal(reviewPayload.total || 0);
         }
       })
-      .catch(() => undefined)
+      .catch((requestError) => {
+        if (!(requestError instanceof ApiError && requestError.status === 401) && active) {
+          setError(accountLoadError);
+        }
+      })
       .finally(() => {
         if (active) setChecking(false);
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [accountLoadError]);
 
   async function submitCustomer(path: string, values: Record<string, string>) {
     setLoading(true);
@@ -191,7 +224,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
       setCustomer(payload.customer);
       await loadAccountData();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Request failed");
+      setError(requestError instanceof ApiError && requestError.status < 500 ? requestError.message : labels.requestFailed);
     } finally {
       setLoading(false);
     }
@@ -204,16 +237,21 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
       await apiRequest("/api/admin/login", { method: "POST", body: JSON.stringify(values) });
       window.location.assign(`/${locale}/admin/reviews`);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Request failed");
+      setError(requestError instanceof ApiError && requestError.status < 500 ? requestError.message : labels.requestFailed);
       setLoading(false);
     }
   }
 
   async function signOut() {
-    await apiRequest("/api/auth/logout", { method: "POST" });
-    setCustomer(null);
-    setOrders([]);
-    setReviews([]);
+    setError("");
+    try {
+      await apiRequest("/api/auth/logout", { method: "POST" });
+      setCustomer(null);
+      setOrders([]);
+      setReviews([]);
+    } catch (requestError) {
+      handleAccountError(requestError);
+    }
   }
 
   if (checking) {
@@ -238,6 +276,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
         </section>
 
         <section className="slowfit-shell slowfit-account-dashboard">
+          {error ? <Alert type="error" showIcon title={error} closable onClose={() => setError("")} /> : null}
           <aside className="slowfit-account-profile">
             <UserOutlined />
             <Typography.Title level={3}>{labels.profile}</Typography.Title>
@@ -278,7 +317,13 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
                     <Tag color={review.status === "APPROVED" ? "success" : review.status === "REJECTED" ? "error" : "warning"}>{review.status === "APPROVED" ? labels.approved : review.status === "REJECTED" ? labels.rejected : labels.pending}</Tag>
                   </article>
                 ))}
-                <Pagination current={reviewPage} pageSize={6} total={reviewTotal} hideOnSinglePage onChange={(page) => void loadReviews(page)} />
+                <Pagination
+                  current={reviewPage}
+                  pageSize={6}
+                  total={reviewTotal}
+                  hideOnSinglePage
+                  onChange={(page) => void loadReviews(page).catch(handleAccountError)}
+                />
               </div>,
             },
           ]} />
@@ -306,7 +351,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
           <Link href={`/${locale}`} className="slowfit-kicker">Slow Fit CR</Link>
           <Typography.Title className="slowfit-display slowfit-account-title">{labels.title}</Typography.Title>
           <Typography.Paragraph className="slowfit-policy-lead">{labels.intro}</Typography.Paragraph>
-          {error ? <Alert type="error" showIcon message={error} closable onClose={() => setError("")} /> : null}
+          {error ? <Alert type="error" showIcon title={error} closable onClose={() => setError("")} /> : null}
           <Tabs
             items={[
               {

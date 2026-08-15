@@ -128,6 +128,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             cancel: "Cancelar",
             replayOk: "Webhook reenviado",
             replayFail: "No se pudo reenviar",
+            sessionExpired: "La sesion expiro. Inicia sesion de nuevo.",
             loadFail: "No se pudo cargar la informacion",
             loginFail: "Credenciales invalidas",
             unauthorized: "Debes autenticarte para continuar.",
@@ -166,6 +167,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             cancel: "Cancel",
             replayOk: "Webhook replayed",
             replayFail: "Could not replay webhook",
+            sessionExpired: "Your session expired. Sign in again.",
             loadFail: "Could not load data",
             loginFail: "Invalid credentials",
             unauthorized: "Authentication is required.",
@@ -343,6 +345,11 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          setAuthorized(false);
+          api.warning(labels.sessionExpired);
+          return;
+        }
         api.error(labels.replayFail);
         return;
       }
