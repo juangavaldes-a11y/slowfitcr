@@ -2,6 +2,26 @@ import type { ApprovedReview } from "../lib/reviews";
 
 export const fallbackApprovedReviews: ApprovedReview[] = [
   {
+    id: "seed-core-tee-1",
+    productHandle: "slow-core-training-tee",
+    locale: "all",
+    rating: 5,
+    author: "Sofia",
+    content: "Ligera, suave y con suficiente espacio para entrenar sin restricciones.",
+    createdAt: "2026-07-15T10:00:00.000Z",
+    source: "manual",
+  },
+  {
+    id: "seed-core-tee-2",
+    productHandle: "slow-core-training-tee",
+    locale: "all",
+    rating: 4,
+    author: "Marco",
+    content: "The relaxed fit works well for training and still looks clean outside the gym.",
+    createdAt: "2026-07-19T10:00:00.000Z",
+    source: "manual",
+  },
+  {
     id: "seed-1",
     productHandle: "performance-collection-1",
     locale: "all",

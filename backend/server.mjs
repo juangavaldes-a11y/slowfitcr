@@ -25,6 +25,28 @@ const rateLimitStore = new Map();
 
 const FALLBACK_APPROVED_REVIEWS = [
   {
+    id: "seed-core-tee-1",
+    productHandle: "slow-core-training-tee",
+    locale: "all",
+    rating: 5,
+    author: "Sofia",
+    email: "",
+    content: "Ligera, suave y con suficiente espacio para entrenar sin restricciones.",
+    source: "manual",
+    createdAt: "2026-07-15T10:00:00.000Z",
+  },
+  {
+    id: "seed-core-tee-2",
+    productHandle: "slow-core-training-tee",
+    locale: "all",
+    rating: 4,
+    author: "Marco",
+    email: "",
+    content: "The relaxed fit works well for training and still looks clean outside the gym.",
+    source: "manual",
+    createdAt: "2026-07-19T10:00:00.000Z",
+  },
+  {
     id: "seed-1",
     productHandle: "performance-collection-1",
     locale: "all",

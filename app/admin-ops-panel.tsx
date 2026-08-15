@@ -22,6 +22,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
+import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
 
 type AuditRow = {
   id: string;
@@ -82,6 +83,9 @@ const AUDIT_ACTION_OPTIONS = [
   "admin.logout",
   "checkout.created",
   "contact.received",
+  "customer.login",
+  "customer.login.failed",
+  "customer.registered",
   "event.ingested",
   "order.webhook.failed",
   "order.webhook.processed",
@@ -107,6 +111,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const [logs, setLogs] = useState<AuditRow[]>([]);
   const [auditTotal, setAuditTotal] = useState(0);
   const [auditQuery, setAuditQuery] = useState<AuditQuery>(DEFAULT_AUDIT_QUERY);
+  const [selectedAudit, setSelectedAudit] = useState<AuditRow | null>(null);
   const [events, setEvents] = useState<WebhookRow[]>([]);
   const [webhookTotal, setWebhookTotal] = useState(0);
   const [webhookQuery, setWebhookQuery] = useState<WebhookQuery>(DEFAULT_WEBHOOK_QUERY);
@@ -139,10 +144,15 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             webhookTitle: "Eventos de webhook",
             auditSearch: "Buscar accion o actor",
             auditAction: "Filtrar por accion",
+            auditDetails: "Detalle de auditoria",
             webhookSearch: "Buscar topic, tienda u orden",
             webhookStatus: "Filtrar por estado",
             webhookDetails: "Detalle del webhook",
             viewDetails: "Ver detalle",
+            action: "Accion",
+            actor: "Actor",
+            when: "Fecha",
+            details: "Detalles",
             topic: "Topic",
             shop: "Tienda",
             order: "Orden",
@@ -178,10 +188,15 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             webhookTitle: "Webhook events",
             auditSearch: "Search action or actor",
             auditAction: "Filter by action",
+            auditDetails: "Audit details",
             webhookSearch: "Search topic, shop, or order",
             webhookStatus: "Filter by status",
             webhookDetails: "Webhook details",
             viewDetails: "View details",
+            action: "Action",
+            actor: "Actor",
+            when: "When",
+            details: "Details",
             topic: "Topic",
             shop: "Shop",
             order: "Order",
@@ -213,7 +228,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const loadAuditLogs = async (query: AuditQuery) => {
     setAuditLoading(true);
     try {
-      const response = await fetch(
+      const payload = await apiRequest<{ logs: AuditRow[]; total: number }>(
         buildUrl("/api/admin/audit-logs", {
           page: query.page,
           pageSize: query.pageSize,
@@ -222,25 +237,18 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
         }),
         { cache: "no-store" },
       );
-
-      if (response.status === 401) {
+      setAuthorized(true);
+      setLogs(payload.logs);
+      setAuditTotal(payload.total);
+      return true;
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) {
         setAuthorized(false);
         setLogs([]);
         setAuditTotal(0);
         return false;
       }
-
-      if (!response.ok) {
-        throw new Error("load_failed");
-      }
-
-      const payload = (await response.json()) as { logs: AuditRow[]; total: number };
-      setAuthorized(true);
-      setLogs(payload.logs);
-      setAuditTotal(payload.total);
-      return true;
-    } catch {
-      api.error(labels.loadFail);
+      api.error(formatApiError(error, locale, { fallback: labels.loadFail }));
       return false;
     } finally {
       setAuditLoading(false);
@@ -251,7 +259,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const loadWebhookEvents = async (query: WebhookQuery) => {
     setWebhookLoading(true);
     try {
-      const response = await fetch(
+      const payload = await apiRequest<{ events: WebhookRow[]; total: number }>(
         buildUrl("/api/admin/webhooks/orders", {
           page: query.page,
           pageSize: query.pageSize,
@@ -261,24 +269,18 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
         { cache: "no-store" },
       );
 
-      if (response.status === 401) {
+      setAuthorized(true);
+      setEvents(payload.events);
+      setWebhookTotal(payload.total);
+      return true;
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) {
         setAuthorized(false);
         setEvents([]);
         setWebhookTotal(0);
         return false;
       }
-
-      if (!response.ok) {
-        throw new Error("load_failed");
-      }
-
-      const payload = (await response.json()) as { events: WebhookRow[]; total: number };
-      setAuthorized(true);
-      setEvents(payload.events);
-      setWebhookTotal(payload.total);
-      return true;
-    } catch {
-      api.error(labels.loadFail);
+      api.error(formatApiError(error, locale, { fallback: labels.loadFail }));
       return false;
     } finally {
       setWebhookLoading(false);
@@ -308,18 +310,15 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const onLogin = async ({ token }: { token: string }) => {
     setLoginLoading(true);
     try {
-      const response = await fetch("/api/admin/login", {
+      await apiRequest<{ ok: true }>("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
       });
 
-      if (!response.ok) {
-        api.error(labels.loginFail);
-        return;
-      }
-
       await refreshAll();
+    } catch (error) {
+      api.error(formatApiError(error, locale, { fallback: labels.loginFail, preserveClientMessage: false }));
     } finally {
       setLoginLoading(false);
       setSessionReady(true);
@@ -327,7 +326,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   };
 
   const onLogout = async () => {
-    await fetch("/api/admin/logout", { method: "POST" });
+    await apiRequest<{ ok: true }>("/api/admin/logout", { method: "POST" }).catch(() => undefined);
     setAuthorized(false);
     setLogs([]);
     setEvents([]);
@@ -338,27 +337,22 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const replayWebhook = async (eventId: string) => {
     setReplayingEventId(eventId);
     try {
-      const response = await fetch("/api/admin/webhooks/orders/replay", {
+      await apiRequest<{ ok: true }>("/api/admin/webhooks/orders/replay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventId, actor: "slowfit-admin" }),
       });
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          setAuthorized(false);
-          api.warning(labels.sessionExpired);
-          return;
-        }
-        api.error(labels.replayFail);
-        return;
-      }
-
       api.success(labels.replayOk);
       setSelectedEvent(null);
       await refreshAll();
-    } catch {
-      api.error(labels.replayFail);
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) {
+        setAuthorized(false);
+        api.warning(formatApiError(error, locale));
+        return;
+      }
+      api.error(formatApiError(error, locale, { fallback: labels.replayFail }));
     } finally {
       setReplayingEventId(null);
     }
@@ -389,30 +383,32 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
 
   const logColumns: ColumnsType<AuditRow> = [
     {
-      title: "Action",
+      title: labels.action,
       dataIndex: "action",
       key: "action",
       width: 260,
     },
     {
-      title: "Actor",
+      title: labels.actor,
       dataIndex: "actor",
       key: "actor",
       width: 160,
     },
     {
-      title: "When",
+      title: labels.when,
       dataIndex: "createdAt",
       key: "createdAt",
       width: 220,
       render: (value: string) => formatDate(value),
     },
     {
-      title: "Details",
-      dataIndex: "details",
+      title: "",
       key: "details",
-      render: (value: Record<string, unknown>) => (
-        <pre className="slowfit-admin-json">{JSON.stringify(value, null, 2)}</pre>
+      width: 150,
+      render: (_value, record) => (
+        <Button icon={<EyeOutlined />} size="small" onClick={() => setSelectedAudit(record)}>
+          {labels.viewDetails}
+        </Button>
       ),
     },
   ];
@@ -600,26 +596,58 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
                 />
               </Space>
               <Typography.Title level={4}>{labels.auditTitle}</Typography.Title>
-              <Table
-                rowKey="id"
-                columns={logColumns}
-                dataSource={logs}
-                loading={auditLoading}
-                locale={{ emptyText: labels.tableEmpty }}
-                pagination={{
-                  current: auditQuery.page,
-                  pageSize: auditQuery.pageSize,
-                  total: auditTotal,
-                  showSizeChanger: true,
-                  onChange: (page, pageSize) => {
-                    const next = { ...auditQuery, page, pageSize: pageSize || auditQuery.pageSize };
-                    setAuditQuery(next);
-                    void loadAuditLogs(next);
-                  },
-                }}
-                scroll={{ x: 1100 }}
-                className="slowfit-admin-table"
-              />
+              {screens.md ? (
+                <Table
+                  rowKey="id"
+                  columns={logColumns}
+                  dataSource={logs}
+                  loading={auditLoading}
+                  locale={{ emptyText: labels.tableEmpty }}
+                  pagination={{
+                    current: auditQuery.page,
+                    pageSize: auditQuery.pageSize,
+                    total: auditTotal,
+                    showSizeChanger: true,
+                    onChange: (page, pageSize) => {
+                      const next = { ...auditQuery, page, pageSize: pageSize || auditQuery.pageSize };
+                      setAuditQuery(next);
+                      void loadAuditLogs(next);
+                    },
+                  }}
+                  className="slowfit-admin-table"
+                />
+              ) : (
+                <Spin spinning={auditLoading}>
+                  <div className="slowfit-webhook-list">
+                    {logs.length === 0 ? <Empty description={labels.tableEmpty} /> : null}
+                    {logs.map((log) => (
+                      <article className="slowfit-webhook-item" key={log.id}>
+                        <Typography.Text strong>{log.action}</Typography.Text>
+                        <Typography.Text type="secondary">{log.actor}</Typography.Text>
+                        <Typography.Text type="secondary">{formatDate(log.createdAt)}</Typography.Text>
+                        <Button icon={<EyeOutlined />} block onClick={() => setSelectedAudit(log)}>
+                          {labels.viewDetails}
+                        </Button>
+                      </article>
+                    ))}
+                  </div>
+                  {auditTotal > auditQuery.pageSize ? (
+                    <Pagination
+                      className="slowfit-admin-pagination"
+                      align="center"
+                      current={auditQuery.page}
+                      pageSize={auditQuery.pageSize}
+                      total={auditTotal}
+                      size="small"
+                      onChange={(page) => {
+                        const next = { ...auditQuery, page };
+                        setAuditQuery(next);
+                        void loadAuditLogs(next);
+                      }}
+                    />
+                  ) : null}
+                </Spin>
+              )}
             </section>
       </AdminShell>
       <Drawer
@@ -655,6 +683,28 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
               <Typography.Title level={5}>{labels.payload}</Typography.Title>
               <pre className="slowfit-admin-json slowfit-webhook-payload">
                 {JSON.stringify(selectedEvent.payload, null, 2)}
+              </pre>
+            </div>
+          </Space>
+        ) : null}
+      </Drawer>
+      <Drawer
+        title={labels.auditDetails}
+        open={selectedAudit !== null}
+        onClose={() => setSelectedAudit(null)}
+        size={screens.md ? 560 : "100%"}
+      >
+        {selectedAudit ? (
+          <Space orientation="vertical" size="large" className="slowfit-webhook-detail">
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label={labels.action}>{selectedAudit.action}</Descriptions.Item>
+              <Descriptions.Item label={labels.actor}>{selectedAudit.actor}</Descriptions.Item>
+              <Descriptions.Item label={labels.when}>{formatDate(selectedAudit.createdAt)}</Descriptions.Item>
+            </Descriptions>
+            <div>
+              <Typography.Title level={5}>{labels.details}</Typography.Title>
+              <pre className="slowfit-admin-json slowfit-webhook-payload">
+                {JSON.stringify(selectedAudit.details, null, 2)}
               </pre>
             </div>
           </Space>

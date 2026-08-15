@@ -5,6 +5,7 @@ import { Button, Drawer, Space, Typography, message } from "antd";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { trackEvent } from "../lib/analytics";
+import { apiRequest, formatApiError } from "../lib/api-client";
 
 export type CartLine = {
   productId: string;
@@ -172,9 +173,8 @@ export function CartDock() {
 
     try {
       setSubmitting(true);
-      const response = await fetch("/api/cart/checkout", {
+      const payload = await apiRequest<{ checkout?: { checkoutUrl: string; cartId: string } }>("/api/cart/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           locale,
           cartId,
@@ -182,11 +182,6 @@ export function CartDock() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("checkout_error");
-      }
-
-      const payload = (await response.json()) as { checkout?: { checkoutUrl: string; cartId: string } };
       const checkoutUrl = payload.checkout?.checkoutUrl;
       const nextCartId = payload.checkout?.cartId;
       if (!checkoutUrl) {
@@ -199,8 +194,10 @@ export function CartDock() {
 
       trackEvent("begin_checkout", { totalItems, subtotal, currency });
       window.location.assign(checkoutUrl);
-    } catch {
-      api.error(locale === "es" ? "No fue posible iniciar checkout" : "Could not start checkout");
+    } catch (error) {
+      api.error(formatApiError(error, locale, {
+        fallback: locale === "es" ? "No fue posible iniciar checkout" : "Could not start checkout",
+      }));
     } finally {
       setSubmitting(false);
     }

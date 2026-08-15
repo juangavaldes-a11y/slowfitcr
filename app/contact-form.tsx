@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Form, Input, Typography, message } from "antd";
+import { apiRequest, formatApiError } from "./lib/api-client";
 import { trackEvent } from "./lib/analytics";
 
 type ContactFormCopy = {
@@ -30,23 +31,18 @@ export default function ContactForm({ copy, locale }: ContactFormProps) {
   const [api, contextHolder] = message.useMessage();
 
   const onSubmit = async (values: ContactFormValues) => {
-    const response = await fetch("/api/contact", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ ...values, locale }),
-    });
-
-    if (!response.ok) {
-      api.error(copy.errorMessage);
+    try {
+      await apiRequest<{ ok: true }>("/api/contact", {
+        method: "POST",
+        body: JSON.stringify({ ...values, locale }),
+      });
+      form.resetFields();
+      api.success(copy.successMessage);
+      trackEvent("contact_form_submit", { locale });
+    } catch (error) {
+      api.error(formatApiError(error, locale, { fallback: copy.errorMessage, preserveClientMessage: true }));
       trackEvent("contact_form_error", { locale });
-      return;
     }
-
-    form.resetFields();
-    api.success(copy.successMessage);
-    trackEvent("contact_form_submit", { locale });
   };
 
   return (

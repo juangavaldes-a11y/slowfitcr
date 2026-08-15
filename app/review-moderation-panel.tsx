@@ -3,6 +3,7 @@
 import { Button, Checkbox, Input, Modal, Pagination, Select, Space, Tag, Typography, message } from "antd";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
+import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
 
 type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -89,23 +90,23 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
       if (nextQuery.createdFrom) params.set("createdFrom", new Date(`${nextQuery.createdFrom}T00:00:00`).toISOString());
       if (nextQuery.createdTo) params.set("createdTo", new Date(`${nextQuery.createdTo}T23:59:59`).toISOString());
 
-      const response = await fetch(`/api/reviews/pending?${params}`, { cache: "no-store" });
-      if (response.status === 401) {
-        setAuthorized(false);
-        setReviews([]);
-        setTotal(0);
-        return false;
-      }
-      if (!response.ok) throw new Error("load_failed");
-
-      const payload = (await response.json()) as { reviews: Review[]; total: number };
+      const payload = await apiRequest<{ reviews: Review[]; total: number }>(
+        `/api/reviews/pending?${params}`,
+        { cache: "no-store" },
+      );
       setReviews(payload.reviews);
       setTotal(payload.total);
       setSelectedIds([]);
       setAuthorized(true);
       return true;
-    } catch {
-      api.error(labels.actionError);
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) {
+        setAuthorized(false);
+        setReviews([]);
+        setTotal(0);
+        return false;
+      }
+      api.error(formatApiError(error, locale, { fallback: labels.actionError }));
       return false;
     } finally {
       setLoading(false);
@@ -126,11 +127,12 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
   const onLogin = async ({ token }: { token: string }) => {
     setLoginLoading(true);
     try {
-      const response = await fetch("/api/admin/login", {
+      await apiRequest<{ ok: true }>("/api/admin/login", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
       });
-      if (!response.ok) { api.error(labels.loginError); return; }
       await loadReviews(query);
+    } catch (error) {
+      api.error(formatApiError(error, locale, { fallback: labels.loginError }));
     } finally {
       setLoginLoading(false);
       setSessionReady(true);
@@ -138,7 +140,7 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
   };
 
   const onLogout = async () => {
-    await fetch("/api/admin/logout", { method: "POST" });
+    await apiRequest<{ ok: true }>("/api/admin/logout", { method: "POST" }).catch(() => undefined);
     setAuthorized(false);
     setReviews([]);
     setTotal(0);
@@ -151,17 +153,20 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
   };
 
   const onModerate = async (reviewId: string, action: "approve" | "reject") => {
-    const response = await fetch("/api/reviews/moderate", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reviewId, action, moderator: "slowfit-admin" }),
-    });
-    if (response.status === 401) {
-      setAuthorized(false);
-      api.warning(labels.sessionExpired);
-      return;
+    try {
+      await apiRequest<{ ok: true }>("/api/reviews/moderate", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reviewId, action, moderator: "slowfit-admin" }),
+      });
+      await loadReviews(query);
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) {
+        setAuthorized(false);
+        api.warning(formatApiError(error, locale));
+        return;
+      }
+      api.error(formatApiError(error, locale, { fallback: labels.actionError }));
     }
-    if (!response.ok) { api.error(labels.actionError); return; }
-    await loadReviews(query);
   };
 
   const onBulkModerate = (action: "approve" | "reject") => {
@@ -172,21 +177,20 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
       onOk: async () => {
         setBulkLoading(true);
         try {
-          const response = await fetch("/api/reviews/moderate/bulk", {
+          await apiRequest<{ ok: true }>("/api/reviews/moderate/bulk", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reviewIds: selectedIds, action, moderator: "slowfit-admin" }),
           });
-          if (response.status === 401) {
-            setAuthorized(false);
-            api.warning(labels.sessionExpired);
-            return;
-          }
-          if (!response.ok) throw new Error("bulk_failed");
           api.success(labels.bulkSuccess);
           await loadReviews(query);
-        } catch {
-          api.error(labels.actionError);
+        } catch (error) {
+          if (isApiErrorStatus(error, 401)) {
+            setAuthorized(false);
+            api.warning(formatApiError(error, locale));
+            return;
+          }
+          api.error(formatApiError(error, locale, { fallback: labels.actionError }));
         } finally {
           setBulkLoading(false);
         }

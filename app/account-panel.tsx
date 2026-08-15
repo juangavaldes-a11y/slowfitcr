@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Locale } from "./i18n";
+import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
 
 type Customer = {
   id: string;
@@ -42,27 +43,6 @@ type CustomerReview = {
 type AccountPanelProps = {
   locale: Locale;
 };
-
-class ApiError extends Error {
-  status: number;
-
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
-
-async function apiRequest(path: string, init?: RequestInit) {
-  const response = await fetch(path, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new ApiError(payload.error || "Request failed", response.status);
-  }
-  return payload;
-}
 
 export default function AccountPanel({ locale }: AccountPanelProps) {
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -156,7 +136,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
       };
 
   function handleAccountError(requestError: unknown) {
-    if (requestError instanceof ApiError && requestError.status === 401) {
+    if (isApiErrorStatus(requestError, 401)) {
       setCustomer(null);
       setOrders([]);
       setReviews([]);
@@ -165,16 +145,16 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
       return;
     }
 
-    setError(labels.requestFailed);
+    setError(formatApiError(requestError, locale, { fallback: labels.requestFailed }));
   }
 
   async function loadOrders() {
-    const payload = await apiRequest("/api/account/orders");
+    const payload = await apiRequest<{ orders: Order[] }>("/api/account/orders");
     setOrders(payload.orders || []);
   }
 
   async function loadReviews(page = 1) {
-    const payload = await apiRequest(`/api/account/reviews?page=${page}&pageSize=6`);
+    const payload = await apiRequest<{ reviews: CustomerReview[]; total: number }>(`/api/account/reviews?page=${page}&pageSize=6`);
     setReviews(payload.reviews || []);
     setReviewTotal(payload.total || 0);
     setReviewPage(page);
@@ -186,13 +166,13 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
 
   useEffect(() => {
     let active = true;
-    apiRequest("/api/auth/session")
+    apiRequest<{ customer: Customer }>("/api/auth/session")
       .then(async (payload) => {
         if (!active) return;
         setCustomer(payload.customer);
         const [orderPayload, reviewPayload] = await Promise.all([
-          apiRequest("/api/account/orders"),
-          apiRequest("/api/account/reviews?page=1&pageSize=6"),
+          apiRequest<{ orders: Order[] }>("/api/account/orders"),
+          apiRequest<{ reviews: CustomerReview[]; total: number }>("/api/account/reviews?page=1&pageSize=6"),
         ]);
         if (active) {
           setOrders(orderPayload.orders || []);
@@ -201,8 +181,8 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
         }
       })
       .catch((requestError) => {
-        if (!(requestError instanceof ApiError && requestError.status === 401) && active) {
-          setError(accountLoadError);
+        if (!isApiErrorStatus(requestError, 401) && active) {
+          setError(formatApiError(requestError, locale, { fallback: accountLoadError }));
         }
       })
       .finally(() => {
@@ -211,20 +191,20 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
     return () => {
       active = false;
     };
-  }, [accountLoadError]);
+  }, [accountLoadError, locale]);
 
   async function submitCustomer(path: string, values: Record<string, string>) {
     setLoading(true);
     setError("");
     try {
-      const payload = await apiRequest(path, {
+      const payload = await apiRequest<{ customer: Customer }>(path, {
         method: "POST",
         body: JSON.stringify({ ...values, locale }),
       });
       setCustomer(payload.customer);
       await loadAccountData();
     } catch (requestError) {
-      setError(requestError instanceof ApiError && requestError.status < 500 ? requestError.message : labels.requestFailed);
+      setError(formatApiError(requestError, locale, { fallback: labels.requestFailed, preserveClientMessage: true }));
     } finally {
       setLoading(false);
     }
@@ -237,7 +217,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
       await apiRequest("/api/admin/login", { method: "POST", body: JSON.stringify(values) });
       window.location.assign(`/${locale}/admin/reviews`);
     } catch (requestError) {
-      setError(requestError instanceof ApiError && requestError.status < 500 ? requestError.message : labels.requestFailed);
+      setError(formatApiError(requestError, locale, { fallback: labels.requestFailed, preserveClientMessage: true }));
       setLoading(false);
     }
   }

@@ -524,6 +524,30 @@ function fallbackCatalog(locale: Locale): ShopCollection[] {
       };
     });
 
+    if (index === 0) {
+      products.unshift({
+        id: "mock-slow-core-training-tee",
+        handle: "slow-core-training-tee",
+        title: locale === "es" ? "Camiseta Slow Core Training" : "Slow Core Training Tee",
+        description: locale === "es"
+          ? "Camiseta ligera de entrenamiento con ajuste relajado, tela transpirable y acabado suave para uso diario."
+          : "A lightweight training tee with a relaxed fit, breathable fabric, and a soft finish for everyday wear.",
+        image: "/slowfit/performance-collection.jpg",
+        price: 48,
+        currencyCode: "USD",
+        compareAtPrice: 56,
+        collectionHandle,
+        collectionTitle: collection.title,
+        variants: ["S", "M", "L", "XL"].map((size) => ({
+          id: `slow-core-training-tee-${size.toLowerCase()}`,
+          title: size,
+          price: 48,
+          currencyCode: "USD",
+          availableForSale: true,
+        })),
+      });
+    }
+
     return {
       id: collectionHandle,
       handle: collectionHandle,

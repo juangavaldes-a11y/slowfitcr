@@ -2,6 +2,7 @@
 
 import { Alert, Button, Empty, Form, Input, Rate, Skeleton, Space, Typography, message } from "antd";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { apiRequest, formatApiError } from "./lib/api-client";
 import { trackEvent } from "./lib/analytics";
 
 type Review = {
@@ -76,9 +77,9 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
     setLoading(true);
     setLoadFailed(false);
     try {
-      const response = await fetch(`/api/reviews?productHandle=${encodeURIComponent(productHandle)}&locale=${locale}`);
-      if (!response.ok) throw new Error("load_failed");
-      const data = (await response.json()) as { reviews: Review[]; average: number; count: number };
+      const data = await apiRequest<{ reviews: Review[]; average: number; count: number }>(
+        `/api/reviews?productHandle=${encodeURIComponent(productHandle)}&locale=${locale}`,
+      );
       setReviews(data.reviews);
       setAverage(data.average);
       setCount(data.count);
@@ -91,8 +92,7 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
 
   const loadInitialData = useEffectEvent(() => {
     void loadReviews();
-    fetch("/api/auth/session")
-      .then((response) => response.ok ? response.json() : null)
+    apiRequest<{ customer?: { firstName: string; email: string } }>("/api/auth/session")
       .then((payload) => {
         if (payload?.customer) {
           form.setFieldsValue({ author: payload.customer.firstName, email: payload.customer.email });
@@ -110,19 +110,16 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
     setSubmitting(true);
     setSubmissionId("");
     try {
-      const response = await fetch("/api/reviews/submit", {
+      const payload = await apiRequest<{ reviewId: string }>("/api/reviews/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ productHandle, locale, ...values }),
       });
-      if (!response.ok) throw new Error("submit_failed");
-      const payload = (await response.json()) as { reviewId: string };
       setSubmissionId(payload.reviewId);
       trackEvent("review_submitted", { product_handle: productHandle, locale });
       form.resetFields(["rating", "content"]);
       api.success(labels.pending);
-    } catch {
-      api.error(labels.error);
+    } catch (error) {
+      api.error(formatApiError(error, locale, { fallback: labels.error, preserveClientMessage: true }));
     } finally {
       setSubmitting(false);
     }

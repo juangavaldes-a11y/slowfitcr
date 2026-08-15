@@ -40,6 +40,53 @@ test("account reports API failures without breaking its mobile layout", async ({
   await expectKeyboardFocus(page);
 });
 
+test("account formats rate-limit errors consistently", async ({ page }) => {
+  await page.route("**/api/auth/session", (route) =>
+    route.fulfill({ status: 401, json: { error: "Unauthorized" } }),
+  );
+  await page.route("**/api/auth/login", (route) =>
+    route.fulfill({ status: 429, json: { error: "Rate limit exceeded" } }),
+  );
+
+  await page.goto("/en/account");
+  await page.getByLabel("Email").fill("customer@example.com");
+  await page.getByLabel("Password").fill("password123");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+
+  await expect(page.getByRole("alert").filter({ hasText: "Too many attempts. Wait a moment and try again." })).toBeVisible();
+});
+
+test("operator filters and inspects audit details on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const audit = {
+    id: "audit-customer-registered",
+    action: "customer.registered",
+    actor: "customer@example.com",
+    details: { customerId: "customer-1042" },
+    createdAt: "2026-08-15T18:00:00.000Z",
+  };
+
+  await page.route("**/api/admin/audit-logs**", (route) =>
+    route.fulfill({ json: { logs: [audit], total: 1 } }),
+  );
+  await page.route("**/api/admin/webhooks/orders**", (route) =>
+    route.fulfill({ json: { events: [], total: 0 } }),
+  );
+
+  await page.goto("/en/admin/ops");
+  const auditRow = page.getByRole("article").filter({ hasText: "customer.registered" });
+  await expect(auditRow).toBeVisible();
+  await auditRow.getByRole("button", { name: "View details" }).click();
+
+  const drawer = page.getByRole("dialog", { name: "Audit details" });
+  await expect(drawer.getByText("customer@example.com")).toBeVisible();
+  await expect(drawer.getByText('"customerId": "customer-1042"')).toBeVisible();
+  await drawer.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("combobox").nth(1).click();
+  await expect(page.getByText("customer.registered", { exact: true }).last()).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 test("expired moderation session returns the operator to sign in", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const review = {
