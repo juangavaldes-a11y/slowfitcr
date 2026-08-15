@@ -70,6 +70,8 @@ Do not baseline a new empty database; `npm run db:migrate` will create its schem
 
 ## Tests
 
+The backend test command enforces a minimum of 80% line coverage with Node's native test runner. The current measured coverage is 82.56% lines and 88.24% functions across `backend/server.mjs`.
+
 Backend integration tests require PostgreSQL and a migrated test database:
 
 ```bash
@@ -86,6 +88,8 @@ TEST_DATABASE_URL=postgresql://slowfit:slowfit@localhost:5433/slowfit_migration_
 ```
 
 The GitHub Actions workflow runs migrations, lint, build, backend integration tests, and browser tests against PostgreSQL on every pull request and push to `master`.
+
+See [CURRENT_TO_PROD.md](CURRENT_TO_PROD.md) for the remaining staging and production rollout work.
 
 ## Environment variables
 

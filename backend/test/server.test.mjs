@@ -8,13 +8,22 @@ process.env.REVIEW_MODERATION_SESSION_SECRET = "integration-session-secret";
 process.env.SHOPIFY_WEBHOOK_SECRET = "integration-webhook-secret";
 process.env.RATE_LIMIT_MAX = "2";
 process.env.RATE_LIMIT_AUTH_MAX = "20";
+process.env.HOST = "127.0.0.1";
+process.env.PORT = "0";
 
 const prisma = new PrismaClient();
 let route;
 let disconnectDatabase;
+let startServer;
+let requestSequence = 1;
 
 function request(path, init = {}) {
-  return new Request(`http://integration.test${path}`, init);
+  const headers = new Headers(init.headers);
+  if (!headers.has("x-forwarded-for")) {
+    headers.set("x-forwarded-for", `198.51.100.${requestSequence}`);
+    requestSequence += 1;
+  }
+  return new Request(`http://integration.test${path}`, { ...init, headers });
 }
 
 async function json(response) {
@@ -32,7 +41,7 @@ async function loginCookie() {
 }
 
 before(async () => {
-  ({ route, disconnectDatabase } = await import("../server.mjs"));
+  ({ route, disconnectDatabase, startServer } = await import("../server.mjs"));
 });
 
 beforeEach(async () => {
@@ -148,4 +157,192 @@ test("authenticated moderators can replay a stored webhook event", async () => {
   assert.equal(response.status, 200);
   const updated = await prisma.orderWebhookEvent.findUnique({ where: { id: event.id } });
   assert.ok(updated.replayedAt);
+});
+
+test("health and unknown routes return their documented responses", async () => {
+  const live = await route(request("/health/live"));
+  assert.deepEqual(await json(live), { ok: true, service: "slowfit-backend" });
+
+  const ready = await route(request("/health/ready"));
+  assert.equal(ready.status, 200);
+  assert.deepEqual(await json(ready), { ok: true, db: "ready" });
+
+  const missing = await route(request("/missing"));
+  assert.equal(missing.status, 404);
+  assert.deepEqual(await json(missing), { error: "Not found" });
+});
+
+test("contact and analytics endpoints validate and persist accepted payloads", async () => {
+  const invalidContact = await route(request("/api/contact", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "A", email: "invalid", message: "short" }),
+  }));
+  assert.equal(invalidContact.status, 400);
+
+  const contact = await route(request("/api/contact", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: "Customer", email: "customer@example.com", message: "Please help with sizing", locale: "en" }),
+  }));
+  assert.equal(contact.status, 200);
+
+  const invalidEvent = await route(request("/api/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  }));
+  assert.equal(invalidEvent.status, 400);
+
+  const event = await route(request("/api/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ eventName: "product_viewed", page: "/en/product/test", locale: "en" }),
+  }));
+  assert.equal(event.status, 200);
+  assert.equal(await prisma.auditLog.count(), 2);
+});
+
+test("checkout validates empty carts and returns fallback sessions without Shopify credentials", async () => {
+  const empty = await route(request("/api/cart/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ locale: "en", lines: [] }),
+  }));
+  assert.equal(empty.status, 400);
+
+  const checkout = await route(request("/api/cart/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ locale: "en", lines: [{ variantId: "performance-collection-1-s", quantity: 1 }] }),
+  }));
+  const payload = await json(checkout);
+  assert.equal(checkout.status, 200);
+  assert.equal(payload.checkout.cartId, "fallback");
+  assert.match(payload.checkout.checkoutUrl, /slowfitcr\.com\/en/);
+});
+
+test("reviews validate submissions and support the complete moderation lifecycle", async () => {
+  const invalidRead = await route(request("/api/reviews?locale=en"));
+  assert.equal(invalidRead.status, 400);
+
+  const invalidSubmission = await route(request("/api/reviews/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ productHandle: "top", locale: "en", rating: 6, author: "A", email: "bad", content: "short" }),
+  }));
+  assert.equal(invalidSubmission.status, 400);
+
+  const submission = await route(request("/api/reviews/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      productHandle: "performance-collection-1",
+      locale: "en",
+      rating: 4,
+      author: "Taylor",
+      email: "taylor@example.com",
+      content: "Comfortable material and reliable fit.",
+    }),
+  }));
+  const submitted = await json(submission);
+  assert.equal(submission.status, 200);
+
+  const unauthorized = await route(request("/api/reviews/pending"));
+  assert.equal(unauthorized.status, 401);
+
+  const invalidModeration = await route(request("/api/reviews/moderate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-moderation-token": "integration-token" },
+    body: JSON.stringify({ reviewId: submitted.reviewId, action: "invalid" }),
+  }));
+  assert.equal(invalidModeration.status, 400);
+
+  const moderation = await route(request("/api/reviews/moderate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-moderation-token": "integration-token" },
+    body: JSON.stringify({ reviewId: submitted.reviewId, action: "approve", moderator: "integration-admin" }),
+  }));
+  assert.equal(moderation.status, 200);
+
+  const duplicateModeration = await route(request("/api/reviews/moderate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-moderation-token": "integration-token" },
+    body: JSON.stringify({ reviewId: submitted.reviewId, action: "reject" }),
+  }));
+  assert.equal(duplicateModeration.status, 404);
+
+  const approved = await route(request("/api/reviews?productHandle=performance-collection-1&locale=en"));
+  const approvedPayload = await json(approved);
+  assert.equal(approved.status, 200);
+  assert.ok(approvedPayload.reviews.some((review) => review.author === "Taylor"));
+  assert.ok(approvedPayload.average > 0);
+});
+
+test("admin listings paginate and replay rejects missing identifiers", async () => {
+  await prisma.auditLog.createMany({
+    data: [
+      { action: "review.submitted", actor: "customer", details: { id: 1 } },
+      { action: "review.moderated", actor: "admin", details: { id: 2 } },
+    ],
+  });
+  await prisma.orderWebhookEvent.create({
+    data: {
+      idempotencyKey: "orders/create:list:1",
+      topic: "orders/create",
+      shop: "slowfit-test.myshopify.com",
+      orderId: "list-order",
+      payload: { id: "list-order" },
+      status: "FAILED",
+      errorMessage: "delivery failed",
+    },
+  });
+  const cookie = await loginCookie();
+
+  const logs = await route(request("/api/admin/audit-logs?page=1&pageSize=1&action=review.submitted&search=customer", { headers: { Cookie: cookie } }));
+  const logsPayload = await json(logs);
+  assert.equal(logsPayload.total, 1);
+  assert.equal(logsPayload.logs.length, 1);
+
+  const events = await route(request("/api/admin/webhooks/orders?page=1&pageSize=1&status=FAILED&search=list-order", { headers: { Cookie: cookie } }));
+  const eventsPayload = await json(events);
+  assert.equal(eventsPayload.total, 1);
+  assert.equal(eventsPayload.events[0].status, "FAILED");
+
+  const missingId = await route(request("/api/admin/webhooks/orders/replay", {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  }));
+  assert.equal(missingId.status, 400);
+
+  const missingEvent = await route(request("/api/admin/webhooks/orders/replay", {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ eventId: "missing" }),
+  }));
+  assert.equal(missingEvent.status, 404);
+});
+
+test("HTTP server adapter translates requests and contains route errors", async () => {
+  const server = startServer();
+  await new Promise((resolve) => server.once("listening", resolve));
+  const address = server.address();
+  const origin = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const live = await fetch(`${origin}/health/live`);
+    assert.equal(live.status, 200);
+    assert.deepEqual(await live.json(), { ok: true, service: "slowfit-backend" });
+
+    const malformed = await fetch(`${origin}/api/contact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{invalid-json",
+    });
+    assert.equal(malformed.status, 500);
+    assert.equal((await malformed.json()).error, "Internal server error");
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 });
