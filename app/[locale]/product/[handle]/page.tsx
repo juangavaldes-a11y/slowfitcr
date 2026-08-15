@@ -69,7 +69,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     <main className="slowfit-shop-page">
       <section className="slowfit-shell slowfit-product-detail">
         <div className="slowfit-product-detail-media">
-          <Image src={product.image} alt={product.title} fill sizes="(max-width: 991px) 100vw, 48vw" className="slowfit-cover" />
+          <Image src={product.image} alt={product.title} fill priority sizes="(max-width: 991px) 100vw, 48vw" className="slowfit-cover" />
         </div>
         <div className="slowfit-product-detail-content">
           <span className="slowfit-kicker">{product.collectionTitle}</span>

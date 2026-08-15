@@ -79,7 +79,7 @@ export default function ProductPurchase({ locale, product }: ProductPurchaseProp
   };
 
   return (
-    <Space direction="vertical" size={14} className="slowfit-product-purchase">
+    <Space orientation="vertical" size={14} className="slowfit-product-purchase">
       <Typography.Text>{labels.variants}</Typography.Text>
       <Select
         value={selected.id}

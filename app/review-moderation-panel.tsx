@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Input, Pagination, Select, Space, Tag, Typography, message } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
 
 type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -86,9 +86,11 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
     }
   };
 
+  const loadInitialReviews = useEffectEvent(() => loadReviews(DEFAULT_QUERY));
+
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      loadReviews(DEFAULT_QUERY).catch(() => undefined);
+      loadInitialReviews().catch(() => undefined);
     }, 0);
 
     return () => window.clearTimeout(timeout);

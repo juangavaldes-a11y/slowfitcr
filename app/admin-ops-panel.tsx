@@ -2,7 +2,7 @@
 
 import { Button, Input, Select, Space, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
 
 type AuditRow = {
@@ -243,9 +243,11 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
     await loadWebhookEvents(webhookQuery);
   };
 
+  const loadInitialData = useEffectEvent(() => refreshAll());
+
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      refreshAll().catch(() => undefined);
+      loadInitialData().catch(() => undefined);
     }, 0);
 
     return () => window.clearTimeout(timeout);

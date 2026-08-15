@@ -4,7 +4,9 @@
   "type": "module",
   "scripts": {
     "db:push": "prisma db push",
-    "start": "npm run db:push && node server.mjs"
+    "db:migrate": "prisma migrate deploy",
+    "test": "node --test test/*.test.mjs",
+    "start": "npm run db:migrate && node server.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0",

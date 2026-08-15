@@ -132,7 +132,7 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
       ) : reviews.length ? (
         reviews.slice(0, 4).map((review) => (
           <Typography.Paragraph key={review.id} className="slowfit-review-quote">
-            "{review.content}" - {review.author}
+            &ldquo;{review.content}&rdquo; - {review.author}
           </Typography.Paragraph>
         ))
       ) : (

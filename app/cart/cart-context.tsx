@@ -43,23 +43,27 @@ export function CartProvider({ children }: PropsWithChildren) {
   const [cartId, setCartId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (!raw) {
-        return;
-      }
-      const parsed = JSON.parse(raw) as CartLine[] | PersistedCart;
-      if (Array.isArray(parsed)) {
-        setLines(parsed);
-        return;
-      }
+    const timeout = window.setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          return;
+        }
+        const parsed = JSON.parse(raw) as CartLine[] | PersistedCart;
+        if (Array.isArray(parsed)) {
+          setLines(parsed);
+          return;
+        }
 
-      setLines(parsed.lines ?? []);
-      setCartId(parsed.cartId);
-    } catch {
-      setLines([]);
-      setCartId(undefined);
-    }
+        setLines(parsed.lines ?? []);
+        setCartId(parsed.cartId);
+      } catch {
+        setLines([]);
+        setCartId(undefined);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, []);
 
   useEffect(() => {

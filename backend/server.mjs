@@ -1,5 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -996,7 +998,7 @@ async function handleShopifyOrderWebhook(request) {
   }
 }
 
-async function route(request) {
+export async function route(request) {
   const url = parseUrl(request);
   const pathname = url.pathname;
   const method = request.method.toUpperCase();
@@ -1073,7 +1075,8 @@ async function route(request) {
   return jsonResponse({ error: "Not found" }, 404);
 }
 
-createServer(async (req, res) => {
+export function createRequestListener() {
+  return async (req, res) => {
   const requestId = randomUUID();
   const startedAt = Date.now();
   const chunks = [];
@@ -1113,6 +1116,20 @@ createServer(async (req, res) => {
       userAgent: req.headers["user-agent"] || "unknown",
     });
   });
-}).listen(PORT, HOST, () => {
-  log("info", "server.started", { host: HOST, port: PORT });
-});
+  };
+}
+
+export function startServer() {
+  return createServer(createRequestListener()).listen(PORT, HOST, () => {
+    log("info", "server.started", { host: HOST, port: PORT });
+  });
+}
+
+export async function disconnectDatabase() {
+  await prisma.$disconnect();
+}
+
+const isMainModule = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+if (isMainModule) {
+  startServer();
+}

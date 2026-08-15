@@ -59,6 +59,34 @@ npm install
 npx prisma generate
 ```
 
+Database changes are committed under `backend/prisma/migrations` and applied at backend startup with `prisma migrate deploy`. For a database that was previously created with `prisma db push`, baseline it once before the first migrated deployment:
+
+```bash
+cd backend
+npx prisma migrate resolve --applied 20260815004500_init
+```
+
+Do not baseline a new empty database; `npm run db:migrate` will create its schema from the migration history.
+
+## Tests
+
+Backend integration tests require PostgreSQL and a migrated test database:
+
+```bash
+cd backend
+DATABASE_URL=postgresql://slowfit:slowfit@localhost:5433/slowfit_migration_test?schema=public npm run db:migrate
+DATABASE_URL=postgresql://slowfit:slowfit@localhost:5433/slowfit_migration_test?schema=public npm test
+```
+
+Playwright starts isolated frontend and backend servers and uses `TEST_DATABASE_URL` when provided:
+
+```bash
+npx playwright install chromium
+TEST_DATABASE_URL=postgresql://slowfit:slowfit@localhost:5433/slowfit_migration_test?schema=public npm run test:e2e
+```
+
+The GitHub Actions workflow runs migrations, lint, build, backend integration tests, and browser tests against PostgreSQL on every pull request and push to `master`.
+
 ## Environment variables
 
 Create a `.env.local` file and configure:
