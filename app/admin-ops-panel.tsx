@@ -1,6 +1,24 @@
 "use client";
 
-import { Button, Input, Select, Space, Table, Tag, Typography, message } from "antd";
+import { EyeOutlined, RedoOutlined } from "@ant-design/icons";
+import {
+  Alert,
+  Button,
+  Descriptions,
+  Drawer,
+  Empty,
+  Grid,
+  Input,
+  Pagination,
+  Popconfirm,
+  Select,
+  Space,
+  Spin,
+  Table,
+  Tag,
+  Typography,
+  message,
+} from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
@@ -18,6 +36,7 @@ type WebhookRow = {
   topic: string;
   shop: string;
   orderId?: string | null;
+  payload: Record<string, unknown>;
   status: "PROCESSED" | "FAILED";
   errorMessage?: string | null;
   createdAt: string;
@@ -79,6 +98,7 @@ const WEBHOOK_STATUS_OPTIONS = [
 
 export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const [api, contextHolder] = message.useMessage();
+  const screens = Grid.useBreakpoint();
   const [sessionReady, setSessionReady] = useState(false);
   const [authorized, setAuthorized] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -90,6 +110,8 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const [events, setEvents] = useState<WebhookRow[]>([]);
   const [webhookTotal, setWebhookTotal] = useState(0);
   const [webhookQuery, setWebhookQuery] = useState<WebhookQuery>(DEFAULT_WEBHOOK_QUERY);
+  const [selectedEvent, setSelectedEvent] = useState<WebhookRow | null>(null);
+  const [replayingEventId, setReplayingEventId] = useState<string | null>(null);
 
   const labels = useMemo(
     () =>
@@ -102,6 +124,8 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             refresh: "Actualizar",
             logout: "Salir",
             replay: "Reenviar",
+            replayConfirm: "¿Reenviar este webhook a las integraciones configuradas?",
+            cancel: "Cancelar",
             replayOk: "Webhook reenviado",
             replayFail: "No se pudo reenviar",
             loadFail: "No se pudo cargar la informacion",
@@ -116,6 +140,18 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             auditAction: "Filtrar por accion",
             webhookSearch: "Buscar topic, tienda u orden",
             webhookStatus: "Filtrar por estado",
+            webhookDetails: "Detalle del webhook",
+            viewDetails: "Ver detalle",
+            topic: "Topic",
+            shop: "Tienda",
+            order: "Orden",
+            status: "Estado",
+            created: "Creado",
+            processed: "Procesado",
+            replayed: "Reenviado",
+            error: "Error",
+            payload: "Payload",
+            notAvailable: "No disponible",
             tableEmpty: "No hay resultados para esta busqueda.",
           }
         : {
@@ -126,6 +162,8 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             refresh: "Refresh",
             logout: "Sign out",
             replay: "Replay",
+            replayConfirm: "Replay this webhook to the configured integrations?",
+            cancel: "Cancel",
             replayOk: "Webhook replayed",
             replayFail: "Could not replay webhook",
             loadFail: "Could not load data",
@@ -140,6 +178,18 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             auditAction: "Filter by action",
             webhookSearch: "Search topic, shop, or order",
             webhookStatus: "Filter by status",
+            webhookDetails: "Webhook details",
+            viewDetails: "View details",
+            topic: "Topic",
+            shop: "Shop",
+            order: "Order",
+            status: "Status",
+            created: "Created",
+            processed: "Processed",
+            replayed: "Replayed",
+            error: "Error",
+            payload: "Payload",
+            notAvailable: "Not available",
             tableEmpty: "No results for this search.",
           },
     [locale],
@@ -284,20 +334,51 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   };
 
   const replayWebhook = async (eventId: string) => {
-    const response = await fetch("/api/admin/webhooks/orders/replay", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventId, actor: "slowfit-admin" }),
-    });
+    setReplayingEventId(eventId);
+    try {
+      const response = await fetch("/api/admin/webhooks/orders/replay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, actor: "slowfit-admin" }),
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        api.error(labels.replayFail);
+        return;
+      }
+
+      api.success(labels.replayOk);
+      setSelectedEvent(null);
+      await refreshAll();
+    } catch {
       api.error(labels.replayFail);
-      return;
+    } finally {
+      setReplayingEventId(null);
     }
-
-    api.success(labels.replayOk);
-    await refreshAll();
   };
+
+  const formatDate = (value?: string | null) =>
+    value ? new Date(value).toLocaleString(locale === "es" ? "es-CR" : "en-US") : labels.notAvailable;
+
+  const replayAction = (record: WebhookRow, block = false) => (
+    <Popconfirm
+      title={labels.replayConfirm}
+      okText={labels.replay}
+      cancelText={labels.cancel}
+      onConfirm={() => replayWebhook(record.id)}
+      disabled={replayingEventId !== null}
+    >
+      <Button
+        icon={<RedoOutlined />}
+        size={block ? "middle" : "small"}
+        block={block}
+        loading={replayingEventId === record.id}
+        disabled={replayingEventId !== null && replayingEventId !== record.id}
+      >
+        {labels.replay}
+      </Button>
+    </Popconfirm>
+  );
 
   const logColumns: ColumnsType<AuditRow> = [
     {
@@ -317,7 +398,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
       dataIndex: "createdAt",
       key: "createdAt",
       width: 220,
-      render: (value: string) => new Date(value).toLocaleString(),
+      render: (value: string) => formatDate(value),
     },
     {
       title: "Details",
@@ -331,47 +412,50 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
 
   const eventColumns: ColumnsType<WebhookRow> = [
     {
-      title: "Topic",
+      title: labels.topic,
       dataIndex: "topic",
       key: "topic",
       width: 180,
     },
     {
-      title: "Order",
+      title: labels.order,
       dataIndex: "orderId",
       key: "orderId",
       width: 120,
       render: (value: string | null | undefined) => value || "-",
     },
     {
-      title: "Status",
+      title: labels.status,
       dataIndex: "status",
       key: "status",
       width: 130,
       render: (value: string) => <Tag color={value === "FAILED" ? "error" : "success"}>{value}</Tag>,
     },
     {
-      title: "Created",
+      title: labels.created,
       dataIndex: "createdAt",
       key: "createdAt",
       width: 220,
-      render: (value: string) => new Date(value).toLocaleString(),
+      render: (value: string) => formatDate(value),
     },
     {
-      title: "Replayed",
+      title: labels.replayed,
       dataIndex: "replayedAt",
       key: "replayedAt",
       width: 220,
-      render: (value: string | null | undefined) => (value ? new Date(value).toLocaleString() : "-"),
+      render: (value: string | null | undefined) => formatDate(value),
     },
     {
-      title: "Action",
+      title: "",
       key: "action",
-      width: 140,
+      width: 210,
       render: (_value, record) => (
-        <Button size="small" onClick={() => replayWebhook(record.id)}>
-          {labels.replay}
-        </Button>
+        <Space>
+          <Button icon={<EyeOutlined />} size="small" onClick={() => setSelectedEvent(record)}>
+            {labels.viewDetails}
+          </Button>
+          {replayAction(record)}
+        </Space>
       ),
     },
   ];
@@ -421,26 +505,66 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
                 />
               </Space>
               <Typography.Title level={4}>{labels.webhookTitle}</Typography.Title>
-              <Table
-                rowKey="id"
-                columns={eventColumns}
-                dataSource={events}
-                loading={webhookLoading}
-                locale={{ emptyText: labels.tableEmpty }}
-                pagination={{
-                  current: webhookQuery.page,
-                  pageSize: webhookQuery.pageSize,
-                  total: webhookTotal,
-                  showSizeChanger: true,
-                  onChange: (page, pageSize) => {
-                    const next = { ...webhookQuery, page, pageSize: pageSize || webhookQuery.pageSize };
-                    setWebhookQuery(next);
-                    void loadWebhookEvents(next);
-                  },
-                }}
-                scroll={{ x: 980 }}
-                className="slowfit-admin-table"
-              />
+              {screens.md ? (
+                <Table
+                  rowKey="id"
+                  columns={eventColumns}
+                  dataSource={events}
+                  loading={webhookLoading}
+                  locale={{ emptyText: labels.tableEmpty }}
+                  pagination={{
+                    current: webhookQuery.page,
+                    pageSize: webhookQuery.pageSize,
+                    total: webhookTotal,
+                    showSizeChanger: true,
+                    onChange: (page, pageSize) => {
+                      const next = { ...webhookQuery, page, pageSize: pageSize || webhookQuery.pageSize };
+                      setWebhookQuery(next);
+                      void loadWebhookEvents(next);
+                    },
+                  }}
+                  scroll={{ x: 1040 }}
+                  className="slowfit-admin-table"
+                />
+              ) : (
+                <Spin spinning={webhookLoading}>
+                  <div className="slowfit-webhook-list">
+                    {events.length === 0 ? <Empty description={labels.tableEmpty} /> : null}
+                    {events.map((event) => (
+                      <article className="slowfit-webhook-item" key={event.id}>
+                        <Space className="slowfit-webhook-item-heading">
+                          <Typography.Text strong>{event.topic}</Typography.Text>
+                          <Tag color={event.status === "FAILED" ? "error" : "success"}>{event.status}</Tag>
+                        </Space>
+                        <Typography.Text type="secondary">{event.orderId || event.shop}</Typography.Text>
+                        <Typography.Text type="secondary">{formatDate(event.createdAt)}</Typography.Text>
+                        {event.errorMessage ? <Alert type="error" showIcon title={event.errorMessage} /> : null}
+                        <Space.Compact block>
+                          <Button icon={<EyeOutlined />} block onClick={() => setSelectedEvent(event)}>
+                            {labels.viewDetails}
+                          </Button>
+                          {replayAction(event, true)}
+                        </Space.Compact>
+                      </article>
+                    ))}
+                  </div>
+                  {webhookTotal > webhookQuery.pageSize ? (
+                    <Pagination
+                      className="slowfit-admin-pagination"
+                      align="center"
+                      current={webhookQuery.page}
+                      pageSize={webhookQuery.pageSize}
+                      total={webhookTotal}
+                      size="small"
+                      onChange={(page) => {
+                      const next = { ...webhookQuery, page };
+                      setWebhookQuery(next);
+                      void loadWebhookEvents(next);
+                      }}
+                    />
+                  ) : null}
+                </Spin>
+              )}
             </section>
 
             <section className="slowfit-policy-card slowfit-admin-card">
@@ -491,6 +615,44 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
               />
             </section>
       </AdminShell>
+      <Drawer
+        title={labels.webhookDetails}
+        open={selectedEvent !== null}
+        onClose={() => setSelectedEvent(null)}
+        size={screens.md ? 620 : "100%"}
+        extra={selectedEvent ? replayAction(selectedEvent) : null}
+      >
+        {selectedEvent ? (
+          <Space orientation="vertical" size="large" className="slowfit-webhook-detail">
+            {selectedEvent.errorMessage ? (
+              <Alert type="error" showIcon title={labels.error} description={selectedEvent.errorMessage} />
+            ) : null}
+            <Descriptions bordered column={1} size="small">
+              <Descriptions.Item label={labels.topic}>{selectedEvent.topic}</Descriptions.Item>
+              <Descriptions.Item label={labels.shop}>{selectedEvent.shop}</Descriptions.Item>
+              <Descriptions.Item label={labels.order}>
+                {selectedEvent.orderId || labels.notAvailable}
+              </Descriptions.Item>
+              <Descriptions.Item label={labels.status}>
+                <Tag color={selectedEvent.status === "FAILED" ? "error" : "success"}>
+                  {selectedEvent.status}
+                </Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label={labels.created}>{formatDate(selectedEvent.createdAt)}</Descriptions.Item>
+              <Descriptions.Item label={labels.processed}>
+                {formatDate(selectedEvent.processedAt)}
+              </Descriptions.Item>
+              <Descriptions.Item label={labels.replayed}>{formatDate(selectedEvent.replayedAt)}</Descriptions.Item>
+            </Descriptions>
+            <div>
+              <Typography.Title level={5}>{labels.payload}</Typography.Title>
+              <pre className="slowfit-admin-json slowfit-webhook-payload">
+                {JSON.stringify(selectedEvent.payload, null, 2)}
+              </pre>
+            </div>
+          </Space>
+        ) : null}
+      </Drawer>
     </>
   );
 }

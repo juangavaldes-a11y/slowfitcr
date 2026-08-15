@@ -903,6 +903,37 @@ a {
   color: var(--ink-soft);
 }
 
+.slowfit-webhook-list {
+  display: grid;
+}
+
+.slowfit-webhook-item,
+.slowfit-webhook-detail {
+  width: 100%;
+}
+
+.slowfit-webhook-item {
+  display: grid;
+  gap: 10px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(47, 42, 40, 0.12);
+}
+
+.slowfit-webhook-item-heading {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.slowfit-webhook-payload {
+  max-width: none;
+  max-height: 50vh;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid rgba(47, 42, 40, 0.12);
+  border-radius: 6px;
+  background: rgba(47, 42, 40, 0.04);
+}
+
 @media (max-width: 991px) {
   .slowfit-nav {
     flex-direction: column;
