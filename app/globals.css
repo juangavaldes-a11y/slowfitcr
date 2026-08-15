@@ -755,6 +755,12 @@ a {
   margin-bottom: 16px;
 }
 
+.slowfit-admin-nav {
+  width: 100%;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
 .slowfit-admin-auth-card {
   max-width: 640px;
 }
@@ -778,6 +784,14 @@ a {
 .slowfit-admin-card-meta {
   width: 100%;
   margin-bottom: 8px;
+}
+
+.slowfit-admin-review-date.ant-typography {
+  margin: 12px 0 !important;
+}
+
+.slowfit-admin-pagination {
+  margin-top: 24px;
 }
 
 .slowfit-admin-table {

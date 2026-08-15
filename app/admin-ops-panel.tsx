@@ -1,8 +1,9 @@
 "use client";
 
-import { Button, Form, Input, Select, Space, Table, Tag, Typography, message } from "antd";
+import { Button, Input, Select, Space, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useEffect, useMemo, useState } from "react";
+import AdminShell from "./admin-shell";
 
 type AuditRow = {
   id: string;
@@ -243,7 +244,11 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   };
 
   useEffect(() => {
-    refreshAll().catch(() => undefined);
+    const timeout = window.setTimeout(() => {
+      refreshAll().catch(() => undefined);
+    }, 0);
+
+    return () => window.clearTimeout(timeout);
   }, []);
 
   const onLogin = async ({ token }: { token: string }) => {
@@ -370,43 +375,22 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   ];
 
   return (
-    <main className="slowfit-policy-page">
+    <>
       {contextHolder}
-      <section className="slowfit-shell slowfit-policy-hero">
-        <span className="slowfit-kicker">Slow Fit Admin</span>
-        <Typography.Title className="slowfit-display slowfit-section-title">{labels.title}</Typography.Title>
-        <Typography.Paragraph className="slowfit-policy-lead">{labels.subtitle}</Typography.Paragraph>
-      </section>
-      <section className="slowfit-shell slowfit-policy-section">
-        {!sessionReady ? (
-          <article className="slowfit-policy-card slowfit-admin-auth-card">
-            <Typography.Title level={4}>{labels.sessionChecking}</Typography.Title>
-          </article>
-        ) : !authorized ? (
-          <article className="slowfit-policy-card slowfit-admin-auth-card">
-            <Typography.Title level={4}>{labels.authTitle}</Typography.Title>
-            <Typography.Paragraph className="slowfit-policy-lead">{labels.authCopy}</Typography.Paragraph>
-            <Form layout="vertical" onFinish={onLogin}>
-              <Form.Item
-                name="token"
-                label={labels.tokenLabel}
-                rules={[{ required: true, message: labels.loginFail }]}
-              >
-                <Input.Password autoComplete="off" />
-              </Form.Item>
-              <Button type="primary" htmlType="submit" loading={loginLoading}>
-                {labels.signIn}
-              </Button>
-            </Form>
-            <Typography.Paragraph className="slowfit-policy-lead">{labels.unauthorized}</Typography.Paragraph>
-          </article>
-        ) : (
-          <>
+      <AdminShell
+        locale={locale}
+        title={labels.title}
+        subtitle={labels.subtitle}
+        sessionReady={sessionReady}
+        authorized={authorized}
+        loginLoading={loginLoading}
+        onLogin={onLogin}
+        onLogout={onLogout}
+      >
             <Space className="slowfit-admin-toolbar" wrap>
               <Button onClick={() => refreshAll()} loading={auditLoading || webhookLoading}>
                 {labels.refresh}
               </Button>
-              <Button onClick={onLogout}>{labels.logout}</Button>
             </Space>
 
             <section className="slowfit-policy-card slowfit-admin-card">
@@ -504,9 +488,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
                 className="slowfit-admin-table"
               />
             </section>
-          </>
-        )}
-      </section>
-    </main>
+      </AdminShell>
+    </>
   );
 }

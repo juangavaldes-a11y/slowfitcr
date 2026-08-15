@@ -729,13 +729,37 @@ async function handlePendingReviews(request) {
     return jsonResponse({ error: "Unauthorized" }, 401);
   }
 
-  const pending = await prisma.review.findMany({
-    where: { status: "PENDING" },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+  const url = parseUrl(request);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 12, 100);
+  const status = getTrimmedParam(url, "status") || "PENDING";
+  const search = getTrimmedParam(url, "search");
 
-  return jsonResponse({ pending });
+  const where = {};
+  if (status !== "all") {
+    where.status = status;
+  }
+
+  if (search) {
+    where.OR = [
+      { productHandle: { contains: search, mode: "insensitive" } },
+      { author: { contains: search, mode: "insensitive" } },
+      { email: { contains: search, mode: "insensitive" } },
+      { content: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const [total, reviews] = await Promise.all([
+    prisma.review.count({ where }),
+    prisma.review.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return jsonResponse({ pending: reviews, reviews, total, page, pageSize });
 }
 
 async function handleModerateReview(request) {
