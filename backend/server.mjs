@@ -491,6 +491,28 @@ function buildOrderIdempotencyKey(topic, payload) {
   return `${topic}:${id}:${updated}`;
 }
 
+function parsePageNumber(value, fallback = 1, max = 1000) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(1, parsed));
+}
+
+function parsePageSize(value, fallback, max) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(1, parsed));
+}
+
+function getTrimmedParam(url, key) {
+  return String(url.searchParams.get(key) || "").trim();
+}
+
 async function processOrderEvent({ topic, shop, payload }, options = { replay: false }) {
   const event = {
     topic,
@@ -784,14 +806,34 @@ async function handleAdminAuditLogs(request) {
   }
 
   const url = parseUrl(request);
-  const limit = Math.min(Number.parseInt(url.searchParams.get("limit") || "100", 10), 500);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 10, 100);
+  const action = getTrimmedParam(url, "action");
+  const search = getTrimmedParam(url, "search");
 
-  const logs = await prisma.auditLog.findMany({
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
+  const where = {};
+  if (action && action !== "all") {
+    where.action = action;
+  }
 
-  return jsonResponse({ logs });
+  if (search) {
+    where.OR = [
+      { action: { contains: search, mode: "insensitive" } },
+      { actor: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const [total, logs] = await Promise.all([
+    prisma.auditLog.count({ where }),
+    prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return jsonResponse({ logs, total, page, pageSize });
 }
 
 async function handleAdminOrderWebhooks(request) {
@@ -800,14 +842,36 @@ async function handleAdminOrderWebhooks(request) {
   }
 
   const url = parseUrl(request);
-  const limit = Math.min(Number.parseInt(url.searchParams.get("limit") || "50", 10), 200);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 10, 100);
+  const status = getTrimmedParam(url, "status");
+  const search = getTrimmedParam(url, "search");
 
-  const events = await prisma.orderWebhookEvent.findMany({
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
+  const where = {};
+  if (status && status !== "all") {
+    where.status = status;
+  }
 
-  return jsonResponse({ events });
+  if (search) {
+    where.OR = [
+      { topic: { contains: search, mode: "insensitive" } },
+      { shop: { contains: search, mode: "insensitive" } },
+      { orderId: { contains: search, mode: "insensitive" } },
+      { errorMessage: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const [total, events] = await Promise.all([
+    prisma.orderWebhookEvent.count({ where }),
+    prisma.orderWebhookEvent.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return jsonResponse({ events, total, page, pageSize });
 }
 
 async function handleReplayOrderWebhook(request) {

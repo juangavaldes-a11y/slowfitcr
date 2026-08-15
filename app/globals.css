@@ -647,6 +647,16 @@ a {
   line-height: 0.95;
 }
 
+.slowfit-product-detail-title {
+  margin: 0;
+  font-size: clamp(2.2rem, 4vw, 3.4rem);
+  line-height: 0.95;
+}
+
+.slowfit-product-description {
+  margin: 0;
+}
+
 .slowfit-product-price-row {
   display: flex;
   align-items: baseline;
@@ -743,6 +753,20 @@ a {
   width: 100%;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.slowfit-admin-auth-card {
+  max-width: 640px;
+}
+
+.slowfit-admin-card {
+  margin-top: 16px;
+}
+
+.slowfit-admin-controls {
+  width: 100%;
+  justify-content: flex-start;
+  margin-bottom: 14px;
 }
 
 .slowfit-admin-grid {

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Typography } from "antd";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import ProductPurchase from "../../../product-purchase";
@@ -74,14 +73,14 @@ export default async function ProductPage({ params }: ProductPageProps) {
         </div>
         <div className="slowfit-product-detail-content">
           <span className="slowfit-kicker">{product.collectionTitle}</span>
-          <Typography.Title className="slowfit-display slowfit-product-detail-title">{product.title}</Typography.Title>
-          <Typography.Paragraph className="slowfit-shop-card-copy">{product.description}</Typography.Paragraph>
+          <h1 className="slowfit-display slowfit-product-detail-title">{product.title}</h1>
+          <p className="slowfit-shop-card-copy slowfit-product-description">{product.description}</p>
           <div className="slowfit-product-price-row">
-            <Typography.Text className="slowfit-product-price">{formatMoney.format(product.price)}</Typography.Text>
+            <span className="slowfit-product-price">{formatMoney.format(product.price)}</span>
             {typeof product.compareAtPrice === "number" ? (
-              <Typography.Text delete className="slowfit-product-compare-price">
+              <span className="slowfit-product-compare-price">
                 {formatMoney.format(product.compareAtPrice)}
-              </Typography.Text>
+              </span>
             ) : null}
           </div>
           <ProductPurchase

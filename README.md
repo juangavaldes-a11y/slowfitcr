@@ -47,9 +47,17 @@ Compose services:
 
 - `frontend` at `http://localhost:3000`
 - `backend` at `http://localhost:8080`
-- `postgres` at `localhost:5432`
+- `postgres` at `localhost:5433` on the host and `postgres:5432` inside Docker
 
 PostgreSQL durable state is persisted in Docker volume `slowfit-postgres-data`.
+
+If you run the backend outside Docker, install backend dependencies first:
+
+```bash
+cd backend
+npm install
+npx prisma generate
+```
 
 ## Environment variables
 
@@ -90,6 +98,51 @@ DATABASE_URL=postgresql://slowfit:slowfit@postgres:5432/slowfit?schema=public
 ```
 
 If Shopify credentials are not set, the storefront uses fallback catalog data so UI routes still work.
+
+## Production deployment checklist
+
+Split the production deployment into two runtimes:
+
+- Frontend runtime: Next.js / OpenNext worker
+- Backend runtime: Node service with direct PostgreSQL access
+
+Required backend secrets:
+
+```bash
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB?schema=public
+REVIEW_MODERATION_TOKEN=set-a-strong-shared-token
+REVIEW_MODERATION_SESSION_SECRET=set-a-long-random-secret
+SHOPIFY_WEBHOOK_SECRET=your_shopify_webhook_secret
+```
+
+Optional but recommended backend integrations:
+
+```bash
+ORDER_EVENTS_WEBHOOK_URL=https://your-backoffice-endpoint.example.com/orders
+CRM_ORDER_WEBHOOK_URL=https://your-crm-endpoint.example.com/orders
+CONTACT_WEBHOOK_URL=https://your-crm-endpoint.example.com/contact
+ANALYTICS_WEBHOOK_URL=https://your-analytics-endpoint.example.com/events
+REVIEWS_MODERATION_WEBHOOK_URL=https://your-moderation-endpoint.example.com/reviews
+RESEND_API_KEY=your_resend_api_key
+ORDER_CONFIRM_FROM=Slow Fit <orders@yourdomain.com>
+```
+
+Required frontend secrets:
+
+```bash
+NEXT_PUBLIC_BACKEND_URL=https://api.yourdomain.com
+NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
+SHOPIFY_STORE_DOMAIN=your-shop.myshopify.com
+SHOPIFY_STOREFRONT_ACCESS_TOKEN=your_storefront_token
+```
+
+Production rollout steps:
+
+1. Provision PostgreSQL and run Prisma against the production `DATABASE_URL`.
+2. Deploy the backend with the secrets above and verify `/health/live` and `/health/ready`.
+3. Deploy the frontend with `NEXT_PUBLIC_BACKEND_URL` pointed at the backend origin.
+4. Register the Shopify order webhook against `POST /api/webhooks/shopify/orders` on the backend.
+5. Verify admin login, review moderation, checkout handoff, and webhook replay after deploy.
 
 ## New API endpoints
 

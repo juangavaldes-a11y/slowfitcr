@@ -217,7 +217,7 @@ export function CartDock() {
         title={`${labels.cart} (${totalItems})`}
         open={open}
         onClose={() => setOpen(false)}
-        width={420}
+        size="default"
       >
         {lines.length === 0 ? (
           <Typography.Paragraph>{labels.empty}</Typography.Paragraph>

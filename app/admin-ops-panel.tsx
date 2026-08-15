@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Space, Table, Tag, Typography, message } from "antd";
+import { Button, Form, Input, Select, Space, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useEffect, useMemo, useState } from "react";
 
@@ -28,67 +28,253 @@ type AdminOpsPanelProps = {
   locale: "es" | "en";
 };
 
+type AuditQuery = {
+  page: number;
+  pageSize: number;
+  search: string;
+  action: string;
+};
+
+type WebhookQuery = {
+  page: number;
+  pageSize: number;
+  search: string;
+  status: string;
+};
+
+const DEFAULT_AUDIT_QUERY: AuditQuery = {
+  page: 1,
+  pageSize: 8,
+  search: "",
+  action: "all",
+};
+
+const DEFAULT_WEBHOOK_QUERY: WebhookQuery = {
+  page: 1,
+  pageSize: 8,
+  search: "",
+  status: "all",
+};
+
+const AUDIT_ACTION_OPTIONS = [
+  "admin.login",
+  "admin.login.failed",
+  "admin.logout",
+  "checkout.created",
+  "contact.received",
+  "event.ingested",
+  "order.webhook.failed",
+  "order.webhook.processed",
+  "order.webhook.replayed",
+  "review.moderated",
+  "review.submitted",
+].map((action) => ({ value: action, label: action }));
+
+const WEBHOOK_STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  { value: "PROCESSED", label: "Processed" },
+  { value: "FAILED", label: "Failed" },
+];
+
 export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const [api, contextHolder] = message.useMessage();
-  const [loading, setLoading] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [authorized, setAuthorized] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [webhookLoading, setWebhookLoading] = useState(false);
   const [logs, setLogs] = useState<AuditRow[]>([]);
+  const [auditTotal, setAuditTotal] = useState(0);
+  const [auditQuery, setAuditQuery] = useState<AuditQuery>(DEFAULT_AUDIT_QUERY);
   const [events, setEvents] = useState<WebhookRow[]>([]);
+  const [webhookTotal, setWebhookTotal] = useState(0);
+  const [webhookQuery, setWebhookQuery] = useState<WebhookQuery>(DEFAULT_WEBHOOK_QUERY);
 
   const labels = useMemo(
     () =>
       locale === "es"
         ? {
             title: "Operaciones",
-            subtitle: "Auditoria del sistema y replay manual de webhooks de pedidos.",
+            subtitle: "Inicia sesion para revisar auditoria, filtrar eventos y reenviar webhooks de pedidos.",
+            authTitle: "Acceso de moderacion",
+            authCopy: "La sesion queda guardada en una cookie segura hasta que expire o cierres sesion.",
             refresh: "Actualizar",
+            logout: "Salir",
             replay: "Reenviar",
             replayOk: "Webhook reenviado",
             replayFail: "No se pudo reenviar",
             loadFail: "No se pudo cargar la informacion",
+            loginFail: "Credenciales invalidas",
+            unauthorized: "Debes autenticarte para continuar.",
+            signIn: "Entrar",
+            tokenLabel: "Token de moderacion",
+            sessionChecking: "Verificando sesion...",
             auditTitle: "Registro de auditoria",
             webhookTitle: "Eventos de webhook",
+            auditSearch: "Buscar accion o actor",
+            auditAction: "Filtrar por accion",
+            webhookSearch: "Buscar topic, tienda u orden",
+            webhookStatus: "Filtrar por estado",
+            tableEmpty: "No hay resultados para esta busqueda.",
           }
         : {
             title: "Operations",
-            subtitle: "System audit trail and manual replay of order webhook events.",
+            subtitle: "Sign in to review the audit trail, filter events, and replay order webhooks.",
+            authTitle: "Moderation access",
+            authCopy: "The session is stored in a secure cookie until it expires or you sign out.",
             refresh: "Refresh",
+            logout: "Sign out",
             replay: "Replay",
             replayOk: "Webhook replayed",
             replayFail: "Could not replay webhook",
             loadFail: "Could not load data",
+            loginFail: "Invalid credentials",
+            unauthorized: "Authentication is required.",
+            signIn: "Sign in",
+            tokenLabel: "Moderation token",
+            sessionChecking: "Checking session...",
             auditTitle: "Audit log",
             webhookTitle: "Webhook events",
+            auditSearch: "Search action or actor",
+            auditAction: "Filter by action",
+            webhookSearch: "Search topic, shop, or order",
+            webhookStatus: "Filter by status",
+            tableEmpty: "No results for this search.",
           },
     [locale],
   );
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [logsRes, eventsRes] = await Promise.all([
-        fetch("/api/admin/audit-logs?limit=200", { cache: "no-store" }),
-        fetch("/api/admin/webhooks/orders?limit=100", { cache: "no-store" }),
-      ]);
+  const buildUrl = (path: string, params: Record<string, string | number | undefined>) => {
+    const url = new URL(path, window.location.origin);
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === "" || value === "all") {
+        continue;
+      }
 
-      if (!logsRes.ok || !eventsRes.ok) {
+      url.searchParams.set(key, String(value));
+    }
+
+    return `${url.pathname}${url.search}`;
+  };
+
+  const loadAuditLogs = async (query: AuditQuery) => {
+    setAuditLoading(true);
+    try {
+      const response = await fetch(
+        buildUrl("/api/admin/audit-logs", {
+          page: query.page,
+          pageSize: query.pageSize,
+          search: query.search,
+          action: query.action,
+        }),
+        { cache: "no-store" },
+      );
+
+      if (response.status === 401) {
+        setAuthorized(false);
+        setLogs([]);
+        setAuditTotal(0);
+        return false;
+      }
+
+      if (!response.ok) {
         throw new Error("load_failed");
       }
 
-      const logsPayload = (await logsRes.json()) as { logs: AuditRow[] };
-      const eventsPayload = (await eventsRes.json()) as { events: WebhookRow[] };
-
-      setLogs(logsPayload.logs);
-      setEvents(eventsPayload.events);
+      const payload = (await response.json()) as { logs: AuditRow[]; total: number };
+      setAuthorized(true);
+      setLogs(payload.logs);
+      setAuditTotal(payload.total);
+      return true;
     } catch {
       api.error(labels.loadFail);
+      return false;
     } finally {
-      setLoading(false);
+      setAuditLoading(false);
+      setSessionReady(true);
     }
   };
 
+  const loadWebhookEvents = async (query: WebhookQuery) => {
+    setWebhookLoading(true);
+    try {
+      const response = await fetch(
+        buildUrl("/api/admin/webhooks/orders", {
+          page: query.page,
+          pageSize: query.pageSize,
+          search: query.search,
+          status: query.status,
+        }),
+        { cache: "no-store" },
+      );
+
+      if (response.status === 401) {
+        setAuthorized(false);
+        setEvents([]);
+        setWebhookTotal(0);
+        return false;
+      }
+
+      if (!response.ok) {
+        throw new Error("load_failed");
+      }
+
+      const payload = (await response.json()) as { events: WebhookRow[]; total: number };
+      setAuthorized(true);
+      setEvents(payload.events);
+      setWebhookTotal(payload.total);
+      return true;
+    } catch {
+      api.error(labels.loadFail);
+      return false;
+    } finally {
+      setWebhookLoading(false);
+      setSessionReady(true);
+    }
+  };
+
+  const refreshAll = async () => {
+    const auditOk = await loadAuditLogs(auditQuery);
+    if (!auditOk) {
+      return;
+    }
+
+    await loadWebhookEvents(webhookQuery);
+  };
+
   useEffect(() => {
-    loadData().catch(() => undefined);
+    refreshAll().catch(() => undefined);
   }, []);
+
+  const onLogin = async ({ token }: { token: string }) => {
+    setLoginLoading(true);
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        api.error(labels.loginFail);
+        return;
+      }
+
+      await refreshAll();
+    } finally {
+      setLoginLoading(false);
+      setSessionReady(true);
+    }
+  };
+
+  const onLogout = async () => {
+    await fetch("/api/admin/logout", { method: "POST" });
+    setAuthorized(false);
+    setLogs([]);
+    setEvents([]);
+    setAuditTotal(0);
+    setWebhookTotal(0);
+  };
 
   const replayWebhook = async (eventId: string) => {
     const response = await fetch("/api/admin/webhooks/orders/replay", {
@@ -103,7 +289,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
     }
 
     api.success(labels.replayOk);
-    await loadData();
+    await refreshAll();
   };
 
   const logColumns: ColumnsType<AuditRow> = [
@@ -169,7 +355,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
       dataIndex: "replayedAt",
       key: "replayedAt",
       width: 220,
-      render: (value: string | null | undefined) => (value ? new Date(value).toLocaleString() : "-") ,
+      render: (value: string | null | undefined) => (value ? new Date(value).toLocaleString() : "-"),
     },
     {
       title: "Action",
@@ -192,31 +378,134 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
         <Typography.Paragraph className="slowfit-policy-lead">{labels.subtitle}</Typography.Paragraph>
       </section>
       <section className="slowfit-shell slowfit-policy-section">
-        <Space className="slowfit-admin-toolbar" wrap>
-          <Button onClick={() => loadData()} loading={loading}>
-            {labels.refresh}
-          </Button>
-        </Space>
-        <Typography.Title level={4}>{labels.webhookTitle}</Typography.Title>
-        <Table
-          rowKey="id"
-          columns={eventColumns}
-          dataSource={events}
-          loading={loading}
-          pagination={{ pageSize: 8 }}
-          scroll={{ x: 980 }}
-          className="slowfit-admin-table"
-        />
-        <Typography.Title level={4}>{labels.auditTitle}</Typography.Title>
-        <Table
-          rowKey="id"
-          columns={logColumns}
-          dataSource={logs}
-          loading={loading}
-          pagination={{ pageSize: 8 }}
-          scroll={{ x: 1100 }}
-          className="slowfit-admin-table"
-        />
+        {!sessionReady ? (
+          <article className="slowfit-policy-card slowfit-admin-auth-card">
+            <Typography.Title level={4}>{labels.sessionChecking}</Typography.Title>
+          </article>
+        ) : !authorized ? (
+          <article className="slowfit-policy-card slowfit-admin-auth-card">
+            <Typography.Title level={4}>{labels.authTitle}</Typography.Title>
+            <Typography.Paragraph className="slowfit-policy-lead">{labels.authCopy}</Typography.Paragraph>
+            <Form layout="vertical" onFinish={onLogin}>
+              <Form.Item
+                name="token"
+                label={labels.tokenLabel}
+                rules={[{ required: true, message: labels.loginFail }]}
+              >
+                <Input.Password autoComplete="off" />
+              </Form.Item>
+              <Button type="primary" htmlType="submit" loading={loginLoading}>
+                {labels.signIn}
+              </Button>
+            </Form>
+            <Typography.Paragraph className="slowfit-policy-lead">{labels.unauthorized}</Typography.Paragraph>
+          </article>
+        ) : (
+          <>
+            <Space className="slowfit-admin-toolbar" wrap>
+              <Button onClick={() => refreshAll()} loading={auditLoading || webhookLoading}>
+                {labels.refresh}
+              </Button>
+              <Button onClick={onLogout}>{labels.logout}</Button>
+            </Space>
+
+            <section className="slowfit-policy-card slowfit-admin-card">
+              <Space className="slowfit-admin-controls" wrap>
+                <Input.Search
+                  allowClear
+                  placeholder={labels.webhookSearch}
+                  value={webhookQuery.search}
+                  onSearch={(value) => {
+                    const next = { ...webhookQuery, search: value.trim(), page: 1 };
+                    setWebhookQuery(next);
+                    void loadWebhookEvents(next);
+                  }}
+                  onChange={(event) => setWebhookQuery((current) => ({ ...current, search: event.target.value }))}
+                  style={{ minWidth: 260 }}
+                />
+                <Select
+                  value={webhookQuery.status}
+                  onChange={(value) => {
+                    const next = { ...webhookQuery, status: value, page: 1 };
+                    setWebhookQuery(next);
+                    void loadWebhookEvents(next);
+                  }}
+                  options={WEBHOOK_STATUS_OPTIONS}
+                  style={{ minWidth: 180 }}
+                />
+              </Space>
+              <Typography.Title level={4}>{labels.webhookTitle}</Typography.Title>
+              <Table
+                rowKey="id"
+                columns={eventColumns}
+                dataSource={events}
+                loading={webhookLoading}
+                locale={{ emptyText: labels.tableEmpty }}
+                pagination={{
+                  current: webhookQuery.page,
+                  pageSize: webhookQuery.pageSize,
+                  total: webhookTotal,
+                  showSizeChanger: true,
+                  onChange: (page, pageSize) => {
+                    const next = { ...webhookQuery, page, pageSize: pageSize || webhookQuery.pageSize };
+                    setWebhookQuery(next);
+                    void loadWebhookEvents(next);
+                  },
+                }}
+                scroll={{ x: 980 }}
+                className="slowfit-admin-table"
+              />
+            </section>
+
+            <section className="slowfit-policy-card slowfit-admin-card">
+              <Space className="slowfit-admin-controls" wrap>
+                <Input.Search
+                  allowClear
+                  placeholder={labels.auditSearch}
+                  value={auditQuery.search}
+                  onSearch={(value) => {
+                    const next = { ...auditQuery, search: value.trim(), page: 1 };
+                    setAuditQuery(next);
+                    void loadAuditLogs(next);
+                  }}
+                  onChange={(event) => setAuditQuery((current) => ({ ...current, search: event.target.value }))}
+                  style={{ minWidth: 260 }}
+                />
+                <Select
+                  value={auditQuery.action}
+                  onChange={(value) => {
+                    const next = { ...auditQuery, action: value, page: 1 };
+                    setAuditQuery(next);
+                    void loadAuditLogs(next);
+                  }}
+                  options={[{ value: "all", label: "All actions" }, ...AUDIT_ACTION_OPTIONS]}
+                  style={{ minWidth: 220 }}
+                />
+              </Space>
+              <Typography.Title level={4}>{labels.auditTitle}</Typography.Title>
+              <Table
+                rowKey="id"
+                columns={logColumns}
+                dataSource={logs}
+                loading={auditLoading}
+                locale={{ emptyText: labels.tableEmpty }}
+                pagination={{
+                  current: auditQuery.page,
+                  pageSize: auditQuery.pageSize,
+                  total: auditTotal,
+                  showSizeChanger: true,
+                  onChange: (page, pageSize) => {
+                    const next = { ...auditQuery, page, pageSize: pageSize || auditQuery.pageSize };
+                    setAuditQuery(next);
+                    void loadAuditLogs(next);
+                  },
+                }}
+                scroll={{ x: 1100 }}
+                className="slowfit-admin-table"
+              />
+            </section>
+          </>
+        )}
       </section>
     </main>
   );
