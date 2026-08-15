@@ -1,7 +1,7 @@
 "use client";
 
 import { LockOutlined, LogoutOutlined, ShoppingOutlined, UserOutlined } from "@ant-design/icons";
-import { Alert, Button, Empty, Form, Input, Space, Spin, Tabs, Tag, Typography } from "antd";
+import { Alert, Button, Collapse, Empty, Form, Input, Pagination, Rate, Space, Spin, Tabs, Tag, Typography } from "antd";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -28,6 +28,17 @@ type Order = {
   updatedAt: string;
 };
 
+type CustomerReview = {
+  id: string;
+  productHandle: string;
+  locale: Locale;
+  rating: number;
+  content: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: string;
+  moderatedAt: string | null;
+};
+
 type AccountPanelProps = {
   locale: Locale;
 };
@@ -47,6 +58,9 @@ async function apiRequest(path: string, init?: RequestInit) {
 export default function AccountPanel({ locale }: AccountPanelProps) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [reviews, setReviews] = useState<CustomerReview[]>([]);
+  const [reviewPage, setReviewPage] = useState(1);
+  const [reviewTotal, setReviewTotal] = useState(0);
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,6 +89,14 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
         paid: "Pago",
         fulfillment: "Entrega",
         items: "artículos",
+        orderDetails: "Ver artículos",
+        reviews: "Tus reseñas",
+        noReviews: "Las reseñas enviadas con este correo aparecerán aquí.",
+        pending: "Pendiente",
+        approved: "Aprobada",
+        rejected: "Rechazada",
+        shipping: "Envíos",
+        returns: "Cambios y devoluciones",
         signOut: "Cerrar sesión",
         shop: "Seguir comprando",
         required: "Este campo es obligatorio.",
@@ -103,6 +125,14 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
         paid: "Payment",
         fulfillment: "Delivery",
         items: "items",
+        orderDetails: "View items",
+        reviews: "Your reviews",
+        noReviews: "Reviews submitted with this email will appear here.",
+        pending: "Pending",
+        approved: "Approved",
+        rejected: "Rejected",
+        shipping: "Shipping",
+        returns: "Returns",
         signOut: "Sign out",
         shop: "Continue shopping",
         required: "This field is required.",
@@ -114,14 +144,32 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
     setOrders(payload.orders || []);
   }
 
+  async function loadReviews(page = 1) {
+    const payload = await apiRequest(`/api/account/reviews?page=${page}&pageSize=6`);
+    setReviews(payload.reviews || []);
+    setReviewTotal(payload.total || 0);
+    setReviewPage(page);
+  }
+
+  async function loadAccountData() {
+    await Promise.all([loadOrders(), loadReviews()]);
+  }
+
   useEffect(() => {
     let active = true;
     apiRequest("/api/auth/session")
       .then(async (payload) => {
         if (!active) return;
         setCustomer(payload.customer);
-        const orderPayload = await apiRequest("/api/account/orders");
-        if (active) setOrders(orderPayload.orders || []);
+        const [orderPayload, reviewPayload] = await Promise.all([
+          apiRequest("/api/account/orders"),
+          apiRequest("/api/account/reviews?page=1&pageSize=6"),
+        ]);
+        if (active) {
+          setOrders(orderPayload.orders || []);
+          setReviews(reviewPayload.reviews || []);
+          setReviewTotal(reviewPayload.total || 0);
+        }
       })
       .catch(() => undefined)
       .finally(() => {
@@ -141,7 +189,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
         body: JSON.stringify({ ...values, locale }),
       });
       setCustomer(payload.customer);
-      await loadOrders();
+      await loadAccountData();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Request failed");
     } finally {
@@ -165,6 +213,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
     await apiRequest("/api/auth/logout", { method: "POST" });
     setCustomer(null);
     setOrders([]);
+    setReviews([]);
   }
 
   if (checking) {
@@ -195,25 +244,44 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
             <Typography.Text strong>{[customer.firstName, customer.lastName].filter(Boolean).join(" ")}</Typography.Text>
             <Typography.Text>{customer.email}</Typography.Text>
           </aside>
-          <div className="slowfit-account-orders">
-            <Typography.Title level={2} className="slowfit-display">{labels.orders}</Typography.Title>
-            {!orders.length ? <Empty description={labels.noOrders} /> : orders.map((order) => (
-              <article className="slowfit-order-row" key={order.id}>
-                <div>
-                  <Typography.Title level={4}>{order.name || `#${order.orderNumber || order.id}`}</Typography.Title>
-                  <Typography.Text type="secondary">
-                    {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(order.shopifyCreatedAt || order.updatedAt))}
-                  </Typography.Text>
-                </div>
-                <div className="slowfit-order-status">
-                  <span>{labels.paid}: <Tag>{order.financialStatus || "pending"}</Tag></span>
-                  <span>{labels.fulfillment}: <Tag color={order.fulfillmentStatus === "fulfilled" ? "green" : "gold"}>{order.fulfillmentStatus || "unfulfilled"}</Tag></span>
-                </div>
-                <Typography.Text strong>{order.total ? `${order.total} ${order.currency || ""}` : ""}</Typography.Text>
-                <Typography.Text>{Array.isArray(order.items) ? order.items.length : 0} {labels.items}</Typography.Text>
-              </article>
-            ))}
-          </div>
+          <Tabs items={[
+            {
+              key: "orders",
+              label: `${labels.orders} (${orders.length})`,
+              children: !orders.length ? <Empty description={labels.noOrders} /> : <div className="slowfit-account-orders">
+                {orders.map((order) => (
+                  <article className="slowfit-order-row" key={order.id}>
+                    <div>
+                      <Typography.Title level={4}>{order.name || `#${order.orderNumber || order.id}`}</Typography.Title>
+                      <Typography.Text type="secondary">{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(order.shopifyCreatedAt || order.updatedAt))}</Typography.Text>
+                    </div>
+                    <div className="slowfit-order-status">
+                      <span>{labels.paid}: <Tag color={order.financialStatus === "paid" ? "success" : "warning"}>{order.financialStatus || "pending"}</Tag></span>
+                      <span>{labels.fulfillment}: <Tag color={order.fulfillmentStatus === "fulfilled" ? "success" : "warning"}>{order.fulfillmentStatus || "unfulfilled"}</Tag></span>
+                    </div>
+                    <Typography.Text strong>{order.total ? `${order.total} ${order.currency || ""}` : ""}</Typography.Text>
+                    <Collapse ghost items={[{ key: "items", label: `${labels.orderDetails} (${Array.isArray(order.items) ? order.items.length : 0})`, children: Array.isArray(order.items) && order.items.length ? order.items.map((item, index) => <Typography.Paragraph key={`${item.title}-${index}`}>{item.quantity || 1} × {item.title || labels.items}</Typography.Paragraph>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} /> }]} />
+                  </article>
+                ))}
+                <Space wrap><Link href={`/${locale}/shipping`}>{labels.shipping}</Link><Link href={`/${locale}/returns`}>{labels.returns}</Link></Space>
+              </div>,
+            },
+            {
+              key: "reviews",
+              label: `${labels.reviews} (${reviewTotal})`,
+              children: !reviews.length ? <Empty description={labels.noReviews} /> : <div>
+                {reviews.map((review) => (
+                  <article className="slowfit-order-row" key={review.id}>
+                    <div><Link href={`/${locale}/product/${review.productHandle}`}><Typography.Text strong>{review.productHandle}</Typography.Text></Link><br /><Typography.Text type="secondary">{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(review.createdAt))}</Typography.Text></div>
+                    <Rate disabled value={review.rating} />
+                    <Typography.Paragraph>{review.content}</Typography.Paragraph>
+                    <Tag color={review.status === "APPROVED" ? "success" : review.status === "REJECTED" ? "error" : "warning"}>{review.status === "APPROVED" ? labels.approved : review.status === "REJECTED" ? labels.rejected : labels.pending}</Tag>
+                  </article>
+                ))}
+                <Pagination current={reviewPage} pageSize={6} total={reviewTotal} hideOnSinglePage onChange={(page) => void loadReviews(page)} />
+              </div>,
+            },
+          ]} />
         </section>
       </main>
     );

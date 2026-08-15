@@ -26,7 +26,7 @@ test("moderator session persists across review and operations pages", async ({ p
   await page.getByRole("button", { name: "search" }).click();
   await expect(page.getByText(author)).toBeVisible();
 
-  await page.getByRole("button", { name: "Approve" }).click();
+  await page.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page.getByText(author)).not.toBeVisible();
 
   await page.getByRole("combobox").first().click();

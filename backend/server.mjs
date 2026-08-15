@@ -842,6 +842,10 @@ async function handlePendingReviews(request) {
   const pageSize = parsePageSize(url.searchParams.get("pageSize"), 12, 100);
   const status = getTrimmedParam(url, "status") || "PENDING";
   const search = getTrimmedParam(url, "search");
+  const locale = getTrimmedParam(url, "locale");
+  const rating = Number.parseInt(getTrimmedParam(url, "rating"), 10);
+  const createdFrom = getTrimmedParam(url, "createdFrom");
+  const createdTo = getTrimmedParam(url, "createdTo");
 
   const where = {};
   if (status !== "all") {
@@ -857,6 +861,21 @@ async function handlePendingReviews(request) {
     ];
   }
 
+  if (locale === "es" || locale === "en") {
+    where.locale = locale;
+  }
+
+  if (rating >= 1 && rating <= 5) {
+    where.rating = rating;
+  }
+
+  if (createdFrom || createdTo) {
+    where.createdAt = {};
+    if (createdFrom && !Number.isNaN(Date.parse(createdFrom))) where.createdAt.gte = new Date(createdFrom);
+    if (createdTo && !Number.isNaN(Date.parse(createdTo))) where.createdAt.lte = new Date(createdTo);
+    if (!Object.keys(where.createdAt).length) delete where.createdAt;
+  }
+
   const [total, reviews] = await Promise.all([
     prisma.review.count({ where }),
     prisma.review.findMany({
@@ -868,6 +887,56 @@ async function handlePendingReviews(request) {
   ]);
 
   return jsonResponse({ pending: reviews, reviews, total, page, pageSize });
+}
+
+async function handleBulkModerateReviews(request) {
+  if (!(await isModeratorAuthorized(request))) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  const payload = await readJson(request);
+  const reviewIds = [...new Set(Array.isArray(payload.reviewIds) ? payload.reviewIds.map(String) : [])]
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const action = payload.action;
+  const moderator = String(payload.moderator || "moderator");
+
+  if (!reviewIds.length || reviewIds.length > 100 || (action !== "approve" && action !== "reject")) {
+    return jsonResponse({ error: "Invalid bulk moderation payload" }, 400);
+  }
+
+  const pendingReviews = await prisma.review.findMany({
+    where: { id: { in: reviewIds }, status: "PENDING" },
+  });
+  const changedIds = pendingReviews.map((review) => review.id);
+  const skippedIds = reviewIds.filter((id) => !changedIds.includes(id));
+  const status = action === "approve" ? "APPROVED" : "REJECTED";
+  const moderatedAt = new Date();
+
+  if (changedIds.length) {
+    await prisma.$transaction([
+      prisma.review.updateMany({
+        where: { id: { in: changedIds }, status: "PENDING" },
+        data: { status, moderatedAt, moderatedBy: moderator },
+      }),
+      prisma.auditLog.create({
+        data: {
+          action: "review.moderated.bulk",
+          actor: moderator,
+          details: { reviewIds: changedIds, action, count: changedIds.length },
+        },
+      }),
+    ]);
+
+    await Promise.all(pendingReviews.map((review) => forwardJsonWebhook(process.env.REVIEWS_MODERATION_WEBHOOK_URL, {
+      type: "review.moderated",
+      action,
+      review,
+      moderator,
+    })));
+  }
+
+  return jsonResponse({ ok: true, changedIds, skippedIds });
 }
 
 async function handleModerateReview(request) {
@@ -1031,6 +1100,43 @@ async function handleCustomerOrders(request) {
     },
   });
   return jsonResponse({ orders });
+}
+
+async function handleCustomerReviews(request) {
+  const session = getCustomerSessionFromRequest(request);
+  if (!session) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  const customer = await prisma.customer.findUnique({ where: { id: session.customerId }, select: { email: true } });
+  if (!customer) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  const url = parseUrl(request);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 10, 50);
+  const where = { email: { equals: customer.email, mode: "insensitive" } };
+  const [total, reviews] = await Promise.all([
+    prisma.review.count({ where }),
+    prisma.review.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      select: {
+        id: true,
+        productHandle: true,
+        locale: true,
+        rating: true,
+        content: true,
+        status: true,
+        createdAt: true,
+        moderatedAt: true,
+      },
+    }),
+  ]);
+  return jsonResponse({ reviews, total, page, pageSize });
 }
 
 async function handleAdminAuditLogs(request) {
@@ -1255,6 +1361,10 @@ export async function route(request) {
     return handleModerateReview(request);
   }
 
+  if (pathname === "/api/reviews/moderate/bulk" && method === "POST") {
+    return handleBulkModerateReviews(request);
+  }
+
   if (pathname === "/api/admin/login" && method === "POST") {
     return handleAdminLogin(request);
   }
@@ -1277,6 +1387,10 @@ export async function route(request) {
 
   if (pathname === "/api/account/orders" && method === "GET") {
     return handleCustomerOrders(request);
+  }
+
+  if (pathname === "/api/account/reviews" && method === "GET") {
+    return handleCustomerReviews(request);
   }
 
   if (pathname === "/api/admin/logout" && method === "POST") {

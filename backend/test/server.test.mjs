@@ -135,7 +135,7 @@ test("review history supports status filters, search, and pagination", async () 
   });
 
   const cookie = await loginCookie();
-  const response = await route(request("/api/reviews/pending?page=1&pageSize=1&status=APPROVED&search=alex", {
+  const response = await route(request("/api/reviews/pending?page=1&pageSize=1&status=APPROVED&search=alex&locale=en&rating=5", {
     headers: { Cookie: cookie },
   }));
   const payload = await json(response);
@@ -144,6 +144,49 @@ test("review history supports status filters, search, and pagination", async () 
   assert.equal(payload.total, 1);
   assert.equal(payload.pageSize, 1);
   assert.equal(payload.reviews[0].author, "Alex");
+});
+
+test("customers see only their own review history", async () => {
+  const registration = await route(request("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "reviews@example.com", password: "secure-pass-123", firstName: "Review", locale: "en" }),
+  }));
+  const cookie = registration.headers.get("set-cookie").split(";")[0];
+  await prisma.review.createMany({
+    data: [
+      { productHandle: "performance-top", locale: "en", rating: 5, author: "Review", email: "REVIEWS@example.com", content: "My pending review content", status: "PENDING" },
+      { productHandle: "accessory-bag", locale: "en", rating: 2, author: "Other", email: "other@example.com", content: "Another customer review", status: "APPROVED" },
+    ],
+  });
+
+  assert.equal((await route(request("/api/account/reviews"))).status, 401);
+  const response = await route(request("/api/account/reviews?page=1&pageSize=1", { headers: { Cookie: cookie } }));
+  const payload = await json(response);
+  assert.equal(response.status, 200);
+  assert.equal(payload.total, 1);
+  assert.equal(payload.reviews[0].productHandle, "performance-top");
+  assert.equal(payload.reviews[0].email, undefined);
+});
+
+test("moderators can bulk moderate pending reviews", async () => {
+  const reviews = await Promise.all([
+    prisma.review.create({ data: { productHandle: "top-a", locale: "en", rating: 5, author: "A", email: "a@example.com", content: "First pending review", status: "PENDING" } }),
+    prisma.review.create({ data: { productHandle: "top-b", locale: "es", rating: 4, author: "B", email: "b@example.com", content: "Second pending review", status: "PENDING" } }),
+    prisma.review.create({ data: { productHandle: "top-c", locale: "en", rating: 3, author: "C", email: "c@example.com", content: "Already approved review", status: "APPROVED" } }),
+  ]);
+  const cookie = await loginCookie();
+  const response = await route(request("/api/reviews/moderate/bulk", {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ reviewIds: reviews.map((review) => review.id), action: "approve", moderator: "integration-admin" }),
+  }));
+  const payload = await json(response);
+  assert.equal(response.status, 200);
+  assert.equal(payload.changedIds.length, 2);
+  assert.deepEqual(payload.skippedIds, [reviews[2].id]);
+  assert.equal(await prisma.review.count({ where: { status: "APPROVED" } }), 3);
+  assert.equal(await prisma.auditLog.count({ where: { action: "review.moderated.bulk" } }), 1);
 });
 
 test("rate limiting returns 429 after the configured request budget", async () => {

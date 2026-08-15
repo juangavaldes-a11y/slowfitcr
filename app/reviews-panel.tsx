@@ -1,7 +1,7 @@
 "use client";
 
-import { Button, Form, Input, Rate, Space, Typography, message } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { Alert, Button, Empty, Form, Input, Rate, Skeleton, Space, Typography, message } from "antd";
+import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import { trackEvent } from "./lib/analytics";
 
 type Review = {
@@ -29,6 +29,10 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
   const [average, setAverage] = useState(0);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(4);
+  const [submissionId, setSubmissionId] = useState("");
   const [api, contextHolder] = message.useMessage();
   const [form] = Form.useForm<ReviewFormValues>();
 
@@ -42,6 +46,10 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
             submit: "Enviar resena",
             pending: "Resena enviada para moderacion.",
             error: "No fue posible enviar tu resena.",
+            loadError: "No fue posible cargar las resenas.",
+            retry: "Reintentar",
+            showMore: "Ver mas resenas",
+            reference: "Referencia",
             author: "Nombre",
             email: "Correo",
             comment: "Comentario",
@@ -53,6 +61,10 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
             submit: "Submit review",
             pending: "Review submitted for moderation.",
             error: "Could not submit your review.",
+            loadError: "Could not load reviews.",
+            retry: "Retry",
+            showMore: "Show more reviews",
+            reference: "Reference",
             author: "Name",
             email: "Email",
             comment: "Comment",
@@ -60,61 +72,60 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
     [locale],
   );
 
+  const loadReviews = async () => {
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const response = await fetch(`/api/reviews?productHandle=${encodeURIComponent(productHandle)}&locale=${locale}`);
+      if (!response.ok) throw new Error("load_failed");
+      const data = (await response.json()) as { reviews: Review[]; average: number; count: number };
+      setReviews(data.reviews);
+      setAverage(data.average);
+      setCount(data.count);
+    } catch {
+      setLoadFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadInitialData = useEffectEvent(() => {
+    void loadReviews();
+    fetch("/api/auth/session")
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        if (payload?.customer) {
+          form.setFieldsValue({ author: payload.customer.firstName, email: payload.customer.email });
+        }
+      })
+      .catch(() => undefined);
+  });
+
   useEffect(() => {
-    let active = true;
-
-    const run = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/reviews?productHandle=${encodeURIComponent(productHandle)}&locale=${locale}`);
-        if (!response.ok) {
-          return;
-        }
-
-        const data = (await response.json()) as { reviews: Review[]; average: number; count: number };
-        if (!active) {
-          return;
-        }
-
-        setReviews(data.reviews);
-        setAverage(data.average);
-        setCount(data.count);
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-
-    run();
-
-    return () => {
-      active = false;
-    };
+    const timeout = window.setTimeout(loadInitialData, 0);
+    return () => window.clearTimeout(timeout);
   }, [locale, productHandle]);
 
   const onSubmit = async (values: ReviewFormValues) => {
-    const response = await fetch("/api/reviews/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        productHandle,
-        locale,
-        rating: values.rating,
-        author: values.author,
-        email: values.email,
-        content: values.content,
-      }),
-    });
-
-    if (!response.ok) {
+    setSubmitting(true);
+    setSubmissionId("");
+    try {
+      const response = await fetch("/api/reviews/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ productHandle, locale, ...values }),
+      });
+      if (!response.ok) throw new Error("submit_failed");
+      const payload = (await response.json()) as { reviewId: string };
+      setSubmissionId(payload.reviewId);
+      trackEvent("review_submitted", { product_handle: productHandle, locale });
+      form.resetFields(["rating", "content"]);
+      api.success(labels.pending);
+    } catch {
       api.error(labels.error);
-      return;
+    } finally {
+      setSubmitting(false);
     }
-
-    trackEvent("review_submitted", { product_handle: productHandle, locale });
-    form.resetFields();
-    api.success(labels.pending);
   };
 
   return (
@@ -127,19 +138,26 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
           {average ? average.toFixed(1) : "0.0"} ({count})
         </Typography.Text>
       </div>
-      {loading ? (
-        <Typography.Paragraph>Loading...</Typography.Paragraph>
+      {loading ? <Skeleton active paragraph={{ rows: 3 }} /> : loadFailed ? (
+        <Alert type="error" showIcon message={labels.loadError} action={<Button size="small" onClick={() => void loadReviews()}>{labels.retry}</Button>} />
       ) : reviews.length ? (
-        reviews.slice(0, 4).map((review) => (
-          <Typography.Paragraph key={review.id} className="slowfit-review-quote">
-            &ldquo;{review.content}&rdquo; - {review.author}
-          </Typography.Paragraph>
-        ))
+        <>
+          {reviews.slice(0, visibleCount).map((review) => (
+            <article key={review.id} className="slowfit-review-quote">
+              <Rate disabled value={review.rating} />
+              <Typography.Paragraph>&ldquo;{review.content}&rdquo;</Typography.Paragraph>
+              <Typography.Text strong>{review.author}</Typography.Text>{" "}
+              <Typography.Text type="secondary">{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(review.createdAt))}</Typography.Text>
+            </article>
+          ))}
+          {visibleCount < reviews.length ? <Button onClick={() => setVisibleCount((value) => value + 4)}>{labels.showMore}</Button> : null}
+        </>
       ) : (
-        <Typography.Paragraph className="slowfit-review-quote">{labels.empty}</Typography.Paragraph>
+        <Empty description={labels.empty} />
       )}
 
       <Typography.Title level={5}>{labels.submitTitle}</Typography.Title>
+      {submissionId ? <Alert type="success" showIcon message={labels.pending} description={`${labels.reference}: ${submissionId}`} /> : null}
       <Form form={form} layout="vertical" onFinish={onSubmit} className="slowfit-review-form">
         <Form.Item name="author" label={labels.author} rules={[{ required: true, min: 2 }]}>
           <Input />
@@ -154,7 +172,7 @@ export default function ReviewsPanel({ locale, productHandle }: ReviewsPanelProp
           <Input.TextArea rows={3} />
         </Form.Item>
         <Space>
-          <Button type="primary" htmlType="submit">
+          <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
             {labels.submit}
           </Button>
         </Space>
