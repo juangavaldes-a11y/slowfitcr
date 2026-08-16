@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Button, Typography } from "antd";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -61,10 +60,8 @@ export default async function ShopPage({ params }: ShopPageProps) {
     <main className="slowfit-shop-page">
       <section className="slowfit-shell slowfit-shop-hero">
         <span className="slowfit-kicker">{copy.shop.kicker}</span>
-        <Typography.Title className="slowfit-display slowfit-section-title">
-          {copy.shop.title}
-        </Typography.Title>
-        <Typography.Paragraph className="slowfit-shop-lead">{copy.shop.description}</Typography.Paragraph>
+        <h1 className="slowfit-display slowfit-section-title">{copy.shop.title}</h1>
+        <p className="slowfit-shop-lead">{copy.shop.description}</p>
       </section>
 
       <section id="collections" className="slowfit-shell">
@@ -84,41 +81,35 @@ export default async function ShopPage({ params }: ShopPageProps) {
                 <span className="slowfit-shop-card-label">
                   {index === 0 ? copy.shop.featuredLabel : copy.collections.kicker}
                 </span>
-                <Typography.Title className="slowfit-display slowfit-shop-card-title">
-                  {collection.title}
-                </Typography.Title>
-                <Typography.Paragraph className="slowfit-shop-card-copy">
-                  {collection.description}
-                </Typography.Paragraph>
-                <Link href={`/${locale}/shop/${collection.handle}`}>
-                  <Button type="primary" className="slowfit-block-cta">
-                    {copy.shop.ctaLabel}
-                  </Button>
+                <h2 className="slowfit-display slowfit-shop-card-title">{collection.title}</h2>
+                <p className="slowfit-shop-card-copy">{collection.description}</p>
+                <Link className="ant-btn slowfit-block-cta" href={`/${locale}/shop/${collection.handle}`}>
+                  {copy.shop.ctaLabel}
                 </Link>
               </div>
             </article>
           ))}
         </div>
-        <Typography.Paragraph className="slowfit-shop-helper">{copy.shop.helper}</Typography.Paragraph>
+        <p className="slowfit-shop-helper">{copy.shop.helper}</p>
       </section>
 
       <section className="slowfit-shell slowfit-policy-section">
         <div className="slowfit-trust-grid">
           <div className="slowfit-trust-card">
-            <Typography.Title level={4}>{copy.trust.shippingTitle}</Typography.Title>
-            <Typography.Paragraph>{copy.trust.shippingCopy}</Typography.Paragraph>
+            <h4>{copy.trust.shippingTitle}</h4>
+            <p>{copy.trust.shippingCopy}</p>
           </div>
           <div className="slowfit-trust-card">
-            <Typography.Title level={4}>{copy.trust.returnsTitle}</Typography.Title>
-            <Typography.Paragraph>{copy.trust.returnsCopy}</Typography.Paragraph>
+            <h4>{copy.trust.returnsTitle}</h4>
+            <p>{copy.trust.returnsCopy}</p>
           </div>
           <div className="slowfit-trust-card">
-            <Typography.Title level={4}>{copy.trust.supportTitle}</Typography.Title>
-            <Typography.Paragraph>{copy.trust.supportCopy}</Typography.Paragraph>
+            <h4>{copy.trust.supportTitle}</h4>
+            <p>{copy.trust.supportCopy}</p>
           </div>
           <div className="slowfit-trust-card">
-            <Typography.Title level={4}>{copy.trust.secureTitle}</Typography.Title>
-            <Typography.Paragraph>{copy.trust.secureCopy}</Typography.Paragraph>
+            <h4>{copy.trust.secureTitle}</h4>
+            <p>{copy.trust.secureCopy}</p>
           </div>
         </div>
       </section>

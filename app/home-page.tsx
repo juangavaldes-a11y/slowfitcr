@@ -2,8 +2,8 @@
 
 import {
   CheckCircleFilled,
-  GlobalOutlined,
   InstagramOutlined,
+  TikTokOutlined,
   UserOutlined,
   WhatsAppOutlined,
 } from "@ant-design/icons";
@@ -226,7 +226,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
               aria-label="TikTok"
               onClick={() => trackEvent("social_click", { locale, network: "tiktok" })}
             >
-              <GlobalOutlined />
+              <TikTokOutlined />
               <span>slowfitcr</span>
             </a>
           </Space>

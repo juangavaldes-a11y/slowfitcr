@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Button, Typography } from "antd";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -59,8 +58,8 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
     <main className="slowfit-shop-page">
       <section className="slowfit-shell slowfit-shop-hero">
         <span className="slowfit-kicker">{locale === "es" ? "Coleccion" : "Collection"}</span>
-        <Typography.Title className="slowfit-display slowfit-section-title">{collection.title}</Typography.Title>
-        <Typography.Paragraph className="slowfit-shop-lead">{collection.description}</Typography.Paragraph>
+        <h1 className="slowfit-display slowfit-section-title">{collection.title}</h1>
+        <p className="slowfit-shop-lead">{collection.description}</p>
       </section>
 
       <section className="slowfit-shell slowfit-policy-section">
@@ -77,13 +76,11 @@ export default async function CollectionPage({ params }: CollectionPageProps) {
                 />
               </div>
               <div className="slowfit-product-card-body">
-                <Typography.Title level={4}>{product.title}</Typography.Title>
-                <Typography.Paragraph className="slowfit-shop-card-copy">{product.description}</Typography.Paragraph>
-                <Typography.Text className="slowfit-product-price">{formatMoney.format(product.price)}</Typography.Text>
-                <Link href={`/${locale}/product/${product.handle}`}>
-                  <Button type="primary" className="slowfit-block-cta">
-                    {locale === "es" ? "Ver producto" : "View product"}
-                  </Button>
+                <h4>{product.title}</h4>
+                <p className="slowfit-shop-card-copy">{product.description}</p>
+                <span className="slowfit-product-price">{formatMoney.format(product.price)}</span>
+                <Link className="ant-btn slowfit-block-cta" href={`/${locale}/product/${product.handle}`}>
+                  {locale === "es" ? "Ver producto" : "View product"}
                 </Link>
               </div>
             </article>
