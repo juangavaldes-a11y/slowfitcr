@@ -40,6 +40,15 @@ test("account reports API failures without breaking its mobile layout", async ({
   await expectKeyboardFocus(page);
 });
 
+test("account login remains available while session restoration is stalled", async ({ page }) => {
+  await page.route("**/api/auth/session", () => new Promise(() => {}));
+
+  await page.goto("/en/account");
+  await expect(page.getByRole("tab", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeEnabled();
+});
+
 test("account formats rate-limit errors consistently", async ({ page }) => {
   await page.route("**/api/auth/session", (route) =>
     route.fulfill({ status: 401, json: { error: "Unauthorized" } }),

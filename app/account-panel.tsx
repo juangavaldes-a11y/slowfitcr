@@ -1,7 +1,7 @@
 "use client";
 
 import { LockOutlined, LogoutOutlined, ShoppingOutlined, UserOutlined } from "@ant-design/icons";
-import { Alert, Button, Collapse, Empty, Form, Input, Pagination, Rate, Space, Spin, Tabs, Tag, Typography } from "antd";
+import { Alert, Button, Collapse, Empty, Form, Input, Pagination, Rate, Space, Tabs, Tag, Typography } from "antd";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -53,7 +53,6 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
   const [reviews, setReviews] = useState<CustomerReview[]>([]);
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewTotal, setReviewTotal] = useState(0);
-  const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -246,9 +245,6 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
           setError(formatApiError(requestError, locale, { fallback: accountLoadError }));
         }
       })
-      .finally(() => {
-        if (active) setChecking(false);
-      });
     return () => {
       active = false;
     };
@@ -293,10 +289,6 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
     } catch (requestError) {
       handleAccountError(requestError);
     }
-  }
-
-  if (checking) {
-    return <div className="slowfit-account-loading"><Spin size="large" /></div>;
   }
 
   if (customer) {
