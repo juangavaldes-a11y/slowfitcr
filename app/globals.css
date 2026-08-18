@@ -192,6 +192,8 @@ a {
 
 .slowfit-hero-media {
   position: relative;
+  display: grid;
+  align-items: start;
   overflow: hidden;
   min-height: 80vh;
 }
@@ -201,13 +203,13 @@ a {
 }
 
 .slowfit-hero-overlay {
-  position: absolute;
-  top: 6%;
-  left: clamp(24px, 7.6vw, 128px);
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: min(calc(100% - 48px), 660px);
   max-width: 660px;
+  margin: clamp(24px, 6vh, 64px) 24px clamp(24px, 6vh, 64px) clamp(24px, 7.6vw, 128px);
   z-index: 2;
 }
 
@@ -1006,9 +1008,9 @@ a {
   }
 
   .slowfit-hero-overlay {
-    top: 7%;
-    left: 20px;
+    width: min(calc(100% - 40px), 500px);
     max-width: 500px;
+    margin-inline: 20px;
   }
 
   .slowfit-collection-block,
@@ -1129,18 +1131,16 @@ a {
   }
 
   .slowfit-hero-overlay {
-    top: 6%;
-    right: 14px;
-    left: 14px;
+    width: auto;
     max-width: none;
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: linear-gradient(180deg, rgba(247, 243, 238, 0.92) 0%, rgba(247, 243, 238, 0.32) 100%);
+    margin: 24px;
   }
 
   .slowfit-hero-line.ant-typography {
+    color: #fff;
     font-size: clamp(0.84rem, 3.8vw, 1.06rem);
     line-height: 1.26;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.82);
   }
 
   .slowfit-hero-mark {
