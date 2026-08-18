@@ -3,12 +3,14 @@
 import {
   CheckCircleFilled,
   InstagramOutlined,
+  MenuOutlined,
   TikTokOutlined,
   UserOutlined,
   WhatsAppOutlined,
 } from "@ant-design/icons";
-import { Button, Col, Row, Space, Typography } from "antd";
+import { Button, Col, Drawer, Row, Space, Typography } from "antd";
 import Image from "next/image";
+import { useState } from "react";
 import ContactForm from "./contact-form";
 import LocaleSwitcher from "./locale-switcher";
 import { trackEvent } from "./lib/analytics";
@@ -20,10 +22,12 @@ type HomePageProps = {
 };
 
 export default function HomePage({ copy, locale }: HomePageProps) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const shopHref = `/${locale}/shop`;
   const collectionsHref = `${shopHref}#collections`;
   const whySlowHref = `/${locale}#why-slow`;
   const contactHref = `/${locale}#contacto`;
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
     <main className="slowfit-page">
@@ -52,7 +56,43 @@ export default function HomePage({ copy, locale }: HomePageProps) {
           </Space>
           <LocaleSwitcher locale={locale} />
         </div>
+        <Button
+          type="text"
+          className="slowfit-menu-trigger"
+          icon={<MenuOutlined />}
+          aria-label={locale === "es" ? "Abrir menú" : "Open menu"}
+          aria-expanded={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen(true)}
+        />
       </section>
+
+      <Drawer
+        className="slowfit-mobile-menu"
+        title="Slow Fit CR"
+        placement="right"
+        size="min(86vw, 360px)"
+        open={mobileMenuOpen}
+        onClose={closeMobileMenu}
+      >
+        <nav className="slowfit-mobile-menu-links" aria-label={locale === "es" ? "Navegación principal" : "Main navigation"}>
+          <Button type="text" href={shopHref} onClick={closeMobileMenu}>
+            {copy.nav.shop}
+          </Button>
+          <Button type="text" href={collectionsHref} onClick={closeMobileMenu}>
+            {copy.nav.collections}
+          </Button>
+          <Button type="text" href={whySlowHref} onClick={closeMobileMenu}>
+            {copy.nav.whySlow}
+          </Button>
+          <Button type="text" href={contactHref} onClick={closeMobileMenu}>
+            {copy.nav.contact}
+          </Button>
+          <Button type="text" icon={<UserOutlined />} href={`/${locale}/account`} onClick={closeMobileMenu}>
+            {copy.nav.account}
+          </Button>
+          <LocaleSwitcher locale={locale} />
+        </nav>
+      </Drawer>
 
       <section className="slowfit-shell slowfit-hero">
         <div className="slowfit-hero-media">

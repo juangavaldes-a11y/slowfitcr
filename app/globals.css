@@ -108,6 +108,49 @@ a {
   flex-wrap: wrap;
 }
 
+.slowfit-menu-trigger.ant-btn {
+  display: none;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  color: var(--foreground);
+  font-size: 1.25rem;
+}
+
+.slowfit-mobile-menu .ant-drawer-header {
+  border-bottom-color: rgba(109, 105, 104, 0.16);
+}
+
+.slowfit-mobile-menu .ant-drawer-title {
+  color: var(--foreground);
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.slowfit-mobile-menu-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slowfit-mobile-menu-links > .ant-btn {
+  width: 100%;
+  min-height: 48px;
+  justify-content: flex-start;
+  padding-inline: 12px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.slowfit-mobile-menu-links .slowfit-locale-switcher {
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
 .slowfit-locale-switcher {
   display: inline-flex;
   align-items: center;
@@ -1091,47 +1134,24 @@ a {
   }
 
   .slowfit-nav {
+    flex-direction: row;
+    align-items: center;
     gap: 12px;
   }
 
   .slowfit-nav-actions {
-    width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
+    display: none;
   }
 
-  .slowfit-nav-actions .ant-space {
-    display: grid;
-    width: 100%;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px !important;
+  .slowfit-menu-trigger.ant-btn {
+    display: inline-flex;
   }
 
-  .slowfit-nav-actions .ant-space-item {
-    margin-inline-end: 0 !important;
-  }
-
-  .slowfit-nav-actions .ant-space-item:last-child {
-    grid-column: span 2;
-  }
-
-  .slowfit-nav-actions .ant-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .slowfit-locale-switcher {
-    width: 100%;
-    justify-content: space-between;
-    padding-right: 6px;
-  }
-
-  .slowfit-locale-switcher .ant-segmented {
+  .slowfit-mobile-menu-links .slowfit-locale-switcher .ant-segmented {
     flex: 1;
   }
 
-  .slowfit-locale-switcher .ant-segmented-group {
+  .slowfit-mobile-menu-links .slowfit-locale-switcher .ant-segmented-group {
     display: grid;
     grid-template-columns: 1fr 1fr;
   }
