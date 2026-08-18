@@ -117,6 +117,7 @@ WEBHOOK_MAX_ATTEMPTS=2
 # Transactional email
 RESEND_API_KEY=your_resend_api_key
 ORDER_CONFIRM_FROM=Slow Fit <orders@yourdomain.com>
+ACCOUNT_RESET_FROM=Slow Fit <accounts@yourdomain.com>
 
 # Contact capture
 CONTACT_WEBHOOK_URL=https://your-crm-endpoint.example.com/contact
@@ -127,10 +128,16 @@ JUDGEME_PRIVATE_API_TOKEN=your_judgeme_token
 REVIEWS_MODERATION_WEBHOOK_URL=https://your-moderation-endpoint.example.com/reviews
 REVIEW_MODERATION_TOKEN=set-a-strong-shared-token
 REVIEW_MODERATION_SESSION_SECRET=set-a-long-random-secret
+CUSTOMER_SESSION_SECRET=set-a-different-long-random-secret
 
 # Prisma / PostgreSQL
 DATABASE_URL=postgresql://slowfit:slowfit@postgres:5432/slowfit?schema=public
 MAX_REQUEST_BODY_BYTES=1048576
+APP_ORIGINS=https://slowfitcr.com,https://www.slowfitcr.com
+APP_ORIGIN=https://slowfitcr.com
+LOGIN_FAILURE_LIMIT=5
+LOGIN_LOCKOUT_MS=900000
+PASSWORD_RESET_MAX_AGE_MS=1800000
 ```
 
 If Shopify credentials are not set, the storefront uses fallback catalog data so UI routes still work.
@@ -148,9 +155,12 @@ Required backend secrets:
 DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB?schema=public
 REVIEW_MODERATION_TOKEN=set-a-strong-shared-token
 REVIEW_MODERATION_SESSION_SECRET=set-a-long-random-secret
+CUSTOMER_SESSION_SECRET=set-a-different-long-random-secret
 SHOPIFY_WEBHOOK_SECRET=your_shopify_webhook_secret
 OUTBOUND_WEBHOOK_SECRET=set-a-long-random-secret
 ```
+
+Production startup requires the moderation token and both session secrets to contain at least 32 characters and to be distinct.
 
 Optional but recommended backend integrations:
 
@@ -169,6 +179,8 @@ MAX_REQUEST_BODY_BYTES=1048576
 
 When `OUTBOUND_WEBHOOK_SECRET` is configured, deliveries include `X-Slowfit-Timestamp` and an
 `X-Slowfit-Signature` containing the Base64-encoded HMAC-SHA256 of `<timestamp>.<raw-body>`.
+
+Customer logins are locked for 15 minutes after five consecutive failures by default. Password recovery links are stored as hashes, expire after 30 minutes, and can only be used once. Reset email delivery uses `ACCOUNT_RESET_FROM` when set, otherwise `ORDER_CONFIRM_FROM`.
 
 Required frontend secrets:
 

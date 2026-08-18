@@ -45,6 +45,13 @@ jobs:
         run: npm ci
         working-directory: backend
 
+      - name: Audit frontend dependencies
+        run: npm audit --audit-level=high
+
+      - name: Audit backend dependencies
+        run: npm audit --audit-level=high
+        working-directory: backend
+
       - name: Generate Prisma client
         run: npx prisma generate
         working-directory: backend

@@ -47,12 +47,14 @@ Backend secrets:
 - `REVIEWS_MODERATION_WEBHOOK_URL`
 - `RESEND_API_KEY`
 - `ORDER_CONFIRM_FROM`
+- `ACCOUNT_RESET_FROM`
 
 Backend delivery and request limits:
 
 - `WEBHOOK_TIMEOUT_MS` (default `2000`)
 - `WEBHOOK_MAX_ATTEMPTS` (default `2`, maximum `3`)
 - `MAX_REQUEST_BODY_BYTES` (default `1048576`)
+- `PASSWORD_RESET_MAX_AGE_MS` (default `1800000`)
 
 Frontend secrets and configuration:
 
@@ -64,7 +66,12 @@ Frontend secrets and configuration:
 Requirements:
 
 - Generate unique high-entropy moderation secrets for each environment.
+- Ensure `REVIEW_MODERATION_TOKEN`, `REVIEW_MODERATION_SESSION_SECRET`, and `CUSTOMER_SESSION_SECRET` are distinct and at least 32 characters before deployment; the backend refuses to start otherwise.
 - Configure downstream systems to verify `X-Slowfit-Timestamp` and `X-Slowfit-Signature` before enabling outbound signing.
+- Set `APP_ORIGINS` to the comma-separated production storefront origins.
+- Set `APP_ORIGIN` to the canonical storefront origin used in password recovery links.
+- Review `LOGIN_FAILURE_LIMIT` and `LOGIN_LOCKOUT_MS` with customer support before launch.
+- Request and complete a password reset in each locale to verify Resend delivery and link routing.
 - Store secrets in platform secret managers, never committed files.
 - Restrict production database credentials to the backend runtime.
 - Document secret rotation ownership and cadence.

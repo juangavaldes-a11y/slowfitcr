@@ -43,9 +43,10 @@ type CustomerReview = {
 
 type AccountPanelProps = {
   locale: Locale;
+  resetToken?: string;
 };
 
-export default function AccountPanel({ locale }: AccountPanelProps) {
+export default function AccountPanel({ locale, resetToken }: AccountPanelProps) {
   const router = useRouter();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -55,6 +56,8 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [recoveryMode, setRecoveryMode] = useState<"none" | "request" | "reset">(resetToken ? "reset" : "none");
   const accountLoadError = locale === "es"
     ? "No pudimos cargar tu cuenta. Intenta de nuevo."
     : "We could not load your account. Try again.";
@@ -97,6 +100,16 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
         invalidEmail: "Ingresa un correo válido.",
         sessionExpired: "Tu sesión expiró. Inicia sesión de nuevo.",
         requestFailed: "No pudimos cargar tu cuenta. Intenta de nuevo.",
+        forgotPassword: "¿Olvidaste tu contraseña?",
+        recoveryTitle: "Recuperar contraseña",
+        recoveryIntro: "Te enviaremos un enlace seguro si existe una cuenta con este correo.",
+        sendReset: "Enviar enlace",
+        resetTitle: "Crear nueva contraseña",
+        resetPassword: "Guardar nueva contraseña",
+        backToLogin: "Volver a iniciar sesión",
+        resetRequested: "Si existe una cuenta, recibirás un enlace de recuperación por correo.",
+        resetCompleted: "Tu contraseña fue actualizada. Ya puedes iniciar sesión.",
+        resetFailed: "El enlace es inválido o venció. Solicita uno nuevo.",
       }
     : {
         kicker: "Slow Fit account",
@@ -135,7 +148,53 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
         invalidEmail: "Enter a valid email.",
         sessionExpired: "Your session expired. Sign in again.",
         requestFailed: "We could not load your account. Try again.",
+        forgotPassword: "Forgot your password?",
+        recoveryTitle: "Recover password",
+        recoveryIntro: "We will send a secure link if an account exists for this email.",
+        sendReset: "Send reset link",
+        resetTitle: "Create new password",
+        resetPassword: "Save new password",
+        backToLogin: "Back to sign in",
+        resetRequested: "If an account exists, you will receive a recovery link by email.",
+        resetCompleted: "Your password was updated. You can now sign in.",
+        resetFailed: "This link is invalid or expired. Request a new one.",
       };
+
+  async function requestPasswordReset(values: { email: string }) {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      await apiRequest("/api/auth/password/forgot", {
+        method: "POST",
+        body: JSON.stringify({ ...values, locale }),
+      });
+      setSuccess(labels.resetRequested);
+    } catch (requestError) {
+      setError(formatApiError(requestError, locale, { fallback: labels.requestFailed }));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function completePasswordReset(values: { password: string }) {
+    setLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      await apiRequest("/api/auth/password/reset", {
+        method: "POST",
+        body: JSON.stringify({ token: resetToken, password: values.password }),
+      });
+      setRecoveryMode("none");
+      setSuccess(labels.resetCompleted);
+      router.replace(`/${locale}/account`);
+    } catch {
+      setError(labels.resetFailed);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function handleAccountError(requestError: unknown) {
     if (isApiErrorStatus(requestError, 401)) {
@@ -334,7 +393,27 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
           <Typography.Title className="slowfit-display slowfit-account-title">{labels.title}</Typography.Title>
           <Typography.Paragraph className="slowfit-policy-lead">{labels.intro}</Typography.Paragraph>
           {error ? <Alert type="error" showIcon title={error} closable onClose={() => setError("")} /> : null}
-          <Tabs
+          {success ? <Alert type="success" showIcon title={success} closable onClose={() => setSuccess("")} /> : null}
+          {recoveryMode === "request" ? (
+            <div>
+              <Typography.Title level={3}>{labels.recoveryTitle}</Typography.Title>
+              <Typography.Paragraph>{labels.recoveryIntro}</Typography.Paragraph>
+              <Form layout="vertical" onFinish={(values) => void requestPasswordReset(values)}>
+                <Form.Item name="email" label={labels.email} rules={emailRules}><Input prefix={<UserOutlined />} autoComplete="email" /></Form.Item>
+                <Button type="primary" htmlType="submit" loading={loading} block>{labels.sendReset}</Button>
+              </Form>
+              <Button type="link" block onClick={() => { setRecoveryMode("none"); setError(""); }}>{labels.backToLogin}</Button>
+            </div>
+          ) : recoveryMode === "reset" ? (
+            <div>
+              <Typography.Title level={3}>{labels.resetTitle}</Typography.Title>
+              <Form layout="vertical" onFinish={(values) => void completePasswordReset(values)}>
+                <Form.Item name="password" label={labels.password} extra={labels.passwordHint} rules={passwordRules}><Input.Password prefix={<LockOutlined />} autoComplete="new-password" /></Form.Item>
+                <Button type="primary" htmlType="submit" loading={loading} block>{labels.resetPassword}</Button>
+              </Form>
+              <Button type="link" block onClick={() => { setRecoveryMode("request"); setError(""); }}>{labels.forgotPassword}</Button>
+            </div>
+          ) : <Tabs
             items={[
               {
                 key: "login",
@@ -344,6 +423,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
                     <Form.Item name="email" label={labels.email} rules={emailRules}><Input prefix={<UserOutlined />} autoComplete="email" /></Form.Item>
                     <Form.Item name="password" label={labels.password} rules={passwordRules}><Input.Password prefix={<LockOutlined />} autoComplete="current-password" /></Form.Item>
                     <Button type="primary" htmlType="submit" loading={loading} block>{labels.submitLogin}</Button>
+                    <Button type="link" block onClick={() => { setRecoveryMode("request"); setError(""); setSuccess(""); }}>{labels.forgotPassword}</Button>
                   </Form>
                 ),
               },
@@ -374,7 +454,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
                 ),
               },
             ]}
-          />
+          />}
         </div>
       </section>
     </main>

@@ -56,6 +56,36 @@ test("account formats rate-limit errors consistently", async ({ page }) => {
   await expect(page.getByRole("alert").filter({ hasText: "Too many attempts. Wait a moment and try again." })).toBeVisible();
 });
 
+test("customer requests and completes password recovery", async ({ page }) => {
+  let requestedEmail = "";
+  let submittedToken = "";
+  await page.route("**/api/auth/password/forgot", async (route) => {
+    const payload = route.request().postDataJSON();
+    requestedEmail = payload.email;
+    await route.fulfill({ status: 202, json: { ok: true } });
+  });
+  await page.route("**/api/auth/password/reset", async (route) => {
+    const payload = route.request().postDataJSON();
+    submittedToken = payload.token;
+    await route.fulfill({ json: { ok: true } });
+  });
+
+  await page.goto("/en/account");
+  await page.getByRole("button", { name: "Forgot your password?" }).click();
+  await page.getByLabel("Email").fill("recover@example.com");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "If an account exists" })).toBeVisible();
+  expect(requestedEmail).toBe("recover@example.com");
+
+  const resetToken = "test-reset-token-that-is-long-enough";
+  await page.goto(`/en/account?resetToken=${resetToken}`);
+  await expect(page.getByRole("heading", { name: "Create new password" })).toBeVisible();
+  await page.getByLabel("Password").fill("new-password-456");
+  await page.getByRole("button", { name: "Save new password" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Your password was updated" })).toBeVisible();
+  expect(submittedToken).toBe(resetToken);
+});
+
 test("operator filters and inspects audit details on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const audit = {

@@ -15,6 +15,7 @@ const prisma = new PrismaClient();
 let route;
 let disconnectDatabase;
 let startServer;
+let validateProductionConfiguration;
 let requestSequence = 1;
 
 function request(path, init = {}) {
@@ -41,12 +42,13 @@ async function loginCookie() {
 }
 
 before(async () => {
-  ({ route, disconnectDatabase, startServer } = await import("../server.mjs"));
+  ({ route, disconnectDatabase, startServer, validateProductionConfiguration } = await import("../server.mjs"));
 });
 
 beforeEach(async () => {
   await prisma.orderWebhookEvent.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
   await prisma.customer.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.review.deleteMany();
@@ -75,6 +77,42 @@ test("admin login creates a reusable session and logout clears it", async () => 
   const logout = await route(request("/api/admin/logout", { method: "POST", headers: { Cookie: cookie } }));
   assert.equal(logout.status, 200);
   assert.match(logout.headers.get("set-cookie"), /Max-Age=0/);
+});
+
+test("production requires strong and distinct authentication secrets", () => {
+  const originalEnvironment = {
+    NODE_ENV: process.env.NODE_ENV,
+    REVIEW_MODERATION_TOKEN: process.env.REVIEW_MODERATION_TOKEN,
+    REVIEW_MODERATION_SESSION_SECRET: process.env.REVIEW_MODERATION_SESSION_SECRET,
+    CUSTOMER_SESSION_SECRET: process.env.CUSTOMER_SESSION_SECRET,
+  };
+
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.REVIEW_MODERATION_TOKEN = "short";
+    delete process.env.REVIEW_MODERATION_SESSION_SECRET;
+    delete process.env.CUSTOMER_SESSION_SECRET;
+    assert.throws(() => validateProductionConfiguration(), /at least 32 characters/);
+
+    const sharedSecret = "a".repeat(32);
+    process.env.REVIEW_MODERATION_TOKEN = sharedSecret;
+    process.env.REVIEW_MODERATION_SESSION_SECRET = sharedSecret;
+    process.env.CUSTOMER_SESSION_SECRET = "b".repeat(32);
+    assert.throws(() => validateProductionConfiguration(), /must be distinct/);
+
+    process.env.REVIEW_MODERATION_TOKEN = "a".repeat(32);
+    process.env.REVIEW_MODERATION_SESSION_SECRET = "b".repeat(32);
+    process.env.CUSTOMER_SESSION_SECRET = "c".repeat(32);
+    assert.doesNotThrow(() => validateProductionConfiguration());
+  } finally {
+    for (const [name, value] of Object.entries(originalEnvironment)) {
+      if (value === undefined) {
+        delete process.env[name];
+      } else {
+        process.env[name] = value;
+      }
+    }
+  }
 });
 
 test("customers can register, sign in, and access only authenticated account data", async () => {
@@ -123,6 +161,144 @@ test("customers can register, sign in, and access only authenticated account dat
     body: JSON.stringify({ email: "CUSTOMER@example.com", password: "secure-pass-123" }),
   }));
   assert.equal(login.status, 200);
+});
+
+test("customer login locks after repeated failures and recovers after expiry", async () => {
+  await route(request("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "locked@example.com", password: "secure-pass-123", firstName: "Locked" }),
+  }));
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await route(request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "locked@example.com", password: "wrong-password" }),
+    }));
+    assert.equal(response.status, 401);
+  }
+
+  const customer = await prisma.customer.findUnique({ where: { email: "locked@example.com" } });
+  assert.ok(customer.lockedUntil > new Date());
+  const blocked = await route(request("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "locked@example.com", password: "secure-pass-123" }),
+  }));
+  assert.equal(blocked.status, 401);
+
+  await prisma.customer.update({ where: { id: customer.id }, data: { lockedUntil: new Date(0) } });
+  const recovered = await route(request("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "locked@example.com", password: "secure-pass-123" }),
+  }));
+  assert.equal(recovered.status, 200);
+  const resetCustomer = await prisma.customer.findUnique({ where: { id: customer.id } });
+  assert.equal(resetCustomer.failedLoginAttempts, 0);
+  assert.equal(resetCustomer.lockedUntil, null);
+});
+
+test("password recovery is non-enumerating, hashed, expiring, and single-use", async () => {
+  await route(request("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "recover@example.com", password: "old-password-123", firstName: "Recover", locale: "en" }),
+  }));
+
+  const originalFetch = globalThis.fetch;
+  const originalEnvironment = {
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    ACCOUNT_RESET_FROM: process.env.ACCOUNT_RESET_FROM,
+    APP_ORIGIN: process.env.APP_ORIGIN,
+  };
+  const deliveries = [];
+  process.env.RESEND_API_KEY = "integration-resend-key";
+  process.env.ACCOUNT_RESET_FROM = "Slow Fit <accounts@example.com>";
+  process.env.APP_ORIGIN = "https://slowfitcr.com";
+  globalThis.fetch = async (url, init) => {
+    deliveries.push({ url: String(url), init });
+    return new Response(null, { status: 202 });
+  };
+
+  try {
+    const known = await route(request("/api/auth/password/forgot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "recover@example.com", locale: "en" }),
+    }));
+    const unknown = await route(request("/api/auth/password/forgot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "unknown@example.com", locale: "en" }),
+    }));
+    assert.equal(known.status, 202);
+    assert.equal(unknown.status, 202);
+    assert.deepEqual(await known.json(), await unknown.json());
+    assert.equal(deliveries.length, 1);
+
+    const emailPayload = JSON.parse(deliveries[0].init.body);
+    const resetUrl = new URL(emailPayload.html.match(/href="([^"]+)"/)[1]);
+    const rawToken = resetUrl.searchParams.get("resetToken");
+    const storedToken = await prisma.passwordResetToken.findFirst();
+    assert.ok(rawToken);
+    assert.notEqual(storedToken.tokenHash, rawToken);
+    assert.equal(storedToken.tokenHash.length, 64);
+
+    const reset = await route(request("/api/auth/password/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: rawToken, password: "new-password-456" }),
+    }));
+    assert.equal(reset.status, 200);
+
+    const reused = await route(request("/api/auth/password/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: rawToken, password: "another-password-789" }),
+    }));
+    assert.equal(reused.status, 400);
+
+    const oldLogin = await route(request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "recover@example.com", password: "old-password-123" }),
+    }));
+    assert.equal(oldLogin.status, 401);
+    const newLogin = await route(request("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "recover@example.com", password: "new-password-456" }),
+    }));
+    assert.equal(newLogin.status, 200);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [name, value] of Object.entries(originalEnvironment)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});
+
+test("browser mutations reject cross-site origins", async () => {
+  const crossSite = await route(request("/api/contact", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: "https://attacker.example",
+      "Sec-Fetch-Site": "cross-site",
+    },
+    body: JSON.stringify({ name: "Customer", email: "customer@example.com", message: "Please help with sizing" }),
+  }));
+  assert.equal(crossSite.status, 403);
+
+  const local = await route(request("/api/contact", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "http://localhost:3000" },
+    body: JSON.stringify({ name: "Customer", email: "customer@example.com", message: "Please help with sizing" }),
+  }));
+  assert.equal(local.status, 200);
 });
 
 test("review history supports status filters, search, and pagination", async () => {

@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -15,6 +15,10 @@ const SESSION_COOKIE_NAME = "slowfit_admin_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 const CUSTOMER_SESSION_COOKIE_NAME = "slowfit_customer_session";
 const CUSTOMER_SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+const SESSION_CLOCK_SKEW_MS = 60 * 1000;
+const LOGIN_FAILURE_LIMIT = Number.parseInt(process.env.LOGIN_FAILURE_LIMIT || "5", 10);
+const LOGIN_LOCKOUT_MS = Number.parseInt(process.env.LOGIN_LOCKOUT_MS || "900000", 10);
+const PASSWORD_RESET_MAX_AGE_MS = Number.parseInt(process.env.PASSWORD_RESET_MAX_AGE_MS || "1800000", 10);
 const scryptAsync = promisify(scrypt);
 
 const RATE_LIMIT_WINDOW_MS = Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000", 10);
@@ -132,6 +136,28 @@ function getCustomerSessionSecret() {
   return process.env.CUSTOMER_SESSION_SECRET || getSessionSecret();
 }
 
+export function validateProductionConfiguration() {
+  if (process.env.NODE_ENV !== "production") {
+    return;
+  }
+
+  const secrets = {
+    REVIEW_MODERATION_TOKEN: process.env.REVIEW_MODERATION_TOKEN || "",
+    REVIEW_MODERATION_SESSION_SECRET: process.env.REVIEW_MODERATION_SESSION_SECRET || "",
+    CUSTOMER_SESSION_SECRET: process.env.CUSTOMER_SESSION_SECRET || "",
+  };
+  const invalidNames = Object.entries(secrets)
+    .filter(([, value]) => value.length < 32)
+    .map(([name]) => name);
+  if (invalidNames.length) {
+    throw new Error(`Production secrets must contain at least 32 characters: ${invalidNames.join(", ")}`);
+  }
+
+  if (new Set(Object.values(secrets)).size !== Object.keys(secrets).length) {
+    throw new Error("Production authentication secrets must be distinct");
+  }
+}
+
 function toBase64Url(value) {
   return Buffer.from(value, "utf8").toString("base64url");
 }
@@ -189,7 +215,14 @@ function verifyAdminSessionToken(token) {
 
   try {
     const decoded = JSON.parse(fromBase64Url(payload));
-    return Boolean(decoded.exp && decoded.exp > Date.now() && decoded.role === "review-moderator");
+    const now = Date.now();
+    return Boolean(
+      decoded.iat
+      && decoded.iat <= now + SESSION_CLOCK_SKEW_MS
+      && decoded.exp > now
+      && decoded.exp <= decoded.iat + SESSION_MAX_AGE_SECONDS * 1000
+      && decoded.role === "review-moderator",
+    );
   } catch {
     return false;
   }
@@ -242,6 +275,42 @@ async function verifyPassword(password, storedHash) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
+function hashResetToken(token) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+async function sendPasswordResetEmail({ email, locale, token }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.ACCOUNT_RESET_FROM || process.env.ORDER_CONFIRM_FROM;
+  if (!apiKey || !from) {
+    throw new Error("Password reset email delivery is not configured");
+  }
+
+  const appOrigin = process.env.APP_ORIGIN || "https://slowfitcr.com";
+  const resetUrl = new URL(`/${locale}/account`, appOrigin);
+  resetUrl.searchParams.set("resetToken", token);
+  const subject = locale === "es" ? "Restablece tu contraseña de Slow Fit" : "Reset your Slow Fit password";
+  const heading = locale === "es" ? "Restablece tu contraseña" : "Reset your password";
+  const message = locale === "es"
+    ? "Este enlace vence en 30 minutos y solo puede utilizarse una vez."
+    : "This link expires in 30 minutes and can only be used once.";
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from,
+      to: [email],
+      subject,
+      html: `<div style="font-family:Arial,sans-serif;color:#2f2a28"><h2>${heading}</h2><p>${message}</p><p><a href="${resetUrl.toString()}">${heading}</a></p></div>`,
+    }),
+    signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+  });
+  if (!response.ok) {
+    throw new Error(`Password reset email rejected with status ${response.status}`);
+  }
+}
+
 function createCustomerSessionToken(customer) {
   const secret = getCustomerSessionSecret();
   if (!secret) {
@@ -273,10 +342,48 @@ function getCustomerSessionFromRequest(request) {
 
   try {
     const decoded = JSON.parse(fromBase64Url(payload));
-    return decoded.exp > Date.now() && decoded.role === "customer" && decoded.customerId ? decoded : null;
+    const now = Date.now();
+    return decoded.iat
+      && decoded.iat <= now + SESSION_CLOCK_SKEW_MS
+      && decoded.exp > now
+      && decoded.exp <= decoded.iat + CUSTOMER_SESSION_MAX_AGE_SECONDS * 1000
+      && decoded.role === "customer"
+      && decoded.customerId
+      ? decoded
+      : null;
   } catch {
     return null;
   }
+}
+
+function isTrustedBrowserMutation(request) {
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite === "cross-site") {
+    return false;
+  }
+
+  const origin = request.headers.get("origin");
+  if (!origin) {
+    return true;
+  }
+
+  const configuredOrigins = (process.env.APP_ORIGINS || "https://slowfitcr.com,https://www.slowfitcr.com")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (configuredOrigins.includes(origin)) {
+    return true;
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      return ["localhost", "127.0.0.1"].includes(new URL(origin).hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 function buildCustomerSessionCookie(token) {
@@ -901,7 +1008,7 @@ async function isModeratorAuthorized(request) {
   }
 
   const token = request.headers.get("x-moderation-token") || "";
-  return Boolean(process.env.REVIEW_MODERATION_TOKEN && token && token === process.env.REVIEW_MODERATION_TOKEN);
+  return Boolean(process.env.REVIEW_MODERATION_TOKEN && token && safeCompare(token, process.env.REVIEW_MODERATION_TOKEN));
 }
 
 async function handlePendingReviews(request) {
@@ -1054,7 +1161,7 @@ async function handleModerateReview(request) {
 async function handleAdminLogin(request) {
   const payload = await readJson(request);
   const token = String(payload.token || "");
-  if (!process.env.REVIEW_MODERATION_TOKEN || token !== process.env.REVIEW_MODERATION_TOKEN) {
+  if (!process.env.REVIEW_MODERATION_TOKEN || !safeCompare(token, process.env.REVIEW_MODERATION_TOKEN)) {
     await appendAudit("admin.login.failed", { reason: "invalid_credentials" }, "unknown");
     return jsonResponse({ error: "Invalid credentials" }, 401);
   }
@@ -1117,16 +1224,133 @@ async function handleCustomerLogin(request) {
   const email = String(payload.email || "").trim().toLowerCase();
   const password = String(payload.password || "");
   const customer = isValidEmail(email) ? await prisma.customer.findUnique({ where: { email } }) : null;
+  const now = new Date();
+
+  if (customer?.lockedUntil && customer.lockedUntil > now) {
+    await appendAudit("customer.login.blocked", { customerId: customer.id }, "unknown");
+    return jsonResponse({ error: "Invalid email or password" }, 401);
+  }
 
   if (!customer || !(await verifyPassword(password, customer.passwordHash))) {
+    if (customer) {
+      const updated = await prisma.customer.update({
+        where: { id: customer.id },
+        data: { failedLoginAttempts: { increment: 1 }, lockedUntil: null },
+        select: { failedLoginAttempts: true },
+      });
+      if (updated.failedLoginAttempts >= LOGIN_FAILURE_LIMIT) {
+        await prisma.customer.update({
+          where: { id: customer.id },
+          data: { failedLoginAttempts: 0, lockedUntil: new Date(Date.now() + LOGIN_LOCKOUT_MS) },
+        });
+      }
+    }
     await appendAudit("customer.login.failed", { email }, "unknown");
     return jsonResponse({ error: "Invalid email or password" }, 401);
   }
 
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { failedLoginAttempts: 0, lockedUntil: null },
+  });
   await appendAudit("customer.login", { customerId: customer.id }, email);
   return jsonResponse({ ok: true, customer: customerResponse(customer) }, 200, {
     "Set-Cookie": buildCustomerSessionCookie(createCustomerSessionToken(customer)),
   });
+}
+
+async function handlePasswordResetRequest(request) {
+  if (!process.env.RESEND_API_KEY || !(process.env.ACCOUNT_RESET_FROM || process.env.ORDER_CONFIRM_FROM)) {
+    return jsonResponse({ error: "Password recovery is unavailable" }, 503);
+  }
+
+  const payload = await readJson(request);
+  const email = String(payload.email || "").trim().toLowerCase();
+  const locale = normalizeLocale(payload.locale);
+  const accepted = { ok: true, message: "If an account exists, a reset link has been sent." };
+  if (!isValidEmail(email)) {
+    return jsonResponse(accepted, 202);
+  }
+
+  const customer = await prisma.customer.findUnique({ where: { email }, select: { id: true, email: true } });
+  if (!customer) {
+    return jsonResponse(accepted, 202);
+  }
+
+  const token = randomBytes(32).toString("base64url");
+  const resetRecord = await prisma.$transaction(async (transaction) => {
+    await transaction.passwordResetToken.deleteMany({ where: { customerId: customer.id } });
+    return transaction.passwordResetToken.create({
+      data: {
+        customerId: customer.id,
+        tokenHash: hashResetToken(token),
+        expiresAt: new Date(Date.now() + PASSWORD_RESET_MAX_AGE_MS),
+      },
+    });
+  });
+
+  try {
+    await sendPasswordResetEmail({ email: customer.email, locale, token });
+    await appendAudit("customer.password_reset.requested", { customerId: customer.id }, "customer");
+  } catch (error) {
+    await prisma.passwordResetToken.delete({ where: { id: resetRecord.id } }).catch(() => undefined);
+    log("error", "customer.password_reset.delivery_failed", {
+      customerId: customer.id,
+      error: String(error?.message || "unknown_error"),
+    });
+  }
+
+  return jsonResponse(accepted, 202);
+}
+
+async function handlePasswordReset(request) {
+  const payload = await readJson(request);
+  const token = String(payload.token || "");
+  const password = String(payload.password || "");
+  if (token.length < 32 || token.length > 256 || password.length < 8 || password.length > 128) {
+    return jsonResponse({ error: "Invalid or expired reset link" }, 400);
+  }
+
+  try {
+    const customerId = await prisma.$transaction(async (transaction) => {
+      const record = await transaction.passwordResetToken.findUnique({
+        where: { tokenHash: hashResetToken(token) },
+      });
+      if (!record || record.consumedAt || record.expiresAt <= new Date()) {
+        throw new Error("INVALID_RESET_TOKEN");
+      }
+
+      const consumed = await transaction.passwordResetToken.updateMany({
+        where: { id: record.id, consumedAt: null, expiresAt: { gt: new Date() } },
+        data: { consumedAt: new Date() },
+      });
+      if (consumed.count !== 1) {
+        throw new Error("INVALID_RESET_TOKEN");
+      }
+
+      await transaction.customer.update({
+        where: { id: record.customerId },
+        data: {
+          passwordHash: await hashPassword(password),
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      });
+      await transaction.passwordResetToken.updateMany({
+        where: { customerId: record.customerId, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+      return record.customerId;
+    });
+
+    await appendAudit("customer.password_reset.completed", { customerId }, "customer");
+    return jsonResponse({ ok: true });
+  } catch (error) {
+    if (error?.message === "INVALID_RESET_TOKEN") {
+      return jsonResponse({ error: "Invalid or expired reset link" }, 400);
+    }
+    throw error;
+  }
 }
 
 async function handleCustomerSession(request) {
@@ -1388,6 +1612,10 @@ export async function route(request) {
   const pathname = url.pathname;
   const method = request.method.toUpperCase();
 
+  if (!["GET", "HEAD", "OPTIONS"].includes(method) && !isTrustedBrowserMutation(request)) {
+    return jsonResponse({ error: "Forbidden origin" }, 403);
+  }
+
   const rate = applyRateLimit(request);
   if (rate.limited) {
     return jsonResponse(
@@ -1447,6 +1675,14 @@ export async function route(request) {
 
   if (pathname === "/api/auth/login" && method === "POST") {
     return handleCustomerLogin(request);
+  }
+
+  if (pathname === "/api/auth/password/forgot" && method === "POST") {
+    return handlePasswordResetRequest(request);
+  }
+
+  if (pathname === "/api/auth/password/reset" && method === "POST") {
+    return handlePasswordReset(request);
   }
 
   if (pathname === "/api/auth/session" && method === "GET") {
@@ -1559,6 +1795,7 @@ export function createRequestListener() {
 }
 
 export function startServer() {
+  validateProductionConfiguration();
   return createServer(createRequestListener()).listen(PORT, HOST, () => {
     log("info", "server.started", { host: HOST, port: PORT });
   });

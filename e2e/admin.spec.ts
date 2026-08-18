@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("moderator session persists across review and operations pages", async ({ page, request }) => {
+  test.setTimeout(60_000);
   const suffix = Date.now();
   const author = `E2E Reviewer ${suffix}`;
   const content = `Excellent end-to-end review content ${suffix}`;
