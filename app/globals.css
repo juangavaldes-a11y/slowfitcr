@@ -249,16 +249,24 @@ a {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  justify-content: space-between;
   width: min(calc(100% - 48px), 660px);
   max-width: 660px;
+  min-height: calc(80vh - clamp(48px, 12vh, 128px));
   margin: clamp(24px, 6vh, 64px) 24px clamp(24px, 6vh, 64px) clamp(24px, 7.6vw, 128px);
   z-index: 2;
+}
+
+.slowfit-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .slowfit-hero-mark {
   width: clamp(220px, 28vw, 360px);
   height: auto;
+  align-self: flex-start;
   margin-bottom: 6px;
 }
 
@@ -272,7 +280,6 @@ a {
 }
 
 .slowfit-hero-line.ant-typography:first-of-type {
-  margin-top: -96px;
   font-size: clamp(0.98rem, 1.6vw, 1.52rem);
 }
 
@@ -1113,6 +1120,17 @@ a {
   }
 }
 
+@media (min-width: 768px) and (max-width: 991px) {
+  .slowfit-hero-line.ant-typography {
+    font-size: 1.25rem;
+    line-height: 1.34;
+  }
+
+  .slowfit-hero-line.ant-typography:first-of-type {
+    font-size: 1.5rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -1173,7 +1191,16 @@ a {
   .slowfit-hero-overlay {
     width: auto;
     max-width: none;
+    min-height: calc(58vh - 48px);
     margin: 24px;
+  }
+
+  .slowfit-hero-media > .slowfit-cover {
+    object-position: 30% center;
+  }
+
+  .slowfit-hero-copy {
+    max-width: 56%;
   }
 
   .slowfit-hero-line.ant-typography {
@@ -1190,6 +1217,7 @@ a {
   .slowfit-hero-mark {
     width: clamp(155px, 47vw, 215px);
     margin-bottom: 4px;
+    transform: translate(-36px, 52px);
   }
 
   .slowfit-collection-block {

@@ -105,16 +105,18 @@ export default function HomePage({ copy, locale }: HomePageProps) {
             className="slowfit-cover"
           />
           <div className="slowfit-hero-overlay">
+            <div className="slowfit-hero-copy">
+              <Typography.Paragraph className="slowfit-hero-line">{copy.brandTagline}</Typography.Paragraph>
+              <Typography.Paragraph className="slowfit-hero-line">{copy.hero.eyebrow}</Typography.Paragraph>
+              <Typography.Paragraph className="slowfit-hero-line">{copy.hero.description}</Typography.Paragraph>
+            </div>
             <Image
               src="/slowfit/hero-mark.png"
               alt={copy.hero.markAlt}
-              width={390}
-              height={136}
+              width={736}
+              height={736}
               className="slowfit-hero-mark"
             />
-            <Typography.Paragraph className="slowfit-hero-line">{copy.brandTagline}</Typography.Paragraph>
-            <Typography.Paragraph className="slowfit-hero-line">{copy.hero.eyebrow}</Typography.Paragraph>
-            <Typography.Paragraph className="slowfit-hero-line">{copy.hero.description}</Typography.Paragraph>
           </div>
         </div>
       </section>
