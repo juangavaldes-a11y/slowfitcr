@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import HomePage from "../home-page";
 import { getCopy, isLocale, locales, type Locale } from "../i18n";
+import StructuredData from "../structured-data";
 
 type LocalePageProps = {
   params: Promise<{
@@ -21,10 +22,14 @@ export async function generateMetadata({ params }: LocalePageProps): Promise<Met
   }
 
   const copy = getCopy(locale);
-  const languages = Object.fromEntries(locales.map((value) => [value, `/${value}`]));
+  const languages = {
+    "es-CR": "/es",
+    en: "/en",
+    "x-default": "/es",
+  };
 
   return {
-    title: `Slow Fit CR | ${copy.brandTagline}`,
+    title: locale === "es" ? "Ropa deportiva en Costa Rica" : "Activewear in Costa Rica",
     description: copy.hero.description,
     alternates: {
       canonical: `/${locale}`,
@@ -53,5 +58,28 @@ export default async function LocalePage({ params }: LocalePageProps) {
     notFound();
   }
 
-  return <HomePage copy={getCopy(locale as Locale)} locale={locale as Locale} />;
+  const copy = getCopy(locale as Locale);
+
+  return (
+    <>
+      <StructuredData
+        data={{
+          "@context": "https://schema.org",
+          "@type": "OnlineStore",
+          "@id": "https://slowfitcr.com/#store",
+          name: "Slow Fit CR",
+          url: `https://slowfitcr.com/${locale}`,
+          logo: "https://slowfitcr.com/slowfit/hero-mark.png",
+          image: "https://slowfitcr.com/slowfit/hero.jpg",
+          description: copy.hero.description,
+          areaServed: {
+            "@type": "Country",
+            name: "Costa Rica",
+          },
+          sameAs: ["https://www.instagram.com/slowfitcr/", "https://www.tiktok.com/@slowfitcr"],
+        }}
+      />
+      <HomePage copy={copy} locale={locale as Locale} />
+    </>
+  );
 }

@@ -22,8 +22,14 @@ const bodyFont = Questrial({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://slowfitcr.com"),
-  title: "Slow Fit CR",
-  description: "Responsive Ant Design rebuild of the Slow Fit Costa Rica landing page.",
+  title: {
+    default: "Slow Fit CR | Ropa deportiva en Costa Rica",
+    template: "%s | Slow Fit CR",
+  },
+  description:
+    "Ropa deportiva y accesorios para entrenar y vivir con propósito en Costa Rica. Compra las colecciones de Slow Fit CR en línea.",
+  applicationName: "Slow Fit CR",
+  category: "Ropa deportiva",
 };
 
 export default async function RootLayout({

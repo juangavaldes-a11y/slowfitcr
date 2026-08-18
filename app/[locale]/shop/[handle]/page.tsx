@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCollectionByHandle } from "../../../lib/shopify";
-import { isLocale, locales, type Locale } from "../../../i18n";
+import { isLocale, type Locale } from "../../../i18n";
 
 type CollectionPageProps = {
   params: Promise<{
@@ -26,11 +26,15 @@ export async function generateMetadata({ params }: CollectionPageProps): Promise
   }
 
   return {
-    title: `Slow Fit CR | ${collection.title}`,
+    title: collection.title,
     description: collection.description,
     alternates: {
       canonical: `/${locale}/shop/${collection.handle}`,
-      languages: Object.fromEntries(locales.map((value) => [value, `/${value}/shop/${collection.handle}`])),
+      languages: {
+        "es-CR": `/es/shop/${collection.handle}`,
+        en: `/en/shop/${collection.handle}`,
+        "x-default": `/es/shop/${collection.handle}`,
+      },
     },
   };
 }

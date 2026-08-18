@@ -25,11 +25,15 @@ export async function generateMetadata({ params }: ShopPageProps): Promise<Metad
   const copy = getCopy(locale);
 
   return {
-    title: `Slow Fit CR | ${copy.shop.kicker}`,
+    title: copy.shop.kicker,
     description: copy.shop.description,
     alternates: {
       canonical: `/${locale}/shop`,
-      languages: Object.fromEntries(locales.map((value) => [value, `/${value}/shop`])),
+      languages: {
+        "es-CR": "/es/shop",
+        en: "/en/shop",
+        "x-default": "/es/shop",
+      },
     },
     openGraph: {
       title: `Slow Fit CR | ${copy.shop.kicker}`,

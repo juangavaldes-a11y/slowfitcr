@@ -2,10 +2,14 @@ import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: {
-      userAgent: "*",
-      allow: "/",
-    },
+    rules: [
+      {
+        userAgent: "*",
+        allow: "/",
+        disallow: ["/api/", "/es/admin/", "/en/admin/", "/es/account", "/en/account"],
+      },
+    ],
     sitemap: "https://slowfitcr.com/sitemap.xml",
+    host: "https://slowfitcr.com",
   };
 }

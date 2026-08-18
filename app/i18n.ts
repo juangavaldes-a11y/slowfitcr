@@ -120,7 +120,7 @@ const copyByLocale: Record<Locale, Copy> = {
       titleLineOne: "Slow is Smooth.",
       titleLineTwo: "Smooth is Fast.",
       description:
-        "Creemos en avanzar todos los días. El progreso nunca ha sido una línea recta; lo importante es nunca dejar de avanzar.",
+        "Ropa deportiva y accesorios para entrenar con comodidad, estilo y propósito en Costa Rica. El progreso se construye avanzando cada día.",
       primaryCta: "VER COLECCIÓN",
       secondaryCta: "CONTACTO",
       imageAlt: "Colección Slow Fit",
@@ -198,13 +198,13 @@ const copyByLocale: Record<Locale, Copy> = {
       errorMessage: "No fue posible enviar el mensaje. Intenta de nuevo.",
     },
     shop: {
-      kicker: "Tienda Slow",
-      title: "Compra por colección con una experiencia guiada y clara.",
+      kicker: "Ropa deportiva en Costa Rica",
+      title: "Ropa deportiva para entrenar y vivir con propósito.",
       description:
-        "Mientras integramos el catálogo completo, esta tienda te dirige a las líneas clave con contexto, prioridades y confianza de compra.",
+        "Explora ropa para entrenamiento, prendas casuales y accesorios Slow Fit. Compra en línea desde Costa Rica con pago seguro.",
       featuredLabel: "Colección destacada",
       ctaLabel: "Explorar colección",
-      helper: "Muy pronto: productos, carrito y checkout completo dentro de Slow Fit.",
+      helper: "Selecciona una colección para conocer productos, tallas, precios y disponibilidad.",
     },
     trust: {
       shippingTitle: "Envíos claros",
@@ -347,13 +347,13 @@ const copyByLocale: Record<Locale, Copy> = {
       errorMessage: "We could not send your message. Please try again.",
     },
     shop: {
-      kicker: "Slow Shop",
-      title: "Shop by collection with a clearer, guided storefront experience.",
+      kicker: "Activewear in Costa Rica",
+      title: "Activewear designed for training and purposeful living.",
       description:
-        "While the full catalog is being integrated, this shop page directs customers into the main lines with context, priorities, and purchase confidence.",
+        "Explore workout clothing, casual essentials, and Slow Fit accessories. Shop online from Costa Rica with secure checkout.",
       featuredLabel: "Featured collection",
       ctaLabel: "Explore collection",
-      helper: "Coming next: products, cart, and full checkout directly inside Slow Fit.",
+      helper: "Choose a collection to see products, sizes, prices, and availability.",
     },
     trust: {
       shippingTitle: "Clear shipping",
