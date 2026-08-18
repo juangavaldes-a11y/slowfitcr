@@ -10,8 +10,8 @@ export default function Providers({ children }: PropsWithChildren) {
       <ConfigProvider
         theme={{
           token: {
-            colorPrimary: "#b1a497",
-            colorInfo: "#b1a497",
+            colorPrimary: "#69676c",
+            colorInfo: "#69676c",
             colorText: "#2f2a28",
             colorTextSecondary: "#6d6968",
             colorBgBase: "#f5f0e8",

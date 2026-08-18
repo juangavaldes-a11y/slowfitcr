@@ -162,26 +162,35 @@ export default function HomePage({ copy, locale }: HomePageProps) {
         </div>
       </section>
 
-      <section id="contacto" className="slowfit-shell slowfit-story">
-        <Row gutter={[32, 32]} align="middle">
-          <Col xs={24} lg={10}>
-            <div className="slowfit-story-media">
-              <Image
-                src="/slowfit/story.jpg"
-                alt={copy.story.imageAlt}
-                fill
-                sizes="(max-width: 991px) 100vw, 40vw"
-                className="slowfit-cover"
-              />
-            </div>
-          </Col>
-          <Col xs={24} lg={14}>
-            <Typography.Paragraph className="slowfit-story-quote">{copy.story.title}</Typography.Paragraph>
-            <Typography.Paragraph className="slowfit-story-quote">{copy.story.description}</Typography.Paragraph>
-            <Typography.Paragraph className="slowfit-story-sign">SLOW.</Typography.Paragraph>
-            <ContactForm copy={copy.contactForm} locale={locale} />
-          </Col>
-        </Row>
+      <section className="slowfit-story">
+        <div className="slowfit-shell">
+          <Row gutter={[32, 32]} align="middle">
+            <Col xs={24} lg={10}>
+              <div className="slowfit-story-media">
+                <Image
+                  src="/slowfit/story.jpg"
+                  alt={copy.story.imageAlt}
+                  fill
+                  sizes="(max-width: 991px) 100vw, 40vw"
+                  className="slowfit-cover"
+                />
+              </div>
+            </Col>
+            <Col xs={24} lg={14}>
+              <div className="slowfit-story-copy">
+                <Typography.Paragraph className="slowfit-story-quote">{copy.story.title}</Typography.Paragraph>
+                <Typography.Paragraph className="slowfit-story-quote">{copy.story.description}</Typography.Paragraph>
+                <Typography.Paragraph className="slowfit-story-sign">SLOW.</Typography.Paragraph>
+              </div>
+            </Col>
+          </Row>
+        </div>
+      </section>
+
+      <section id="contacto" className="slowfit-contact-section">
+        <div className="slowfit-shell">
+          <ContactForm copy={copy.contactForm} locale={locale} />
+        </div>
       </section>
 
       <section className="slowfit-footer-contact">
