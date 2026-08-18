@@ -39,6 +39,7 @@ Backend secrets:
 - `REVIEW_MODERATION_SESSION_SECRET`
 - `CUSTOMER_SESSION_SECRET`
 - `SHOPIFY_WEBHOOK_SECRET`
+- `OUTBOUND_WEBHOOK_SECRET`
 - `ORDER_EVENTS_WEBHOOK_URL`
 - `CRM_ORDER_WEBHOOK_URL`
 - `CONTACT_WEBHOOK_URL`
@@ -46,6 +47,12 @@ Backend secrets:
 - `REVIEWS_MODERATION_WEBHOOK_URL`
 - `RESEND_API_KEY`
 - `ORDER_CONFIRM_FROM`
+
+Backend delivery and request limits:
+
+- `WEBHOOK_TIMEOUT_MS` (default `2000`)
+- `WEBHOOK_MAX_ATTEMPTS` (default `2`, maximum `3`)
+- `MAX_REQUEST_BODY_BYTES` (default `1048576`)
 
 Frontend secrets and configuration:
 
@@ -57,6 +64,7 @@ Frontend secrets and configuration:
 Requirements:
 
 - Generate unique high-entropy moderation secrets for each environment.
+- Configure downstream systems to verify `X-Slowfit-Timestamp` and `X-Slowfit-Signature` before enabling outbound signing.
 - Store secrets in platform secret managers, never committed files.
 - Restrict production database credentials to the backend runtime.
 - Document secret rotation ownership and cadence.

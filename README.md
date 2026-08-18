@@ -110,6 +110,9 @@ ANALYTICS_WEBHOOK_URL=https://your-analytics-endpoint.example.com/events
 # Checkout and order forwarding
 ORDER_EVENTS_WEBHOOK_URL=https://your-backoffice-endpoint.example.com/orders
 CRM_ORDER_WEBHOOK_URL=https://your-crm-endpoint.example.com/orders
+OUTBOUND_WEBHOOK_SECRET=set-a-long-random-secret
+WEBHOOK_TIMEOUT_MS=2000
+WEBHOOK_MAX_ATTEMPTS=2
 
 # Transactional email
 RESEND_API_KEY=your_resend_api_key
@@ -127,6 +130,7 @@ REVIEW_MODERATION_SESSION_SECRET=set-a-long-random-secret
 
 # Prisma / PostgreSQL
 DATABASE_URL=postgresql://slowfit:slowfit@postgres:5432/slowfit?schema=public
+MAX_REQUEST_BODY_BYTES=1048576
 ```
 
 If Shopify credentials are not set, the storefront uses fallback catalog data so UI routes still work.
@@ -145,6 +149,7 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB?schema=public
 REVIEW_MODERATION_TOKEN=set-a-strong-shared-token
 REVIEW_MODERATION_SESSION_SECRET=set-a-long-random-secret
 SHOPIFY_WEBHOOK_SECRET=your_shopify_webhook_secret
+OUTBOUND_WEBHOOK_SECRET=set-a-long-random-secret
 ```
 
 Optional but recommended backend integrations:
@@ -157,7 +162,13 @@ ANALYTICS_WEBHOOK_URL=https://your-analytics-endpoint.example.com/events
 REVIEWS_MODERATION_WEBHOOK_URL=https://your-moderation-endpoint.example.com/reviews
 RESEND_API_KEY=your_resend_api_key
 ORDER_CONFIRM_FROM=Slow Fit <orders@yourdomain.com>
+WEBHOOK_TIMEOUT_MS=2000
+WEBHOOK_MAX_ATTEMPTS=2
+MAX_REQUEST_BODY_BYTES=1048576
 ```
+
+When `OUTBOUND_WEBHOOK_SECRET` is configured, deliveries include `X-Slowfit-Timestamp` and an
+`X-Slowfit-Signature` containing the Base64-encoded HMAC-SHA256 of `<timestamp>.<raw-body>`.
 
 Required frontend secrets:
 

@@ -4,6 +4,7 @@ import { LockOutlined, LogoutOutlined, ShoppingOutlined, UserOutlined } from "@a
 import { Alert, Button, Collapse, Empty, Form, Input, Pagination, Rate, Space, Spin, Tabs, Tag, Typography } from "antd";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Locale } from "./i18n";
 import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
@@ -45,6 +46,7 @@ type AccountPanelProps = {
 };
 
 export default function AccountPanel({ locale }: AccountPanelProps) {
+  const router = useRouter();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [reviews, setReviews] = useState<CustomerReview[]>([]);
@@ -215,7 +217,7 @@ export default function AccountPanel({ locale }: AccountPanelProps) {
     setError("");
     try {
       await apiRequest("/api/admin/login", { method: "POST", body: JSON.stringify(values) });
-      window.location.assign(`/${locale}/admin/reviews`);
+      router.push(`/${locale}/admin/reviews`);
     } catch (requestError) {
       setError(formatApiError(requestError, locale, { fallback: labels.requestFailed, preserveClientMessage: true }));
       setLoading(false);

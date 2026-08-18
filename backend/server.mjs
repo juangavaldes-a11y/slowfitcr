@@ -20,6 +20,9 @@ const scryptAsync = promisify(scrypt);
 const RATE_LIMIT_WINDOW_MS = Number.parseInt(process.env.RATE_LIMIT_WINDOW_MS || "60000", 10);
 const RATE_LIMIT_MAX = Number.parseInt(process.env.RATE_LIMIT_MAX || "120", 10);
 const RATE_LIMIT_AUTH_MAX = Number.parseInt(process.env.RATE_LIMIT_AUTH_MAX || "20", 10);
+const WEBHOOK_TIMEOUT_MS = Number.parseInt(process.env.WEBHOOK_TIMEOUT_MS || "2000", 10);
+const WEBHOOK_MAX_ATTEMPTS = Math.min(3, Math.max(1, Number.parseInt(process.env.WEBHOOK_MAX_ATTEMPTS || "2", 10)));
+const MAX_REQUEST_BODY_BYTES = Number.parseInt(process.env.MAX_REQUEST_BODY_BYTES || "1048576", 10);
 
 const rateLimitStore = new Map();
 
@@ -30,7 +33,6 @@ const FALLBACK_APPROVED_REVIEWS = [
     locale: "all",
     rating: 5,
     author: "Sofia",
-    email: "",
     content: "Ligera, suave y con suficiente espacio para entrenar sin restricciones.",
     source: "manual",
     createdAt: "2026-07-15T10:00:00.000Z",
@@ -41,7 +43,6 @@ const FALLBACK_APPROVED_REVIEWS = [
     locale: "all",
     rating: 4,
     author: "Marco",
-    email: "",
     content: "The relaxed fit works well for training and still looks clean outside the gym.",
     source: "manual",
     createdAt: "2026-07-19T10:00:00.000Z",
@@ -52,7 +53,6 @@ const FALLBACK_APPROVED_REVIEWS = [
     locale: "all",
     rating: 5,
     author: "Mariana",
-    email: "",
     content: "Excelente calidad de tela y el ajuste se mantiene en entrenamientos intensos.",
     source: "manual",
     createdAt: "2026-07-01T10:00:00.000Z",
@@ -63,7 +63,6 @@ const FALLBACK_APPROVED_REVIEWS = [
     locale: "all",
     rating: 4,
     author: "Daniel",
-    email: "",
     content: "Muy comoda y con buen soporte. La entrega fue puntual.",
     source: "manual",
     createdAt: "2026-07-08T10:00:00.000Z",
@@ -74,7 +73,6 @@ const FALLBACK_APPROVED_REVIEWS = [
     locale: "all",
     rating: 5,
     author: "Andrea",
-    email: "",
     content: "The accessory quality surprised me and it pairs well with my daily routine.",
     source: "manual",
     createdAt: "2026-07-11T10:00:00.000Z",
@@ -97,7 +95,9 @@ function jsonResponse(payload, status = 200, headers = {}) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
+      "Cache-Control": "no-store",
       "Content-Type": "application/json",
+      "X-Content-Type-Options": "nosniff",
       ...headers,
     },
   });
@@ -565,11 +565,50 @@ async function forwardJsonWebhook(url, payload) {
     return;
   }
 
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const target = new URL(url);
+  if (process.env.NODE_ENV === "production" && target.protocol !== "https:") {
+    throw new Error("Outbound webhook URL must use HTTPS");
+  }
+
+  const body = JSON.stringify(payload);
+  const timestamp = String(Date.now());
+  const headers = { "Content-Type": "application/json", "X-Slowfit-Timestamp": timestamp };
+  const signingSecret = process.env.OUTBOUND_WEBHOOK_SECRET;
+  if (signingSecret) {
+    headers["X-Slowfit-Signature"] = createHmac("sha256", signingSecret)
+      .update(`${timestamp}.${body}`)
+      .digest("base64");
+  }
+
+  let lastError;
+  for (let attempt = 1; attempt <= WEBHOOK_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(target, {
+        method: "POST",
+        headers,
+        body,
+        signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+      });
+      if (response.ok) {
+        return;
+      }
+
+      lastError = new Error(`Outbound webhook rejected with status ${response.status}`);
+      if (![408, 425, 429].includes(response.status) && response.status < 500) {
+        throw lastError;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt >= WEBHOOK_MAX_ATTEMPTS) {
+        throw error;
+      }
+    }
+
+    log("warn", "webhook.delivery.retry", { target: target.origin, attempt });
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 200 * attempt));
+  }
+
+  throw lastError || new Error("Outbound webhook delivery failed");
 }
 
 function verifyShopifyHmac(rawBody, signature, secret) {
@@ -765,7 +804,8 @@ async function handleCheckout(request) {
     await appendAudit("checkout.created", { locale, cartId: checkout.cartId, lineCount: lines.length }, "customer");
     return jsonResponse({ ok: true, checkout });
   } catch (error) {
-    return jsonResponse({ error: "Unable to create checkout", details: String(error?.message || "") }, 500);
+    log("error", "checkout.failed", { error: String(error?.message || "unknown_error") });
+    return jsonResponse({ error: "Unable to create checkout" }, 500);
   }
 }
 
@@ -785,6 +825,16 @@ async function handleReadReviews(request) {
       OR: [{ locale }, { locale: "all" }],
     },
     orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      productHandle: true,
+      locale: true,
+      rating: true,
+      author: true,
+      content: true,
+      source: true,
+      createdAt: true,
+    },
   });
 
   const fallback = FALLBACK_APPROVED_REVIEWS.filter(
@@ -1443,9 +1493,29 @@ export function createRequestListener() {
   const requestId = randomUUID();
   const startedAt = Date.now();
   const chunks = [];
+  let bodyBytes = 0;
+  let rejected = false;
 
-  req.on("data", (chunk) => chunks.push(chunk));
+  req.on("data", (chunk) => {
+    bodyBytes += chunk.length;
+    if (bodyBytes > MAX_REQUEST_BODY_BYTES) {
+      rejected = true;
+      chunks.length = 0;
+      res.statusCode = 413;
+      res.setHeader("Cache-Control", "no-store");
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.end(JSON.stringify({ error: "Request body too large" }));
+      req.resume();
+      return;
+    }
+    chunks.push(chunk);
+  });
   req.on("end", async () => {
+    if (rejected) {
+      return;
+    }
+
     const body = Buffer.concat(chunks);
     const request = new Request(`http://${req.headers.host || `${HOST}:${PORT}`}${req.url || "/"}`, {
       method: req.method,
@@ -1457,7 +1527,13 @@ export function createRequestListener() {
     try {
       response = await route(request);
     } catch (error) {
-      response = jsonResponse({ error: "Internal server error", details: String(error?.message || "") }, 500);
+      log("error", "request.failed", {
+        requestId,
+        method: req.method || "GET",
+        path: req.url || "/",
+        error: String(error?.message || "unknown_error"),
+      });
+      response = jsonResponse({ error: "Internal server error" }, 500);
     }
 
     res.statusCode = response.status;

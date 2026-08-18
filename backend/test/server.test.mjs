@@ -337,6 +337,39 @@ test("contact and analytics endpoints validate and persist accepted payloads", a
   assert.equal(await prisma.auditLog.count(), 2);
 });
 
+test("outbound webhooks retry transient failures and include HMAC headers", async () => {
+  const originalFetch = globalThis.fetch;
+  const deliveries = [];
+  process.env.CONTACT_WEBHOOK_URL = "https://hooks.example.test/contact";
+  process.env.OUTBOUND_WEBHOOK_SECRET = "integration-outbound-secret";
+
+  globalThis.fetch = async (url, init) => {
+    deliveries.push({ url: String(url), init });
+    return new Response(null, { status: deliveries.length === 1 ? 500 : 204 });
+  };
+
+  try {
+    const response = await route(request("/api/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Customer", email: "customer@example.com", message: "Please help with sizing", locale: "en" }),
+    }));
+
+    assert.equal(response.status, 200);
+    assert.equal(deliveries.length, 2);
+    assert.equal(deliveries[1].url, process.env.CONTACT_WEBHOOK_URL);
+    const timestamp = deliveries[1].init.headers["X-Slowfit-Timestamp"];
+    const expectedSignature = createHmac("sha256", process.env.OUTBOUND_WEBHOOK_SECRET)
+      .update(`${timestamp}.${deliveries[1].init.body}`)
+      .digest("base64");
+    assert.equal(deliveries[1].init.headers["X-Slowfit-Signature"], expectedSignature);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.CONTACT_WEBHOOK_URL;
+    delete process.env.OUTBOUND_WEBHOOK_SECRET;
+  }
+});
+
 test("checkout validates empty carts and returns fallback sessions without Shopify credentials", async () => {
   const empty = await route(request("/api/cart/checkout", {
     method: "POST",
@@ -410,6 +443,7 @@ test("reviews validate submissions and support the complete moderation lifecycle
   const approvedPayload = await json(approved);
   assert.equal(approved.status, 200);
   assert.ok(approvedPayload.reviews.some((review) => review.author === "Taylor"));
+  assert.ok(approvedPayload.reviews.every((review) => review.email === undefined));
   assert.ok(approvedPayload.average > 0);
 });
 
@@ -475,7 +509,19 @@ test("HTTP server adapter translates requests and contains route errors", async 
       body: "{invalid-json",
     });
     assert.equal(malformed.status, 500);
-    assert.equal((await malformed.json()).error, "Internal server error");
+    const malformedPayload = await malformed.json();
+    assert.equal(malformedPayload.error, "Internal server error");
+    assert.equal(malformedPayload.details, undefined);
+    assert.equal(malformed.headers.get("cache-control"), "no-store");
+    assert.equal(malformed.headers.get("x-content-type-options"), "nosniff");
+
+    const oversized = await fetch(`${origin}/api/contact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: "x".repeat(1024 * 1024) }),
+    });
+    assert.equal(oversized.status, 413);
+    assert.deepEqual(await oversized.json(), { error: "Request body too large" });
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
