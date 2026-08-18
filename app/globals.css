@@ -1184,7 +1184,7 @@ a {
   }
 
   .slowfit-footer-contact {
-    padding: 52px 0 56px;
+    padding: 52px 0 calc(84px + env(safe-area-inset-bottom));
   }
 
   .slowfit-footer-mark {
