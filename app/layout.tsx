@@ -31,8 +31,8 @@ export const metadata: Metadata = {
   applicationName: "Slow Fit CR",
   category: "Ropa deportiva",
   icons: {
-    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
-    shortcut: "/icon.svg",
+    icon: [{ url: "/icon.png", type: "image/png" }],
+    shortcut: "/icon.png",
   },
 };
 

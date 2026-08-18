@@ -27,6 +27,18 @@ test("not-found recovery is localized and keyboard accessible", async ({ page })
   await expect(page.getByRole("link", { name: "Volver al inicio" })).toHaveAttribute("href", "/es");
 });
 
+test("language switch completes and persists through navigation", async ({ page }) => {
+  await page.goto("/es?campaign=test#why-slow");
+  await page.locator(".slowfit-locale-switcher .ant-segmented-item").filter({ hasText: "EN" }).click();
+
+  await expect(page).toHaveURL(/\/en\?campaign=test#why-slow$/);
+  await expect(page.getByText("We do not believe in quick results", { exact: true })).toBeVisible();
+
+  await page.getByRole("link", { name: "Shop", exact: true }).click();
+  await expect(page).toHaveURL(/\/en\/shop$/);
+  await expect(page.getByRole("heading", { name: "Activewear designed for training and purposeful living." })).toBeVisible();
+});
+
 test("account reports API failures without breaking its mobile layout", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route("**/api/auth/session", (route) =>
