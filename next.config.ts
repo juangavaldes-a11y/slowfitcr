@@ -12,7 +12,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   `script-src 'self' 'unsafe-inline'${developmentScriptSources} https://www.googletagmanager.com`,
   "style-src 'self' 'unsafe-inline'",
-  `connect-src 'self'${developmentConnectSources} https://www.google-analytics.com https://*.google-analytics.com`,
+  `connect-src 'self'${developmentConnectSources} https://www.google-analytics.com https://*.google-analytics.com https://*.r2.cloudflarestorage.com`,
   "upgrade-insecure-requests",
 ].join("; ");
 

@@ -1,6 +1,22 @@
 import { expect, test } from "@playwright/test";
 
-test("customer can add a product to cart and request checkout", async ({ page, request }) => {
+test("customer can add an internal product to cart and request payment", async ({ page, request }) => {
+  const login = await request.post("/api/admin/login", { data: { token: "e2e-token" } });
+  expect(login.ok()).toBeTruthy();
+  const created = await request.post("/api/admin/catalog/products", {
+    data: {
+      title: "Slow Core Training Tee",
+      handle: "slow-core-training-tee",
+      description: "A lightweight training tee with a relaxed fit.",
+      status: "ACTIVE",
+      tags: ["training"],
+      images: [{ url: "https://images.example.com/training-tee.jpg", altText: "Training tee" }],
+      variants: [{ title: "M", sku: "E2E-TEE-M", price: 48, compareAtPrice: 56, inventoryQuantity: 5 }],
+    },
+  });
+  expect(created.ok()).toBeTruthy();
+  const product = (await created.json()).product;
+
   await page.goto("/en/product/slow-core-training-tee");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Slow Core Training Tee");
   await expect(page.getByText("The relaxed fit works well for training")).toBeVisible();
@@ -19,11 +35,10 @@ test("customer can add a product to cart and request checkout", async ({ page, r
   const checkout = await request.post("/api/cart/checkout", {
     data: {
       locale: "en",
-      lines: [{ variantId: "slow-core-training-tee-m", quantity: 1 }],
+      lines: [{ variantId: product.variants[0].id, quantity: 1 }],
     },
   });
-  expect(checkout.ok()).toBeTruthy();
+  expect(checkout.status()).toBe(503);
   const payload = await checkout.json();
-  expect(payload.checkout.cartId).toBe("fallback");
-  expect(payload.checkout.checkoutUrl).toBeTruthy();
+  expect(payload.error).toBe("Payment provider is not configured");
 });

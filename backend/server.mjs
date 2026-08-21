@@ -3,6 +3,8 @@ import { createServer } from "node:http";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -450,221 +452,66 @@ async function appendAudit(action, details, actor = "system") {
   });
 }
 
-function getShopifyEnv() {
-  const domain = process.env.SHOPIFY_STORE_DOMAIN;
-  const token = process.env.SHOPIFY_STOREFRONT_ACCESS_TOKEN;
-
-  if (!domain || !token) {
-    return null;
+async function createPaymentSession(lines, locale) {
+  const quantities = new Map();
+  for (const line of lines) {
+    const variantId = String(line?.variantId || "").trim();
+    const quantity = Number(line?.quantity);
+    if (!variantId || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
+      throw new Error("INVALID_CART");
+    }
+    quantities.set(variantId, (quantities.get(variantId) || 0) + quantity);
   }
 
-  return { domain, token };
-}
-
-async function shopifyFetch(query, variables) {
-  const env = getShopifyEnv();
-  if (!env) {
-    return null;
-  }
-
-  const response = await fetch(`https://${env.domain}/api/2025-01/graphql.json`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Storefront-Access-Token": env.token,
-    },
-    body: JSON.stringify({ query, variables }),
+  const variants = await prisma.productVariant.findMany({
+    where: { id: { in: [...quantities.keys()] }, product: { status: "ACTIVE" } },
+    include: { product: { select: { title: true, handle: true } } },
   });
-
-  if (!response.ok) {
-    throw new Error(`Shopify request failed with ${response.status}`);
+  if (variants.length !== quantities.size) {
+    throw new Error("INVALID_CART");
   }
 
-  const payload = await response.json();
-  if (payload.errors?.length) {
-    throw new Error(payload.errors.map((item) => item.message).join("; "));
-  }
-
-  return payload.data || null;
-}
-
-const CART_CREATE_MUTATION = `#graphql
-  mutation CartCreate($lines: [CartLineInput!]!, $countryCode: CountryCode) {
-    cartCreate(input: { lines: $lines, buyerIdentity: { countryCode: $countryCode } }) {
-      cart {
-        id
-        checkoutUrl
-      }
-      userErrors {
-        message
-      }
+  const items = variants.map((variant) => {
+    const quantity = quantities.get(variant.id);
+    if (variant.inventoryQuantity < quantity) {
+      throw new Error("INSUFFICIENT_STOCK");
     }
-  }
-`;
-
-const CART_QUERY = `#graphql
-  query CartById($id: ID!) {
-    cart(id: $id) {
-      id
-      checkoutUrl
-      lines(first: 250) {
-        edges {
-          node {
-            id
-            quantity
-            merchandise {
-              ... on ProductVariant {
-                id
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-`;
-
-const CART_LINES_ADD = `#graphql
-  mutation CartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
-    cartLinesAdd(cartId: $cartId, lines: $lines) {
-      userErrors {
-        message
-      }
-    }
-  }
-`;
-
-const CART_LINES_UPDATE = `#graphql
-  mutation CartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
-    cartLinesUpdate(cartId: $cartId, lines: $lines) {
-      userErrors {
-        message
-      }
-    }
-  }
-`;
-
-const CART_LINES_REMOVE = `#graphql
-  mutation CartLinesRemove($cartId: ID!, $lineIds: [ID!]!) {
-    cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
-      userErrors {
-        message
-      }
-    }
-  }
-`;
-
-async function createCheckoutSession(lines, locale) {
-  const env = getShopifyEnv();
-  if (!env) {
     return {
-      cartId: "fallback",
-      checkoutUrl: `https://slowfitcr.com/${locale}`,
+      variantId: variant.id,
+      sku: variant.sku,
+      name: `${variant.product.title} - ${variant.title}`,
+      quantity,
+      unitPrice: Number(variant.price),
+      lineTotal: Number(variant.price) * quantity,
     };
-  }
-
-  const data = await shopifyFetch(CART_CREATE_MUTATION, {
-    lines: lines.map((line) => ({ merchandiseId: line.variantId, quantity: line.quantity })),
-    countryCode: locale === "es" ? "CR" : "US",
   });
 
-  const created = data?.cartCreate;
-  if (!created?.cart) {
-    const message = created?.userErrors?.map((err) => err.message).join("; ") || "Could not create cart";
-    throw new Error(message);
+  const providerUrl = process.env.PAYMENT_PROVIDER_URL;
+  const providerToken = process.env.PAYMENT_PROVIDER_TOKEN;
+  if (!providerUrl || !providerToken) {
+    throw new Error("PAYMENT_NOT_CONFIGURED");
   }
 
-  return {
-    cartId: created.cart.id,
-    checkoutUrl: created.cart.checkoutUrl,
+  const reference = randomUUID();
+  const origin = process.env.APP_ORIGIN || "https://slowfitcr.com";
+  const paymentPayload = {
+    reference,
+    currency: process.env.STORE_CURRENCY || "USD",
+    amount: items.reduce((total, item) => total + item.lineTotal, 0),
+    items,
+    returnUrl: `${origin}/${locale}/account?payment=success&reference=${reference}`,
+    cancelUrl: `${origin}/${locale}/shop?payment=cancelled`,
   };
-}
-
-async function syncCheckoutSession(lines, locale, cartId) {
-  const cleanLines = lines.filter((line) => line?.variantId && Number(line.quantity) > 0);
-  if (!cleanLines.length) {
-    throw new Error("Cart is empty");
+  const response = await fetch(providerUrl, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${providerToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(paymentPayload),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.checkoutUrl) {
+    throw new Error("PAYMENT_PROVIDER_ERROR");
   }
-
-  if (!cartId) {
-    return createCheckoutSession(cleanLines, locale);
-  }
-
-  const cartData = await shopifyFetch(CART_QUERY, { id: cartId });
-  const cart = cartData?.cart;
-  if (!cart) {
-    return createCheckoutSession(cleanLines, locale);
-  }
-
-  const currentByVariant = new Map();
-  for (const edge of cart.lines?.edges || []) {
-    const variantId = edge?.node?.merchandise?.id;
-    if (!variantId) {
-      continue;
-    }
-
-    currentByVariant.set(variantId, {
-      lineId: edge.node.id,
-      quantity: edge.node.quantity,
-    });
-  }
-
-  const desiredByVariant = new Map(cleanLines.map((line) => [line.variantId, Number(line.quantity)]));
-  const toRemove = [];
-  const toUpdate = [];
-  const toAdd = [];
-
-  for (const [variantId, current] of currentByVariant.entries()) {
-    const desiredQuantity = desiredByVariant.get(variantId);
-    if (!desiredQuantity) {
-      toRemove.push(current.lineId);
-      continue;
-    }
-
-    if (desiredQuantity !== current.quantity) {
-      toUpdate.push({ id: current.lineId, quantity: desiredQuantity });
-    }
-  }
-
-  for (const [variantId, quantity] of desiredByVariant.entries()) {
-    if (!currentByVariant.has(variantId)) {
-      toAdd.push({ merchandiseId: variantId, quantity });
-    }
-  }
-
-  if (toRemove.length) {
-    const removeResult = await shopifyFetch(CART_LINES_REMOVE, { cartId, lineIds: toRemove });
-    const errors = removeResult?.cartLinesRemove?.userErrors || [];
-    if (errors.length) {
-      throw new Error(errors.map((e) => e.message).join("; "));
-    }
-  }
-
-  if (toUpdate.length) {
-    const updateResult = await shopifyFetch(CART_LINES_UPDATE, { cartId, lines: toUpdate });
-    const errors = updateResult?.cartLinesUpdate?.userErrors || [];
-    if (errors.length) {
-      throw new Error(errors.map((e) => e.message).join("; "));
-    }
-  }
-
-  if (toAdd.length) {
-    const addResult = await shopifyFetch(CART_LINES_ADD, { cartId, lines: toAdd });
-    const errors = addResult?.cartLinesAdd?.userErrors || [];
-    if (errors.length) {
-      throw new Error(errors.map((e) => e.message).join("; "));
-    }
-  }
-
-  const synced = await shopifyFetch(CART_QUERY, { id: cartId });
-  if (!synced?.cart) {
-    return createCheckoutSession(cleanLines, locale);
-  }
-
-  return {
-    cartId: synced.cart.id,
-    checkoutUrl: synced.cart.checkoutUrl,
-  };
+  return { cartId: reference, checkoutUrl: result.checkoutUrl };
 }
 
 async function forwardJsonWebhook(url, payload) {
@@ -718,7 +565,7 @@ async function forwardJsonWebhook(url, payload) {
   throw lastError || new Error("Outbound webhook delivery failed");
 }
 
-function verifyShopifyHmac(rawBody, signature, secret) {
+function verifyPaymentHmac(rawBody, signature, secret) {
   const digest = createHmac("sha256", secret).update(rawBody, "utf8").digest("base64");
   const expected = Buffer.from(digest);
   const received = Buffer.from(signature || "");
@@ -730,8 +577,8 @@ function verifyShopifyHmac(rawBody, signature, secret) {
 }
 
 function buildOrderIdempotencyKey(topic, payload) {
-  const id = payload.id || payload.order_number || payload.name || "unknown";
-  const updated = payload.updated_at || payload.processed_at || payload.created_at || "none";
+  const id = payload.reference || payload.id || payload.orderNumber || payload.name || "unknown";
+  const updated = payload.updatedAt || payload.processedAt || payload.createdAt || payload.updated_at || "none";
   return `${topic}:${id}:${updated}`;
 }
 
@@ -757,68 +604,203 @@ function getTrimmedParam(url, key) {
   return String(url.searchParams.get(key) || "").trim();
 }
 
-async function processOrderEvent({ topic, shop, payload }, options = { replay: false }) {
-  const email = String(payload.email || payload.customer?.email || "").trim().toLowerCase();
+const CATALOG_PRODUCT_INCLUDE = {
+  images: { orderBy: { position: "asc" } },
+  variants: { orderBy: { position: "asc" } },
+};
+
+function catalogHandle(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function serializeCatalogProduct(product) {
+  return {
+    ...product,
+    currencyCode: process.env.STORE_CURRENCY || "USD",
+    images: product.images.map((image) => ({ ...image })),
+    variants: product.variants.map((variant) => ({
+      ...variant,
+      price: Number(variant.price),
+      compareAtPrice: variant.compareAtPrice === null ? null : Number(variant.compareAtPrice),
+      currencyCode: process.env.STORE_CURRENCY || "USD",
+      availableForSale: variant.inventoryQuantity > 0,
+    })),
+  };
+}
+
+function normalizeCatalogProduct(payload) {
+  const title = String(payload.title || "").trim();
+  const handle = catalogHandle(payload.handle || title);
+  const description = String(payload.description || "").trim();
+  const status = String(payload.status || "DRAFT").toUpperCase();
+  const tags = Array.from(new Set((Array.isArray(payload.tags) ? payload.tags : [])
+    .map((tag) => String(tag).trim().toLowerCase())
+    .filter(Boolean)));
+  const rawImages = Array.isArray(payload.images) ? payload.images : [];
+  const rawVariants = Array.isArray(payload.variants) ? payload.variants : [];
+
+  if (!title || title.length > 120 || !handle || handle.length > 160 || description.length > 5000) {
+    throw new Error("Invalid product details");
+  }
+  if (!["DRAFT", "ACTIVE", "ARCHIVED"].includes(status) || tags.length > 20 || tags.some((tag) => tag.length > 40)) {
+    throw new Error("Invalid product status or tags");
+  }
+  if (!rawVariants.length || rawVariants.length > 50 || rawImages.length > 10) {
+    throw new Error("A product requires 1-50 variants and supports up to 10 images");
+  }
+
+  const variants = rawVariants.map((variant, position) => {
+    const id = String(variant.id || "").trim() || undefined;
+    const variantTitle = String(variant.title || "").trim();
+    const sku = String(variant.sku || "").trim() || null;
+    const price = Number(variant.price);
+    const compareAtPrice = variant.compareAtPrice === null || variant.compareAtPrice === ""
+      ? null
+      : Number(variant.compareAtPrice);
+    const inventoryQuantity = Number(variant.inventoryQuantity);
+
+    if (!variantTitle || variantTitle.length > 80 || (sku && sku.length > 80)
+      || !Number.isFinite(price) || price < 0
+      || (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice <= price))
+      || !Number.isInteger(inventoryQuantity) || inventoryQuantity < 0) {
+      throw new Error("Invalid product variant");
+    }
+
+    return { id, title: variantTitle, sku, price, compareAtPrice, inventoryQuantity, position };
+  });
+
+  const images = rawImages.map((image, position) => {
+    const id = String(image.id || "").trim() || undefined;
+    const url = String(image.url || "").trim();
+    const altText = String(image.altText || "").trim();
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      throw new Error("Invalid product image URL");
+    }
+    if (!["http:", "https:"].includes(parsedUrl.protocol) || altText.length > 160) {
+      throw new Error("Invalid product image URL");
+    }
+    return { id, url, altText, position };
+  });
+
+  return { title, handle, description, status, tags, variants, images };
+}
+
+function paymentInventoryLines(items) {
+  const quantities = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const variantId = String(item?.variantId || "").trim();
+    const quantity = Number(item?.quantity);
+    if (!variantId || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
+      throw new Error("INVALID_PAYMENT_ITEMS");
+    }
+    quantities.set(variantId, (quantities.get(variantId) || 0) + quantity);
+  }
+  if (!quantities.size) {
+    throw new Error("INVALID_PAYMENT_ITEMS");
+  }
+  return quantities;
+}
+
+async function processOrderEvent({ topic, provider, payload }, options = { replay: false }) {
+  const email = String(payload.email || "").trim().toLowerCase();
+  const externalPaymentId = String(payload.reference || payload.id || "").trim();
+  if (topic === "payment.paid" && (!externalPaymentId || !email)) {
+    throw new Error("INVALID_PAID_PAYMENT");
+  }
   const event = {
     topic,
-    shop,
-    orderId: payload.id,
-    orderNumber: payload.order_number,
+    provider,
+    orderId: externalPaymentId,
+    orderNumber: payload.orderNumber,
     orderName: payload.name,
-    email: payload.email,
-    total: payload.current_total_price,
+    email,
+    total: payload.amount,
     currency: payload.currency,
-    items: payload.line_items || [],
+    items: payload.items || [],
     createdAt: new Date().toISOString(),
   };
 
-  if (payload.id && email) {
+  if (externalPaymentId && email) {
     const customer = await prisma.customer.findUnique({ where: { email }, select: { id: true } });
-    await prisma.order.upsert({
-      where: { shopifyOrderId: String(payload.id) },
-      create: {
-        shopifyOrderId: String(payload.id),
-        orderNumber: payload.order_number ? String(payload.order_number) : null,
-        name: payload.name ? String(payload.name) : null,
-        email,
-        financialStatus: payload.financial_status ? String(payload.financial_status) : null,
-        fulfillmentStatus: payload.fulfillment_status ? String(payload.fulfillment_status) : null,
-        total: payload.current_total_price ? String(payload.current_total_price) : null,
-        currency: payload.currency ? String(payload.currency) : null,
-        items: payload.line_items || [],
-        shopifyCreatedAt: payload.created_at ? new Date(payload.created_at) : null,
-        customerId: customer?.id,
-      },
-      update: {
-        orderNumber: payload.order_number ? String(payload.order_number) : null,
-        name: payload.name ? String(payload.name) : null,
-        email,
-        financialStatus: payload.financial_status ? String(payload.financial_status) : null,
-        fulfillmentStatus: payload.fulfillment_status ? String(payload.fulfillment_status) : null,
-        total: payload.current_total_price ? String(payload.current_total_price) : null,
-        currency: payload.currency ? String(payload.currency) : null,
-        items: payload.line_items || [],
-        customerId: customer?.id,
-      },
-    });
+    const inventoryLines = topic === "payment.paid" ? paymentInventoryLines(payload.items) : null;
+    await prisma.$transaction(async (transaction) => {
+      const order = await transaction.order.upsert({
+        where: { externalPaymentId },
+        create: {
+          externalPaymentId,
+          orderNumber: payload.orderNumber ? String(payload.orderNumber) : null,
+          name: payload.name ? String(payload.name) : null,
+          email,
+          financialStatus: payload.status ? String(payload.status) : null,
+          fulfillmentStatus: payload.fulfillmentStatus ? String(payload.fulfillmentStatus) : null,
+          total: payload.amount === undefined ? null : String(payload.amount),
+          currency: payload.currency ? String(payload.currency) : null,
+          items: payload.items || [],
+          paymentCreatedAt: payload.createdAt ? new Date(payload.createdAt) : null,
+          customerId: customer?.id,
+        },
+        update: {
+          orderNumber: payload.orderNumber ? String(payload.orderNumber) : null,
+          name: payload.name ? String(payload.name) : null,
+          email,
+          financialStatus: payload.status ? String(payload.status) : null,
+          fulfillmentStatus: payload.fulfillmentStatus ? String(payload.fulfillmentStatus) : null,
+          total: payload.amount === undefined ? null : String(payload.amount),
+          currency: payload.currency ? String(payload.currency) : null,
+          items: payload.items || [],
+          customerId: customer?.id,
+        },
+      });
+
+      if (!inventoryLines) {
+        return;
+      }
+
+      const claimed = await transaction.order.updateMany({
+        where: { id: order.id, inventoryAdjustedAt: null },
+        data: { inventoryAdjustedAt: new Date() },
+      });
+      if (!claimed.count) {
+        return;
+      }
+
+      for (const [variantId, quantity] of inventoryLines) {
+        const adjusted = await transaction.productVariant.updateMany({
+          where: { id: variantId, inventoryQuantity: { gte: quantity } },
+          data: { inventoryQuantity: { decrement: quantity } },
+        });
+        if (adjusted.count !== 1) {
+          throw new Error("INSUFFICIENT_STOCK_AT_PAYMENT");
+        }
+      }
+    }, { isolationLevel: "Serializable" });
   }
 
   await forwardJsonWebhook(process.env.ORDER_EVENTS_WEBHOOK_URL, event);
   await forwardJsonWebhook(process.env.CRM_ORDER_WEBHOOK_URL, {
-    source: options.replay ? "slowfit-webhook-replay" : "slowfit-shopify-order-webhook",
+    source: options.replay ? "slowfit-webhook-replay" : "slowfit-payment-webhook",
     event,
   });
 
-  if ((topic === "orders/create" || topic === "orders/paid") && payload.email) {
+  if ((topic === "payment.created" || topic === "payment.paid") && email) {
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.ORDER_CONFIRM_FROM;
 
     if (apiKey && from) {
-      const name = `${payload.customer?.first_name || ""} ${payload.customer?.last_name || ""}`.trim() || "Slow Fit customer";
-      const orderLabel = payload.name || `#${payload.order_number || ""}`;
-      const total = `${payload.current_total_price || "0.00"} ${payload.currency || "USD"}`;
-      const items = (payload.line_items || [])
-        .map((item) => `${item.quantity || 1}x ${item.title || "Item"}`)
+      const name = String(payload.customerName || "").trim() || "Slow Fit customer";
+      const orderLabel = payload.name || `#${payload.orderNumber || externalPaymentId}`;
+      const total = `${payload.amount || "0.00"} ${payload.currency || "USD"}`;
+      const items = (payload.items || [])
+        .map((item) => `${item.quantity || 1}x ${item.name || "Item"}`)
         .slice(0, 8)
         .join(", ");
 
@@ -830,7 +812,7 @@ async function processOrderEvent({ topic, shop, payload }, options = { replay: f
         },
         body: JSON.stringify({
           from,
-          to: [payload.email],
+          to: [email],
           subject: `Order confirmation ${orderLabel}`,
           html: `<div style=\"font-family:Arial,sans-serif;color:#2f2a28\"><h2>Thanks for your order, ${name}.</h2><p>Order: ${orderLabel}</p><p>Total: ${total}</p><p>Items: ${items}</p></div>`,
         }),
@@ -899,7 +881,6 @@ async function handleEvent(request) {
 async function handleCheckout(request) {
   const payload = await readJson(request);
   const locale = normalizeLocale(payload.locale);
-  const cartId = payload.cartId ? String(payload.cartId) : undefined;
   const lines = Array.isArray(payload.lines) ? payload.lines : [];
 
   if (!lines.length) {
@@ -907,12 +888,15 @@ async function handleCheckout(request) {
   }
 
   try {
-    const checkout = await syncCheckoutSession(lines, locale, cartId);
-    await appendAudit("checkout.created", { locale, cartId: checkout.cartId, lineCount: lines.length }, "customer");
+    const checkout = await createPaymentSession(lines, locale);
+    await appendAudit("checkout.created", { locale, reference: checkout.cartId, lineCount: lines.length }, "customer");
     return jsonResponse({ ok: true, checkout });
   } catch (error) {
+    if (error?.message === "INVALID_CART") return jsonResponse({ error: "Invalid cart" }, 400);
+    if (error?.message === "INSUFFICIENT_STOCK") return jsonResponse({ error: "Insufficient stock" }, 409);
+    if (error?.message === "PAYMENT_NOT_CONFIGURED") return jsonResponse({ error: "Payment provider is not configured" }, 503);
     log("error", "checkout.failed", { error: String(error?.message || "unknown_error") });
-    return jsonResponse({ error: "Unable to create checkout" }, 500);
+    return jsonResponse({ error: "Unable to create payment session" }, 502);
   }
 }
 
@@ -1391,7 +1375,7 @@ async function handleCustomerOrders(request) {
       total: true,
       currency: true,
       items: true,
-      shopifyCreatedAt: true,
+      paymentCreatedAt: true,
       updatedAt: true,
     },
   });
@@ -1435,6 +1419,217 @@ async function handleCustomerReviews(request) {
   return jsonResponse({ reviews, total, page, pageSize });
 }
 
+async function handleCatalogProducts(request, admin = false) {
+  if (admin && !(await isModeratorAuthorized(request))) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  const url = parseUrl(request);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 24, 100);
+  const search = getTrimmedParam(url, "search");
+  const tag = getTrimmedParam(url, "tag").toLowerCase();
+  const requestedStatus = getTrimmedParam(url, "status").toUpperCase();
+  const where = admin ? {} : { status: "ACTIVE" };
+
+  if (admin && ["DRAFT", "ACTIVE", "ARCHIVED"].includes(requestedStatus)) {
+    where.status = requestedStatus;
+  }
+  if (tag) {
+    where.tags = { has: tag };
+  }
+  if (search) {
+    where.OR = [
+      { title: { contains: search, mode: "insensitive" } },
+      { handle: { contains: search, mode: "insensitive" } },
+      { description: { contains: search, mode: "insensitive" } },
+    ];
+  }
+
+  const [total, products] = await Promise.all([
+    prisma.product.count({ where }),
+    prisma.product.findMany({
+      where,
+      include: CATALOG_PRODUCT_INCLUDE,
+      orderBy: { updatedAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+
+  return jsonResponse({ products: products.map(serializeCatalogProduct), total, page, pageSize });
+}
+
+async function handleCatalogProductByHandle(handle) {
+  const product = await prisma.product.findFirst({
+    where: { handle, status: "ACTIVE" },
+    include: CATALOG_PRODUCT_INCLUDE,
+  });
+  return product ? jsonResponse({ product: serializeCatalogProduct(product) }) : jsonResponse({ error: "Not found" }, 404);
+}
+
+async function handleCreateCatalogProduct(request) {
+  if (!(await isModeratorAuthorized(request))) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const input = normalizeCatalogProduct(await readJson(request));
+    const product = await prisma.product.create({
+      data: {
+        title: input.title,
+        handle: input.handle,
+        description: input.description,
+        status: input.status,
+        tags: input.tags,
+        variants: { create: input.variants.map((variant) => ({
+          title: variant.title,
+          sku: variant.sku,
+          price: variant.price,
+          compareAtPrice: variant.compareAtPrice,
+          inventoryQuantity: variant.inventoryQuantity,
+          position: variant.position,
+        })) },
+        images: { create: input.images.map((image) => ({
+          url: image.url,
+          altText: image.altText,
+          position: image.position,
+        })) },
+      },
+      include: CATALOG_PRODUCT_INCLUDE,
+    });
+    await appendAudit("catalog.product.created", { productId: product.id, handle: product.handle }, "catalog-admin");
+    return jsonResponse({ product: serializeCatalogProduct(product) }, 201);
+  } catch (error) {
+    if (error?.code === "P2002") {
+      return jsonResponse({ error: "Handle or SKU already exists" }, 409);
+    }
+    if (error instanceof Error && error.message.startsWith("Invalid") || error?.message?.startsWith("A product")) {
+      return jsonResponse({ error: error.message }, 400);
+    }
+    throw error;
+  }
+}
+
+async function handleUpdateCatalogProduct(request, productId) {
+  if (!(await isModeratorAuthorized(request))) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const input = normalizeCatalogProduct(await readJson(request));
+    const product = await prisma.$transaction(async (transaction) => {
+      const existing = await transaction.product.findUnique({
+        where: { id: productId },
+        select: { id: true, variants: { select: { id: true } }, images: { select: { id: true } } },
+      });
+      if (!existing) {
+        return null;
+      }
+      const variantIds = new Set(existing.variants.map((variant) => variant.id));
+      const imageIds = new Set(existing.images.map((image) => image.id));
+      if (input.variants.some((variant) => variant.id && !variantIds.has(variant.id))
+        || input.images.some((image) => image.id && !imageIds.has(image.id))) {
+        throw new Error("Invalid nested product identifier");
+      }
+
+      const retainedVariantIds = input.variants.map((variant) => variant.id).filter(Boolean);
+      const retainedImageIds = input.images.map((image) => image.id).filter(Boolean);
+      await transaction.productVariant.deleteMany({ where: { productId, id: { notIn: retainedVariantIds } } });
+      await transaction.productImage.deleteMany({ where: { productId, id: { notIn: retainedImageIds } } });
+      for (const variant of input.variants) {
+        const { id, ...data } = variant;
+        if (id) await transaction.productVariant.update({ where: { id }, data });
+        else await transaction.productVariant.create({ data: { ...data, productId } });
+      }
+      for (const image of input.images) {
+        const { id, ...data } = image;
+        if (id) await transaction.productImage.update({ where: { id }, data });
+        else await transaction.productImage.create({ data: { ...data, productId } });
+      }
+      await transaction.product.update({
+        where: { id: productId },
+        data: {
+          title: input.title,
+          handle: input.handle,
+          description: input.description,
+          status: input.status,
+          tags: input.tags,
+        },
+      });
+      return transaction.product.findUnique({ where: { id: productId }, include: CATALOG_PRODUCT_INCLUDE });
+    });
+    if (!product) {
+      return jsonResponse({ error: "Not found" }, 404);
+    }
+    await appendAudit("catalog.product.updated", { productId, handle: product.handle }, "catalog-admin");
+    return jsonResponse({ product: serializeCatalogProduct(product) });
+  } catch (error) {
+    if (error?.code === "P2002") {
+      return jsonResponse({ error: "Handle or SKU already exists" }, 409);
+    }
+    if (error instanceof Error && (error.message.startsWith("Invalid") || error.message.startsWith("A product"))) {
+      return jsonResponse({ error: error.message }, 400);
+    }
+    throw error;
+  }
+}
+
+async function handleDeleteCatalogProduct(request, productId) {
+  if (!(await isModeratorAuthorized(request))) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  const deleted = await prisma.product.deleteMany({ where: { id: productId } });
+  if (!deleted.count) {
+    return jsonResponse({ error: "Not found" }, 404);
+  }
+  await appendAudit("catalog.product.deleted", { productId }, "catalog-admin");
+  return jsonResponse({ ok: true });
+}
+
+async function handleCatalogImageUpload(request) {
+  if (!(await isModeratorAuthorized(request))) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  const payload = await readJson(request);
+  const fileName = String(payload.fileName || "").trim();
+  const contentType = String(payload.contentType || "").trim().toLowerCase();
+  const allowedTypes = new Map([
+    ["image/jpeg", "jpg"],
+    ["image/png", "png"],
+    ["image/webp", "webp"],
+    ["image/avif", "avif"],
+  ]);
+  if (!fileName || fileName.length > 180 || !allowedTypes.has(contentType)) {
+    return jsonResponse({ error: "Unsupported image" }, 400);
+  }
+
+  const accountId = process.env.R2_ACCOUNT_ID;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+  const bucket = process.env.R2_BUCKET_NAME;
+  const publicUrl = String(process.env.R2_PUBLIC_URL || "").replace(/\/$/, "");
+  if (!accountId || !accessKeyId || !secretAccessKey || !bucket || !publicUrl) {
+    return jsonResponse({ error: "Image storage is not configured" }, 503);
+  }
+
+  const extension = allowedTypes.get(contentType);
+  const readableName = catalogHandle(fileName.replace(/\.[^.]+$/, "")) || "product";
+  const key = `products/${new Date().toISOString().slice(0, 10)}/${randomUUID()}-${readableName}.${extension}`;
+  const client = new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+  const uploadUrl = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }), {
+    expiresIn: 300,
+  });
+
+  return jsonResponse({ uploadUrl, publicUrl: `${publicUrl}/${key}` });
+}
+
 async function handleAdminAuditLogs(request) {
   if (!(await isModeratorAuthorized(request))) {
     return jsonResponse({ error: "Unauthorized" }, 401);
@@ -1471,7 +1666,7 @@ async function handleAdminAuditLogs(request) {
   return jsonResponse({ logs, total, page, pageSize });
 }
 
-async function handleAdminOrderWebhooks(request) {
+async function handleAdminPaymentWebhooks(request) {
   if (!(await isModeratorAuthorized(request))) {
     return jsonResponse({ error: "Unauthorized" }, 401);
   }
@@ -1490,15 +1685,15 @@ async function handleAdminOrderWebhooks(request) {
   if (search) {
     where.OR = [
       { topic: { contains: search, mode: "insensitive" } },
-      { shop: { contains: search, mode: "insensitive" } },
+      { provider: { contains: search, mode: "insensitive" } },
       { orderId: { contains: search, mode: "insensitive" } },
       { errorMessage: { contains: search, mode: "insensitive" } },
     ];
   }
 
   const [total, events] = await Promise.all([
-    prisma.orderWebhookEvent.count({ where }),
-    prisma.orderWebhookEvent.findMany({
+    prisma.paymentWebhookEvent.count({ where }),
+    prisma.paymentWebhookEvent.findMany({
       where,
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * pageSize,
@@ -1509,7 +1704,7 @@ async function handleAdminOrderWebhooks(request) {
   return jsonResponse({ events, total, page, pageSize });
 }
 
-async function handleReplayOrderWebhook(request) {
+async function handleReplayPaymentWebhook(request) {
   if (!(await isModeratorAuthorized(request))) {
     return jsonResponse({ error: "Unauthorized" }, 401);
   }
@@ -1522,7 +1717,7 @@ async function handleReplayOrderWebhook(request) {
     return jsonResponse({ error: "eventId is required" }, 400);
   }
 
-  const event = await prisma.orderWebhookEvent.findUnique({ where: { id: eventId } });
+  const event = await prisma.paymentWebhookEvent.findUnique({ where: { id: eventId } });
   if (!event) {
     return jsonResponse({ error: "Webhook event not found" }, 404);
   }
@@ -1530,11 +1725,11 @@ async function handleReplayOrderWebhook(request) {
   const typedPayload = event.payload;
   await processOrderEvent({
     topic: event.topic,
-    shop: event.shop,
+    provider: event.provider,
     payload: typedPayload,
   }, { replay: true });
 
-  await prisma.orderWebhookEvent.update({
+  await prisma.paymentWebhookEvent.update({
     where: { id: event.id },
     data: {
       replayedAt: new Date(),
@@ -1545,14 +1740,14 @@ async function handleReplayOrderWebhook(request) {
   return jsonResponse({ ok: true });
 }
 
-async function handleShopifyOrderWebhook(request) {
-  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
-  const signature = request.headers.get("x-shopify-hmac-sha256") || "";
-  const topic = request.headers.get("x-shopify-topic") || "unknown";
-  const shop = request.headers.get("x-shopify-shop-domain") || "unknown";
+async function handlePaymentWebhook(request) {
+  const secret = process.env.PAYMENT_WEBHOOK_SECRET;
+  const signature = request.headers.get("x-slowfit-signature") || "";
+  const topic = request.headers.get("x-payment-topic") || "unknown";
+  const provider = request.headers.get("x-payment-provider") || "unknown";
   const rawBody = await request.text();
 
-  if (!secret || !signature || !verifyShopifyHmac(rawBody, signature, secret)) {
+  if (!secret || !signature || !verifyPaymentHmac(rawBody, signature, secret)) {
     return jsonResponse({ error: "Invalid signature" }, 401);
   }
 
@@ -1567,12 +1762,12 @@ async function handleShopifyOrderWebhook(request) {
 
   let createdEvent;
   try {
-    createdEvent = await prisma.orderWebhookEvent.create({
+    createdEvent = await prisma.paymentWebhookEvent.create({
       data: {
         idempotencyKey,
         topic,
-        shop,
-        orderId: payload.id ? String(payload.id) : null,
+        provider,
+        orderId: payload.reference ? String(payload.reference) : null,
         payload,
         status: "PROCESSED",
         processedAt: new Date(),
@@ -1586,11 +1781,11 @@ async function handleShopifyOrderWebhook(request) {
   }
 
   try {
-    await processOrderEvent({ topic, shop, payload });
-    await appendAudit("order.webhook.processed", { topic, orderId: payload.id, idempotencyKey }, "shopify-webhook");
+    await processOrderEvent({ topic, provider, payload });
+    await appendAudit("payment.webhook.processed", { topic, orderId: payload.reference, idempotencyKey }, "payment-webhook");
     return jsonResponse({ ok: true });
   } catch (error) {
-    await prisma.orderWebhookEvent.update({
+    await prisma.paymentWebhookEvent.update({
       where: { id: createdEvent.id },
       data: {
         status: "FAILED",
@@ -1599,9 +1794,9 @@ async function handleShopifyOrderWebhook(request) {
     });
 
     await appendAudit(
-      "order.webhook.failed",
-      { topic, orderId: payload.id, idempotencyKey, error: String(error?.message || "unknown_error") },
-      "shopify-webhook",
+      "payment.webhook.failed",
+      { topic, orderId: payload.reference, idempotencyKey, error: String(error?.message || "unknown_error") },
+      "payment-webhook",
     );
     return jsonResponse({ error: "Webhook processing failed" }, 500);
   }
@@ -1705,20 +1900,50 @@ export async function route(request) {
     return handleAdminLogout();
   }
 
+  if (pathname === "/api/catalog/products" && method === "GET") {
+    return handleCatalogProducts(request);
+  }
+
+  const publicProductMatch = pathname.match(/^\/api\/catalog\/products\/([^/]+)$/);
+  if (publicProductMatch && method === "GET") {
+    return handleCatalogProductByHandle(decodeURIComponent(publicProductMatch[1]));
+  }
+
+  if (pathname === "/api/admin/catalog/products" && method === "GET") {
+    return handleCatalogProducts(request, true);
+  }
+
+  if (pathname === "/api/admin/catalog/products" && method === "POST") {
+    return handleCreateCatalogProduct(request);
+  }
+
+  if (pathname === "/api/admin/catalog/images/presign" && method === "POST") {
+    return handleCatalogImageUpload(request);
+  }
+
+  const adminProductMatch = pathname.match(/^\/api\/admin\/catalog\/products\/([^/]+)$/);
+  if (adminProductMatch && method === "PUT") {
+    return handleUpdateCatalogProduct(request, decodeURIComponent(adminProductMatch[1]));
+  }
+
+  if (adminProductMatch && method === "DELETE") {
+    return handleDeleteCatalogProduct(request, decodeURIComponent(adminProductMatch[1]));
+  }
+
   if (pathname === "/api/admin/audit-logs" && method === "GET") {
     return handleAdminAuditLogs(request);
   }
 
-  if (pathname === "/api/admin/webhooks/orders" && method === "GET") {
-    return handleAdminOrderWebhooks(request);
+  if (pathname === "/api/admin/webhooks/payments" && method === "GET") {
+    return handleAdminPaymentWebhooks(request);
   }
 
-  if (pathname === "/api/admin/webhooks/orders/replay" && method === "POST") {
-    return handleReplayOrderWebhook(request);
+  if (pathname === "/api/admin/webhooks/payments/replay" && method === "POST") {
+    return handleReplayPaymentWebhook(request);
   }
 
-  if (pathname === "/api/webhooks/shopify/orders" && method === "POST") {
-    return handleShopifyOrderWebhook(request);
+  if (pathname === "/api/webhooks/payments" && method === "POST") {
+    return handlePaymentWebhook(request);
   }
 
   return jsonResponse({ error: "Not found" }, 404);

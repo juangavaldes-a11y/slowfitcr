@@ -210,6 +210,7 @@ export function CartDock() {
         className="slowfit-cart-fab"
         type="primary"
         icon={<ShoppingOutlined />}
+        aria-label={`${labels.cart} (${totalItems})`}
         onClick={() => setOpen(true)}
       >
         {labels.cart} ({totalItems})

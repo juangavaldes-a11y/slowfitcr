@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import ProductPurchase from "../../../product-purchase";
 import ReviewsPanel from "../../../reviews-panel";
 import { isLocale, type Locale } from "../../../i18n";
-import { getProductByHandle } from "../../../lib/shopify";
+import { getProductByHandle } from "../../../lib/catalog";
 import StructuredData from "../../../structured-data";
 
 type ProductPageProps = {
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     return {};
   }
 
-  const product = await getProductByHandle(handle, locale as Locale);
+  const product = await getProductByHandle(handle);
 
   if (!product) {
     return {};
@@ -58,7 +58,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
-  const product = await getProductByHandle(handle, locale as Locale);
+  const product = await getProductByHandle(handle);
 
   if (!product) {
     notFound();
@@ -104,7 +104,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
       />
       <section className="slowfit-shell slowfit-product-detail">
         <div className="slowfit-product-detail-media">
-          <Image src={product.image} alt={product.title} fill priority sizes="(max-width: 991px) 100vw, 48vw" className="slowfit-cover" />
+          <Image src={product.image} alt={product.images[0]?.altText || product.title} fill priority unoptimized sizes="(max-width: 991px) 100vw, 48vw" className="slowfit-cover" />
         </div>
         <div className="slowfit-product-detail-content">
           <span className="slowfit-kicker">{product.collectionTitle}</span>

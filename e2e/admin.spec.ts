@@ -49,8 +49,8 @@ test("operator inspects and replays a failed webhook", async ({ page }) => {
 
   const event = {
     id: "webhook-failed-1",
-    topic: "orders/paid",
-    shop: "slow-fit.myshopify.com",
+    topic: "payment.paid",
+    provider: "test-bank",
     orderId: "1042",
     payload: { id: 1042, name: "#1042", total_price: "89.00" },
     status: "FAILED",
@@ -64,16 +64,16 @@ test("operator inspects and replays a failed webhook", async ({ page }) => {
   await page.route("**/api/admin/audit-logs**", (route) =>
     route.fulfill({ json: { logs: [], total: 0, page: 1, pageSize: 8 } }),
   );
-  await page.route("**/api/admin/webhooks/orders**", (route) =>
+  await page.route("**/api/admin/webhooks/payments**", (route) =>
     route.fulfill({ json: { events: [event], total: 1, page: 1, pageSize: 8 } }),
   );
-  await page.route("**/api/admin/webhooks/orders/replay", async (route) => {
+  await page.route("**/api/admin/webhooks/payments/replay", async (route) => {
     replayCount += 1;
     await route.fulfill({ json: { ok: true } });
   });
 
   await page.goto("/en/admin/ops");
-  await expect(page.getByText("orders/paid", { exact: true })).toBeVisible();
+  await expect(page.getByText("payment.paid", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "View details" }).click();
 
   const drawer = page.getByRole("dialog", { name: "Webhook details" });

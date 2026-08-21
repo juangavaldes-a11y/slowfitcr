@@ -5,7 +5,7 @@ import { PrismaClient } from "@prisma/client";
 
 process.env.REVIEW_MODERATION_TOKEN = "integration-token";
 process.env.REVIEW_MODERATION_SESSION_SECRET = "integration-session-secret";
-process.env.SHOPIFY_WEBHOOK_SECRET = "integration-webhook-secret";
+process.env.PAYMENT_WEBHOOK_SECRET = "integration-webhook-secret";
 process.env.RATE_LIMIT_MAX = "2";
 process.env.RATE_LIMIT_AUTH_MAX = "20";
 process.env.HOST = "127.0.0.1";
@@ -46,7 +46,8 @@ before(async () => {
 });
 
 beforeEach(async () => {
-  await prisma.orderWebhookEvent.deleteMany();
+  await prisma.product.deleteMany();
+  await prisma.paymentWebhookEvent.deleteMany();
   await prisma.order.deleteMany();
   await prisma.passwordResetToken.deleteMany();
   await prisma.customer.deleteMany();
@@ -77,6 +78,67 @@ test("admin login creates a reusable session and logout clears it", async () => 
   const logout = await route(request("/api/admin/logout", { method: "POST", headers: { Cookie: cookie } }));
   assert.equal(logout.status, 200);
   assert.match(logout.headers.get("set-cookie"), /Max-Age=0/);
+});
+
+test("admins manage internal products and customers filter the active catalog", async () => {
+  const unauthorized = await route(request("/api/admin/catalog/products"));
+  assert.equal(unauthorized.status, 401);
+
+  const cookie = await loginCookie();
+  const createResponse = await route(request("/api/admin/catalog/products", {
+    method: "POST",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: "Core Training Tee",
+      handle: "core-training-tee",
+      description: "Lightweight training shirt",
+      status: "ACTIVE",
+      tags: ["Training", "Women"],
+      images: [{ url: "https://cdn.example.com/core-tee.jpg", altText: "Core tee" }],
+      variants: [{
+        title: "M / Black",
+        sku: "CORE-M-BLK",
+        price: 48,
+        compareAtPrice: 56,
+        inventoryQuantity: 7,
+      }],
+    }),
+  }));
+  assert.equal(createResponse.status, 201);
+  const created = (await json(createResponse)).product;
+  assert.equal(created.tags[0], "training");
+  assert.equal(created.variants[0].inventoryQuantity, 7);
+  assert.equal(created.variants[0].compareAtPrice, 56);
+
+  const filteredResponse = await route(request("/api/catalog/products?tag=training"));
+  assert.equal(filteredResponse.status, 200);
+  const filtered = await json(filteredResponse);
+  assert.equal(filtered.total, 1);
+  assert.equal(filtered.products[0].handle, "core-training-tee");
+
+  const updateResponse = await route(request(`/api/admin/catalog/products/${created.id}`, {
+    method: "PUT",
+    headers: { Cookie: cookie, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...created,
+      variants: [{ ...created.variants[0], inventoryQuantity: 3, compareAtPrice: null }],
+    }),
+  }));
+  assert.equal(updateResponse.status, 200);
+  const updated = (await json(updateResponse)).product;
+  assert.equal(updated.variants[0].id, created.variants[0].id);
+  assert.equal(updated.images[0].id, created.images[0].id);
+  assert.equal(updated.variants[0].inventoryQuantity, 3);
+  assert.equal(updated.variants[0].compareAtPrice, null);
+
+  const deleteResponse = await route(request(`/api/admin/catalog/products/${created.id}`, {
+    method: "DELETE",
+    headers: { Cookie: cookie },
+  }));
+  assert.equal(deleteResponse.status, 200);
+
+  const missingResponse = await route(request("/api/catalog/products/core-training-tee"));
+  assert.equal(missingResponse.status, 404);
 });
 
 test("production requires strong and distinct authentication secrets", () => {
@@ -379,33 +441,43 @@ test("rate limiting returns 429 after the configured request budget", async () =
   assert.ok(limited.headers.get("retry-after"));
 });
 
-test("Shopify webhooks verify signatures and ignore duplicate deliveries", async () => {
-  const body = JSON.stringify({ id: 991, order_number: 42, updated_at: "2026-08-15T00:00:00Z", line_items: [] });
-  const signature = createHmac("sha256", process.env.SHOPIFY_WEBHOOK_SECRET).update(body, "utf8").digest("base64");
+test("payment webhooks verify signatures and ignore duplicate deliveries", async () => {
+  const body = JSON.stringify({ reference: "pay-991", orderNumber: 42, updated_at: "2026-08-15T00:00:00Z", items: [] });
+  const signature = createHmac("sha256", process.env.PAYMENT_WEBHOOK_SECRET).update(body, "utf8").digest("base64");
   const headers = {
     "Content-Type": "application/json",
     "x-forwarded-for": "203.0.113.21",
-    "x-shopify-hmac-sha256": signature,
-    "x-shopify-topic": "orders/create",
-    "x-shopify-shop-domain": "slowfit-test.myshopify.com",
+    "x-slowfit-signature": signature,
+    "x-payment-topic": "payment.created",
+    "x-payment-provider": "test-bank",
   };
 
-  const invalid = await route(request("/api/webhooks/shopify/orders", {
+  const invalid = await route(request("/api/webhooks/payments", {
     method: "POST",
-    headers: { ...headers, "x-forwarded-for": "203.0.113.20", "x-shopify-hmac-sha256": "invalid" },
+    headers: { ...headers, "x-forwarded-for": "203.0.113.20", "x-slowfit-signature": "invalid" },
     body,
   }));
   assert.equal(invalid.status, 401);
 
-  const first = await route(request("/api/webhooks/shopify/orders", { method: "POST", headers, body }));
+  const first = await route(request("/api/webhooks/payments", { method: "POST", headers, body }));
   assert.equal(first.status, 200);
 
-  const duplicate = await route(request("/api/webhooks/shopify/orders", { method: "POST", headers, body }));
+  const duplicate = await route(request("/api/webhooks/payments", { method: "POST", headers, body }));
   assert.deepEqual(await json(duplicate), { ok: true, duplicate: true });
-  assert.equal(await prisma.orderWebhookEvent.count(), 1);
+  assert.equal(await prisma.paymentWebhookEvent.count(), 1);
 });
 
-test("Shopify webhooks expose order status to the matching customer", async () => {
+test("payment webhooks expose order status to the matching customer", async () => {
+  const product = await prisma.product.create({
+    data: {
+      title: "Performance Top",
+      handle: "performance-top",
+      status: "ACTIVE",
+      variants: { create: { title: "M", price: 79, inventoryQuantity: 2 } },
+    },
+    include: { variants: true },
+  });
+  const variantId = product.variants[0].id;
   const registration = await route(request("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -413,26 +485,26 @@ test("Shopify webhooks expose order status to the matching customer", async () =
   }));
   const cookie = registration.headers.get("set-cookie").split(";")[0];
   const body = JSON.stringify({
-    id: 1199,
-    order_number: 88,
+    reference: "pay-1199",
+    orderNumber: 88,
     name: "#1088",
     email: "ORDER@example.com",
-    financial_status: "paid",
-    fulfillment_status: "unfulfilled",
-    current_total_price: "79.00",
+    status: "paid",
+    fulfillmentStatus: "unfulfilled",
+    amount: "79.00",
     currency: "USD",
-    created_at: "2026-08-15T00:00:00Z",
+    createdAt: "2026-08-15T00:00:00Z",
     updated_at: "2026-08-15T00:01:00Z",
-    line_items: [{ title: "Performance Top", quantity: 1 }],
+    items: [{ variantId, name: "Performance Top", quantity: 1 }],
   });
-  const signature = createHmac("sha256", process.env.SHOPIFY_WEBHOOK_SECRET).update(body, "utf8").digest("base64");
-  const webhook = await route(request("/api/webhooks/shopify/orders", {
+  const signature = createHmac("sha256", process.env.PAYMENT_WEBHOOK_SECRET).update(body, "utf8").digest("base64");
+  const webhook = await route(request("/api/webhooks/payments", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-shopify-hmac-sha256": signature,
-      "x-shopify-topic": "orders/paid",
-      "x-shopify-shop-domain": "slowfit-test.myshopify.com",
+      "x-slowfit-signature": signature,
+      "x-payment-topic": "payment.paid",
+      "x-payment-provider": "test-bank",
     },
     body,
   }));
@@ -444,28 +516,85 @@ test("Shopify webhooks expose order status to the matching customer", async () =
   assert.equal(ordersPayload.orders.length, 1);
   assert.equal(ordersPayload.orders[0].financialStatus, "paid");
   assert.equal(ordersPayload.orders[0].fulfillmentStatus, "unfulfilled");
+  assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 1);
+
+  const secondDeliveryBody = JSON.stringify({
+    ...JSON.parse(body),
+    updated_at: "2026-08-15T00:02:00Z",
+  });
+  const secondSignature = createHmac("sha256", process.env.PAYMENT_WEBHOOK_SECRET)
+    .update(secondDeliveryBody, "utf8")
+    .digest("base64");
+  const secondDelivery = await route(request("/api/webhooks/payments", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-slowfit-signature": secondSignature,
+      "x-payment-topic": "payment.paid",
+      "x-payment-provider": "test-bank",
+    },
+    body: secondDeliveryBody,
+  }));
+  assert.equal(secondDelivery.status, 200);
+  assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 1);
+});
+
+test("paid payment rolls back the order when inventory is no longer available", async () => {
+  const product = await prisma.product.create({
+    data: {
+      title: "Limited Top",
+      handle: "limited-top",
+      status: "ACTIVE",
+      variants: { create: { title: "S", price: 65, inventoryQuantity: 1 } },
+    },
+    include: { variants: true },
+  });
+  const variantId = product.variants[0].id;
+  const body = JSON.stringify({
+    reference: "pay-no-stock",
+    email: "buyer@example.com",
+    status: "paid",
+    updated_at: "2026-08-15T00:03:00Z",
+    items: [{ variantId, name: "Limited Top", quantity: 2 }],
+  });
+  const signature = createHmac("sha256", process.env.PAYMENT_WEBHOOK_SECRET).update(body, "utf8").digest("base64");
+  const webhook = await route(request("/api/webhooks/payments", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-slowfit-signature": signature,
+      "x-payment-topic": "payment.paid",
+      "x-payment-provider": "test-bank",
+    },
+    body,
+  }));
+
+  assert.equal(webhook.status, 500);
+  assert.equal(await prisma.order.count({ where: { externalPaymentId: "pay-no-stock" } }), 0);
+  assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 1);
+  assert.equal((await prisma.paymentWebhookEvent.findFirst({ where: { orderId: "pay-no-stock" } })).status, "FAILED");
 });
 
 test("authenticated moderators can replay a stored webhook event", async () => {
-  const event = await prisma.orderWebhookEvent.create({
+  const event = await prisma.paymentWebhookEvent.create({
     data: {
-      idempotencyKey: "orders/create:replay:1",
-      topic: "orders/create",
-      shop: "slowfit-test.myshopify.com",
+      idempotencyKey: "payment.created:replay:1",
+      topic: "payment.created",
+      provider: "test-bank",
       orderId: "replay-order",
-      payload: { id: "replay-order", line_items: [] },
+      payload: { reference: "replay-order", items: [] },
       status: "PROCESSED",
     },
   });
   const cookie = await loginCookie();
-  const response = await route(request("/api/admin/webhooks/orders/replay", {
+  const response = await route(request("/api/admin/webhooks/payments/replay", {
     method: "POST",
     headers: { Cookie: cookie, "Content-Type": "application/json" },
     body: JSON.stringify({ eventId: event.id, actor: "integration-admin" }),
   }));
 
   assert.equal(response.status, 200);
-  const updated = await prisma.orderWebhookEvent.findUnique({ where: { id: event.id } });
+  const updated = await prisma.paymentWebhookEvent.findUnique({ where: { id: event.id } });
   assert.ok(updated.replayedAt);
 });
 
@@ -546,7 +675,7 @@ test("outbound webhooks retry transient failures and include HMAC headers", asyn
   }
 });
 
-test("checkout validates empty carts and returns fallback sessions without Shopify credentials", async () => {
+test("checkout validates internal inventory and sends server-calculated totals to the payment adapter", async () => {
   const empty = await route(request("/api/cart/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -554,15 +683,52 @@ test("checkout validates empty carts and returns fallback sessions without Shopi
   }));
   assert.equal(empty.status, 400);
 
-  const checkout = await route(request("/api/cart/checkout", {
+  const product = await prisma.product.create({
+    data: {
+      title: "Internal Tee",
+      handle: "internal-tee",
+      status: "ACTIVE",
+      variants: { create: { title: "M", sku: "INTERNAL-M", price: 42, inventoryQuantity: 2 } },
+    },
+    include: { variants: true },
+  });
+  const variantId = product.variants[0].id;
+
+  const insufficient = await route(request("/api/cart/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ locale: "en", lines: [{ variantId: "performance-collection-1-s", quantity: 1 }] }),
+    body: JSON.stringify({ locale: "en", lines: [{ variantId, quantity: 3 }] }),
   }));
-  const payload = await json(checkout);
-  assert.equal(checkout.status, 200);
-  assert.equal(payload.checkout.cartId, "fallback");
-  assert.match(payload.checkout.checkoutUrl, /slowfitcr\.com\/en/);
+  assert.equal(insufficient.status, 409);
+
+  const originalFetch = globalThis.fetch;
+  let paymentPayload;
+  process.env.PAYMENT_PROVIDER_URL = "https://payments.example.com/session";
+  process.env.PAYMENT_PROVIDER_TOKEN = "payment-token";
+  globalThis.fetch = async (_url, init) => {
+    paymentPayload = JSON.parse(init.body);
+    return new Response(JSON.stringify({ checkoutUrl: "https://payments.example.com/pay/123" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+
+  try {
+    const checkout = await route(request("/api/cart/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locale: "en", lines: [{ variantId, quantity: 2, price: 1 }] }),
+    }));
+    const payload = await json(checkout);
+    assert.equal(checkout.status, 200);
+    assert.equal(payload.checkout.checkoutUrl, "https://payments.example.com/pay/123");
+    assert.equal(paymentPayload.amount, 84);
+    assert.equal(paymentPayload.items[0].unitPrice, 42);
+  } finally {
+    globalThis.fetch = originalFetch;
+    delete process.env.PAYMENT_PROVIDER_URL;
+    delete process.env.PAYMENT_PROVIDER_TOKEN;
+  }
 });
 
 test("reviews validate submissions and support the complete moderation lifecycle", async () => {
@@ -630,11 +796,11 @@ test("admin listings paginate and replay rejects missing identifiers", async () 
       { action: "review.moderated", actor: "admin", details: { id: 2 } },
     ],
   });
-  await prisma.orderWebhookEvent.create({
+  await prisma.paymentWebhookEvent.create({
     data: {
-      idempotencyKey: "orders/create:list:1",
-      topic: "orders/create",
-      shop: "slowfit-test.myshopify.com",
+      idempotencyKey: "payment.created:list:1",
+      topic: "payment.created",
+      provider: "test-bank",
       orderId: "list-order",
       payload: { id: "list-order" },
       status: "FAILED",
@@ -648,19 +814,19 @@ test("admin listings paginate and replay rejects missing identifiers", async () 
   assert.equal(logsPayload.total, 1);
   assert.equal(logsPayload.logs.length, 1);
 
-  const events = await route(request("/api/admin/webhooks/orders?page=1&pageSize=1&status=FAILED&search=list-order", { headers: { Cookie: cookie } }));
+  const events = await route(request("/api/admin/webhooks/payments?page=1&pageSize=1&status=FAILED&search=list-order", { headers: { Cookie: cookie } }));
   const eventsPayload = await json(events);
   assert.equal(eventsPayload.total, 1);
   assert.equal(eventsPayload.events[0].status, "FAILED");
 
-  const missingId = await route(request("/api/admin/webhooks/orders/replay", {
+  const missingId = await route(request("/api/admin/webhooks/payments/replay", {
     method: "POST",
     headers: { Cookie: cookie, "Content-Type": "application/json" },
     body: JSON.stringify({}),
   }));
   assert.equal(missingId.status, 400);
 
-  const missingEvent = await route(request("/api/admin/webhooks/orders/replay", {
+  const missingEvent = await route(request("/api/admin/webhooks/payments/replay", {
     method: "POST",
     headers: { Cookie: cookie, "Content-Type": "application/json" },
     body: JSON.stringify({ eventId: "missing" }),

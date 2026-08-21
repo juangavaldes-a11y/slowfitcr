@@ -1,3 +1,53 @@
+.slowfit-admin-catalog,
+.slowfit-form-list {
+  width: 100%;
+}
+
+.slowfit-admin-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px) auto;
+  width: 100%;
+}
+
+.slowfit-full-width {
+  width: 100%;
+}
+
+.slowfit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 24px;
+  width: 100%;
+}
+
+.slowfit-shop-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 280px);
+  margin-bottom: 28px;
+  width: 100%;
+}
+
+.slowfit-stock-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+  padding: 6px 10px;
+  background: #1f2421;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  .slowfit-admin-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .slowfit-shop-filters {
+    grid-template-columns: 1fr;
+  }
+}
 @import "tailwindcss";
 
 :root {
@@ -1311,6 +1361,15 @@ a {
   .slowfit-cart-fab.ant-btn {
     right: 12px;
     bottom: 12px;
+    width: 48px;
+    padding-inline: 0;
+    border-color: var(--ink);
+    background: var(--paper);
+    color: var(--ink);
+  }
+
+  .slowfit-cart-fab.ant-btn > span:not(.ant-btn-icon) {
+    display: none;
   }
 
   .slowfit-footer-links {

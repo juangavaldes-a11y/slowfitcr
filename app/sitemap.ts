@@ -1,20 +1,16 @@
 import type { MetadataRoute } from "next";
 import { locales } from "./i18n";
-import { getCollections } from "./lib/shopify";
+import { getProducts } from "./lib/catalog";
 
 const staticRoutes = ["", "/shop", "/privacy", "/terms", "/shipping", "/returns"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const dynamicRoutes: string[] = [];
+  const products = await getProducts();
 
   for (const locale of locales) {
-    const collections = await getCollections(locale);
-
-    for (const collection of collections) {
-      dynamicRoutes.push(`/${locale}/shop/${collection.handle}`);
-      for (const product of collection.products) {
-        dynamicRoutes.push(`/${locale}/product/${product.handle}`);
-      }
+    for (const product of products) {
+      dynamicRoutes.push(`/${locale}/product/${product.handle}`);
     }
   }
 

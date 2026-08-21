@@ -26,7 +26,7 @@ type Order = {
   total: string | null;
   currency: string | null;
   items: Array<{ title?: string; quantity?: number }>;
-  shopifyCreatedAt: string | null;
+  paymentCreatedAt: string | null;
   updatedAt: string;
 };
 
@@ -81,7 +81,7 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         adminHint: "Acceso reservado para el equipo de Slow Fit.",
         profile: "Tu perfil",
         orders: "Tus pedidos",
-        noOrders: "Tus pedidos aparecerán aquí cuando Shopify confirme la compra con este correo.",
+        noOrders: "Tus pedidos aparecerán aqui cuando el banco confirme una compra con este correo.",
         paid: "Pago",
         fulfillment: "Entrega",
         items: "artículos",
@@ -129,7 +129,7 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         adminHint: "Reserved for the Slow Fit team.",
         profile: "Your profile",
         orders: "Your orders",
-        noOrders: "Orders will appear here when Shopify confirms a purchase using this email.",
+        noOrders: "Orders will appear here when the payment provider confirms a purchase using this email.",
         paid: "Payment",
         fulfillment: "Delivery",
         items: "items",
@@ -325,7 +325,7 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
                   <article className="slowfit-order-row" key={order.id}>
                     <div>
                       <Typography.Title level={4}>{order.name || `#${order.orderNumber || order.id}`}</Typography.Title>
-                      <Typography.Text type="secondary">{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(order.shopifyCreatedAt || order.updatedAt))}</Typography.Text>
+                      <Typography.Text type="secondary">{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(order.paymentCreatedAt || order.updatedAt))}</Typography.Text>
                     </div>
                     <div className="slowfit-order-status">
                       <span>{labels.paid}: <Tag color={order.financialStatus === "paid" ? "success" : "warning"}>{order.financialStatus || "pending"}</Tag></span>

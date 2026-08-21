@@ -35,7 +35,7 @@ type AuditRow = {
 type WebhookRow = {
   id: string;
   topic: string;
-  shop: string;
+  provider: string;
   orderId?: string | null;
   payload: Record<string, unknown>;
   status: "PROCESSED" | "FAILED";
@@ -87,9 +87,9 @@ const AUDIT_ACTION_OPTIONS = [
   "customer.login.failed",
   "customer.registered",
   "event.ingested",
-  "order.webhook.failed",
-  "order.webhook.processed",
-  "order.webhook.replayed",
+  "payment.webhook.failed",
+  "payment.webhook.processed",
+  "payment.webhook.replayed",
   "review.moderated",
   "review.submitted",
 ].map((action) => ({ value: action, label: action }));
@@ -123,7 +123,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
       locale === "es"
         ? {
             title: "Operaciones",
-            subtitle: "Inicia sesion para revisar auditoria, filtrar eventos y reenviar webhooks de pedidos.",
+            subtitle: "Inicia sesion para revisar auditoria, filtrar eventos y reenviar webhooks de pago.",
             authTitle: "Acceso de moderacion",
             authCopy: "La sesion queda guardada en una cookie segura hasta que expire o cierres sesion.",
             refresh: "Actualizar",
@@ -145,7 +145,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             auditSearch: "Buscar accion o actor",
             auditAction: "Filtrar por accion",
             auditDetails: "Detalle de auditoria",
-            webhookSearch: "Buscar topic, tienda u orden",
+            webhookSearch: "Buscar topic, proveedor u orden",
             webhookStatus: "Filtrar por estado",
             webhookDetails: "Detalle del webhook",
             viewDetails: "Ver detalle",
@@ -154,7 +154,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             when: "Fecha",
             details: "Detalles",
             topic: "Topic",
-            shop: "Tienda",
+            provider: "Proveedor",
             order: "Orden",
             status: "Estado",
             created: "Creado",
@@ -167,7 +167,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
           }
         : {
             title: "Operations",
-            subtitle: "Sign in to review the audit trail, filter events, and replay order webhooks.",
+            subtitle: "Sign in to review the audit trail, filter events, and replay payment webhooks.",
             authTitle: "Moderation access",
             authCopy: "The session is stored in a secure cookie until it expires or you sign out.",
             refresh: "Refresh",
@@ -189,7 +189,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             auditSearch: "Search action or actor",
             auditAction: "Filter by action",
             auditDetails: "Audit details",
-            webhookSearch: "Search topic, shop, or order",
+            webhookSearch: "Search topic, provider, or order",
             webhookStatus: "Filter by status",
             webhookDetails: "Webhook details",
             viewDetails: "View details",
@@ -198,7 +198,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             when: "When",
             details: "Details",
             topic: "Topic",
-            shop: "Shop",
+            provider: "Provider",
             order: "Order",
             status: "Status",
             created: "Created",
@@ -260,7 +260,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
     setWebhookLoading(true);
     try {
       const payload = await apiRequest<{ events: WebhookRow[]; total: number }>(
-        buildUrl("/api/admin/webhooks/orders", {
+        buildUrl("/api/admin/webhooks/payments", {
           page: query.page,
           pageSize: query.pageSize,
           search: query.search,
@@ -337,7 +337,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const replayWebhook = async (eventId: string) => {
     setReplayingEventId(eventId);
     try {
-      await apiRequest<{ ok: true }>("/api/admin/webhooks/orders/replay", {
+      await apiRequest<{ ok: true }>("/api/admin/webhooks/payments/replay", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ eventId, actor: "slowfit-admin" }),
@@ -539,7 +539,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
                           <Typography.Text strong>{event.topic}</Typography.Text>
                           <Tag color={event.status === "FAILED" ? "error" : "success"}>{event.status}</Tag>
                         </Space>
-                        <Typography.Text type="secondary">{event.orderId || event.shop}</Typography.Text>
+                        <Typography.Text type="secondary">{event.orderId || event.provider}</Typography.Text>
                         <Typography.Text type="secondary">{formatDate(event.createdAt)}</Typography.Text>
                         {event.errorMessage ? <Alert type="error" showIcon title={event.errorMessage} /> : null}
                         <Space.Compact block>
@@ -664,7 +664,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             ) : null}
             <Descriptions bordered column={1} size="small">
               <Descriptions.Item label={labels.topic}>{selectedEvent.topic}</Descriptions.Item>
-              <Descriptions.Item label={labels.shop}>{selectedEvent.shop}</Descriptions.Item>
+              <Descriptions.Item label={labels.provider}>{selectedEvent.provider}</Descriptions.Item>
               <Descriptions.Item label={labels.order}>
                 {selectedEvent.orderId || labels.notAvailable}
               </Descriptions.Item>

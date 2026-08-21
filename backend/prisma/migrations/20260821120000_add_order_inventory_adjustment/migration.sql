@@ -1,0 +1,1 @@
+ALTER TABLE "Order" ADD COLUMN "inventoryAdjustedAt" TIMESTAMP(3);

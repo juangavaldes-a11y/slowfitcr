@@ -214,7 +214,7 @@ const copyByLocale: Record<Locale, Copy> = {
       supportTitle: "Soporte directo",
       supportCopy: "WhatsApp y formulario de contacto para resolver dudas de talla, stock o entrega.",
       secureTitle: "Pago seguro",
-      secureCopy: "La siguiente fase conectará checkout seguro con Shopify y seguimiento de pedidos.",
+      secureCopy: "Checkout bancario seguro y seguimiento claro de cada pedido.",
     },
     policies: {
       privacy: {
@@ -363,7 +363,7 @@ const copyByLocale: Record<Locale, Copy> = {
       supportTitle: "Direct support",
       supportCopy: "WhatsApp and a contact form will help with sizing, stock, or delivery questions.",
       secureTitle: "Secure payments",
-      secureCopy: "The next phase connects Shopify-powered secure checkout and order tracking.",
+      secureCopy: "Secure bank checkout and clear tracking for every order.",
     },
     policies: {
       privacy: {

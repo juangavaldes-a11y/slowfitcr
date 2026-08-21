@@ -5,15 +5,15 @@
 The application is ready for a staging deployment:
 
 - Responsive bilingual Next.js storefront
-- Product catalog fallback and Shopify Storefront integration boundary
-- Persistent cart and checkout handoff
+- Internal product catalog, inventory, images, tags, prices, and discounts
+- Persistent cart and bank payment handoff
 - PostgreSQL persistence through Prisma migrations
 - Review submission, moderation history, audit logs, and webhook replay
-- Backend health checks, rate limiting, structured logs, and Shopify webhook idempotency
+- Backend health checks, rate limiting, structured logs, and payment webhook idempotency
 - CI gates for lint, build, database migrations, backend tests, and Playwright tests
 - Backend coverage gate at 80% lines; current coverage is 82.56%
 
-Production is not yet live. Infrastructure, production credentials, Shopify configuration, monitoring, and a staging acceptance pass remain.
+Production is not yet live. Infrastructure, production credentials, payment-provider configuration, monitoring, and a staging acceptance pass remain.
 
 ## 1. Provision staging
 
@@ -21,7 +21,7 @@ Production is not yet live. Infrastructure, production credentials, Shopify conf
 - Deploy the Node backend to a runtime that supports long-lived Node processes and direct PostgreSQL connectivity.
 - Deploy the Next.js frontend through the configured OpenNext Cloudflare Worker path.
 - Use separate staging domains, for example `staging.slowfitcr.com` and `api-staging.slowfitcr.com`.
-- Keep staging Shopify credentials and webhook endpoints separate from production where possible.
+- Keep staging payment-provider credentials and webhook endpoints separate from production.
 
 Exit criteria:
 
@@ -38,7 +38,15 @@ Backend secrets:
 - `REVIEW_MODERATION_TOKEN`
 - `REVIEW_MODERATION_SESSION_SECRET`
 - `CUSTOMER_SESSION_SECRET`
-- `SHOPIFY_WEBHOOK_SECRET`
+- `PAYMENT_PROVIDER_URL`
+- `PAYMENT_PROVIDER_TOKEN`
+- `PAYMENT_WEBHOOK_SECRET`
+- `STORE_CURRENCY`
+- `R2_ACCOUNT_ID`
+- `R2_ACCESS_KEY_ID`
+- `R2_SECRET_ACCESS_KEY`
+- `R2_BUCKET_NAME`
+- `R2_PUBLIC_URL`
 - `OUTBOUND_WEBHOOK_SECRET`
 - `ORDER_EVENTS_WEBHOOK_URL`
 - `CRM_ORDER_WEBHOOK_URL`
@@ -56,12 +64,10 @@ Backend delivery and request limits:
 - `MAX_REQUEST_BODY_BYTES` (default `1048576`)
 - `PASSWORD_RESET_MAX_AGE_MS` (default `1800000`)
 
-Frontend secrets and configuration:
+Frontend configuration:
 
 - `NEXT_PUBLIC_BACKEND_URL`
 - `NEXT_PUBLIC_GA_ID`
-- `SHOPIFY_STORE_DOMAIN`
-- `SHOPIFY_STOREFRONT_ACCESS_TOKEN`
 
 Requirements:
 
@@ -101,12 +107,13 @@ Before every production migration:
 - Test the migration against a staging copy of production-like data.
 - Define the rollback or forward-fix procedure.
 
-## 4. Configure Shopify
+## 4. Configure payments and product media
 
-- Add the production Storefront API domain and token.
-- Register order webhooks against `POST /api/webhooks/shopify/orders` on the backend origin.
-- Configure the exact same `SHOPIFY_WEBHOOK_SECRET` in Shopify and the backend.
-- Confirm order create/paid topics required by operations.
+- Configure the BAC or bank session endpoint and provider token.
+- Register provider callbacks against `POST /api/webhooks/payments` on the backend origin.
+- Configure the same `PAYMENT_WEBHOOK_SECRET` in the provider and backend.
+- Confirm `payment.paid` callbacks preserve the checkout `reference` plus every item's `variantId` and `quantity`; inventory deduction rejects incomplete paid events.
+- Configure the R2 bucket, public media domain, and CORS for the admin origin.
 - Verify duplicate deliveries return success without duplicating downstream processing.
 - Verify failed deliveries appear in Admin Operations and can be replayed.
 
@@ -138,7 +145,7 @@ Perform manual acceptance on desktop and mobile:
 Exit criteria:
 
 - No critical or high-severity defects.
-- Real Shopify checkout succeeds with a test product.
+- Real bank sandbox checkout succeeds with a test product.
 - Order webhook reaches every configured downstream integration.
 - Monitoring captures a controlled backend error and a readiness failure.
 
@@ -163,7 +170,7 @@ Recommended release order:
 3. Deploy the backend and run `prisma migrate deploy`.
 4. Verify backend liveness and readiness.
 5. Deploy the frontend with the production backend URL.
-6. Register or enable Shopify production webhooks.
+6. Register or enable payment-provider production webhooks.
 7. Run checkout, review moderation, and webhook smoke tests.
 8. Monitor logs, errors, webhook failures, and conversion events during the launch window.
 

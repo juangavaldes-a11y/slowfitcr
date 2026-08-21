@@ -29,6 +29,7 @@ export default function AdminShell({
 }: AdminShellProps) {
   const labels = locale === "es"
     ? {
+        catalog: "Catalogo",
         reviews: "Resenas",
         operations: "Operaciones",
         authTitle: "Acceso de moderacion",
@@ -40,6 +41,7 @@ export default function AdminShell({
         required: "Ingresa el token de moderacion.",
       }
     : {
+        catalog: "Catalog",
         reviews: "Reviews",
         operations: "Operations",
         authTitle: "Moderation access",
@@ -62,6 +64,9 @@ export default function AdminShell({
       <section className="slowfit-shell slowfit-policy-section">
         <Space className="slowfit-admin-nav" wrap>
           <Space wrap>
+            <Link href={`/${locale}/admin/catalog`}>
+              <Button>{labels.catalog}</Button>
+            </Link>
             <Link href={`/${locale}/admin/reviews`}>
               <Button>{labels.reviews}</Button>
             </Link>

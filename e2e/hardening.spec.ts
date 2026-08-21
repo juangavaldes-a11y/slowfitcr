@@ -120,7 +120,7 @@ test("operator filters and inspects audit details on mobile", async ({ page }) =
   await page.route("**/api/admin/audit-logs**", (route) =>
     route.fulfill({ json: { logs: [audit], total: 1 } }),
   );
-  await page.route("**/api/admin/webhooks/orders**", (route) =>
+  await page.route("**/api/admin/webhooks/payments**", (route) =>
     route.fulfill({ json: { events: [], total: 0 } }),
   );
 
@@ -175,8 +175,8 @@ test("failed webhook replay preserves event details and reports the error", asyn
   await page.setViewportSize({ width: 390, height: 844 });
   const event = {
     id: "webhook-failed-replay",
-    topic: "orders/paid",
-    shop: "slow-fit.myshopify.com",
+    topic: "payment.paid",
+    provider: "test-bank",
     orderId: "1042",
     payload: { id: 1042 },
     status: "FAILED",
@@ -189,10 +189,10 @@ test("failed webhook replay preserves event details and reports the error", asyn
   await page.route("**/api/admin/audit-logs**", (route) =>
     route.fulfill({ json: { logs: [], total: 0 } }),
   );
-  await page.route("**/api/admin/webhooks/orders**", (route) =>
+  await page.route("**/api/admin/webhooks/payments**", (route) =>
     route.fulfill({ json: { events: [event], total: 1 } }),
   );
-  await page.route("**/api/admin/webhooks/orders/replay", (route) =>
+  await page.route("**/api/admin/webhooks/payments/replay", (route) =>
     route.fulfill({ status: 502, json: { error: "Downstream unavailable" } }),
   );
 

@@ -96,12 +96,18 @@ See [CURRENT_TO_PROD.md](CURRENT_TO_PROD.md) for the remaining staging and produ
 Create a `.env.local` file and configure:
 
 ```bash
-# Shopify storefront
-SHOPIFY_STORE_DOMAIN=your-shop.myshopify.com
-SHOPIFY_STOREFRONT_ACCESS_TOKEN=your_storefront_token
+# External bank payment adapter (BAC or another supported bank)
+PAYMENT_PROVIDER_URL=https://payments.example.com/session
+PAYMENT_PROVIDER_TOKEN=set-a-provider-token
+PAYMENT_WEBHOOK_SECRET=set-a-long-random-secret
+STORE_CURRENCY=USD
 
-# Shopify order webhook signature verification
-SHOPIFY_WEBHOOK_SECRET=your_shopify_webhook_secret
+# Internal product media (Cloudflare R2)
+R2_ACCOUNT_ID=your-cloudflare-account-id
+R2_ACCESS_KEY_ID=your-r2-access-key
+R2_SECRET_ACCESS_KEY=your-r2-secret
+R2_BUCKET_NAME=slowfit-products
+R2_PUBLIC_URL=https://media.slowfitcr.com
 
 # Analytics
 NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
@@ -123,8 +129,6 @@ ACCOUNT_RESET_FROM=Slow Fit <accounts@yourdomain.com>
 CONTACT_WEBHOOK_URL=https://your-crm-endpoint.example.com/contact
 
 # Reviews and moderation
-JUDGEME_SHOP_DOMAIN=your-shop.myshopify.com
-JUDGEME_PRIVATE_API_TOKEN=your_judgeme_token
 REVIEWS_MODERATION_WEBHOOK_URL=https://your-moderation-endpoint.example.com/reviews
 REVIEW_MODERATION_TOKEN=set-a-strong-shared-token
 REVIEW_MODERATION_SESSION_SECRET=set-a-long-random-secret
@@ -140,7 +144,7 @@ LOGIN_LOCKOUT_MS=900000
 PASSWORD_RESET_MAX_AGE_MS=1800000
 ```
 
-If Shopify credentials are not set, the storefront uses fallback catalog data so UI routes still work.
+Products, variants, stock, tags, prices, sale prices, and image metadata are stored in PostgreSQL. Product files are uploaded directly to Cloudflare R2 using five-minute signed URLs. Configure bucket CORS to allow `PUT` from the admin site origin.
 
 ## Production deployment checklist
 
@@ -156,8 +160,16 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DB?schema=public
 REVIEW_MODERATION_TOKEN=set-a-strong-shared-token
 REVIEW_MODERATION_SESSION_SECRET=set-a-long-random-secret
 CUSTOMER_SESSION_SECRET=set-a-different-long-random-secret
-SHOPIFY_WEBHOOK_SECRET=your_shopify_webhook_secret
 OUTBOUND_WEBHOOK_SECRET=set-a-long-random-secret
+PAYMENT_PROVIDER_URL=https://payments.example.com/session
+PAYMENT_PROVIDER_TOKEN=set-a-provider-token
+PAYMENT_WEBHOOK_SECRET=set-a-long-random-secret
+STORE_CURRENCY=USD
+R2_ACCOUNT_ID=your-cloudflare-account-id
+R2_ACCESS_KEY_ID=your-r2-access-key
+R2_SECRET_ACCESS_KEY=your-r2-secret
+R2_BUCKET_NAME=slowfit-products
+R2_PUBLIC_URL=https://media.slowfitcr.com
 ```
 
 Production startup requires the moderation token and both session secrets to contain at least 32 characters and to be distinct.
@@ -180,6 +192,27 @@ MAX_REQUEST_BODY_BYTES=1048576
 When `OUTBOUND_WEBHOOK_SECRET` is configured, deliveries include `X-Slowfit-Timestamp` and an
 `X-Slowfit-Signature` containing the Base64-encoded HMAC-SHA256 of `<timestamp>.<raw-body>`.
 
+Payment providers must return the checkout `reference` and preserve each item's `variantId` and
+`quantity` in `payment.paid` webhooks. The backend deducts inventory and records the order in one
+serializable transaction. Repeated paid events for the same reference do not deduct stock again.
+
+`CONTACT_WEBHOOK_URL` must accept an HTTPS `POST` with `Content-Type: application/json` and this body:
+
+```json
+{
+	"source": "slowfit-backend",
+	"name": "Customer name",
+	"email": "customer@example.com",
+	"message": "Contact message",
+	"locale": "es",
+	"createdAt": "2026-08-21T12:00:00.000Z"
+}
+```
+
+The receiver must return a 2xx response. Slow Fit retries transient failures according to
+`WEBHOOK_MAX_ATTEMPTS`. When `OUTBOUND_WEBHOOK_SECRET` is set, the receiver must verify the
+`X-Slowfit-Timestamp` and `X-Slowfit-Signature` headers before accepting the lead.
+
 Customer logins are locked for 15 minutes after five consecutive failures by default. Password recovery links are stored as hashes, expire after 30 minutes, and can only be used once. Reset email delivery uses `ACCOUNT_RESET_FROM` when set, otherwise `ORDER_CONFIRM_FROM`.
 
 Required frontend secrets:
@@ -187,8 +220,6 @@ Required frontend secrets:
 ```bash
 NEXT_PUBLIC_BACKEND_URL=https://api.yourdomain.com
 NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
-SHOPIFY_STORE_DOMAIN=your-shop.myshopify.com
-SHOPIFY_STOREFRONT_ACCESS_TOKEN=your_storefront_token
 ```
 
 Production rollout steps:
@@ -196,23 +227,28 @@ Production rollout steps:
 1. Provision PostgreSQL and run Prisma against the production `DATABASE_URL`.
 2. Deploy the backend with the secrets above and verify `/health/live` and `/health/ready`.
 3. Deploy the frontend with `NEXT_PUBLIC_BACKEND_URL` pointed at the backend origin.
-4. Register the Shopify order webhook against `POST /api/webhooks/shopify/orders` on the backend.
-5. Verify admin login, review moderation, checkout handoff, and webhook replay after deploy.
+4. Configure R2 CORS and verify image uploads from the admin origin.
+5. Configure the BAC or bank adapter and verify a signed checkout handoff.
+6. Verify admin login, catalog management, review moderation, and checkout after deploy.
 
 ## New API endpoints
 
-- `POST /api/cart/checkout` creates a Shopify cart and returns checkout URL.
-- `POST /api/cart/checkout` also reuses `cartId` and syncs line items when provided.
+- `GET /api/catalog/products` lists active internal products and supports tag/search filters.
+- `GET /api/catalog/products/:handle` returns an active internal product.
+- `GET|POST /api/admin/catalog/products` lists or creates products for authenticated admins.
+- `PUT|DELETE /api/admin/catalog/products/:id` updates or deletes an internal product.
+- `POST /api/admin/catalog/images/presign` creates a temporary Cloudflare R2 upload URL.
+- `POST /api/cart/checkout` validates internal prices and stock, then creates a bank payment session.
 - `POST /api/events` ingests conversion and UX events server-side.
-- `POST /api/webhooks/shopify/orders` receives verified Shopify order webhooks.
+- `POST /api/webhooks/payments` receives signed payment-provider webhooks.
 - `GET /api/reviews?productHandle=...&locale=...` reads approved reviews.
 - `GET /api/reviews/pending` returns pending reviews for authenticated moderators.
 - `POST /api/reviews/submit` submits a review for moderation.
 - `POST /api/reviews/moderate` approves/rejects pending reviews (admin session cookie or `x-moderation-token`).
 - `POST /api/admin/login` and `POST /api/admin/logout` manage moderation sessions.
 - `GET /api/admin/audit-logs` returns audit log entries.
-- `GET /api/admin/webhooks/orders` lists persisted order webhook deliveries.
-- `POST /api/admin/webhooks/orders/replay` replays a previously processed order webhook event.
+- `GET /api/admin/webhooks/payments` lists persisted payment webhook deliveries.
+- `POST /api/admin/webhooks/payments/replay` replays a previously processed payment webhook event.
 - `GET /health/live` and `GET /health/ready` provide liveness and readiness checks.
 
 ## Backend implementation phases (completed)
@@ -223,7 +259,7 @@ Phase 1: PostgreSQL persistence (Prisma ORM)
 
 Phase 2: Webhook idempotency and replay operations
 
-- Shopify order webhook handler stores idempotency keys and ignores duplicate deliveries.
+- Payment webhook handling stores idempotency keys and ignores duplicate deliveries.
 - Webhook deliveries are queryable from admin ops and can be replayed manually.
 
 Phase 3: Operational hardening
