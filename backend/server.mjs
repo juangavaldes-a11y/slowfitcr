@@ -464,8 +464,8 @@ async function createPaymentSession(lines, locale) {
   }
 
   const variants = await prisma.productVariant.findMany({
-    where: { id: { in: [...quantities.keys()] }, product: { status: "ACTIVE" } },
-    include: { product: { select: { title: true, handle: true } } },
+    where: { id: { in: [...quantities.keys()] }, product: { status: "ACTIVE", published: true } },
+    include: { product: { select: { title: true, handle: true, preorderEnabled: true } } },
   });
   if (variants.length !== quantities.size) {
     throw new Error("INVALID_CART");
@@ -473,7 +473,8 @@ async function createPaymentSession(lines, locale) {
 
   const items = variants.map((variant) => {
     const quantity = quantities.get(variant.id);
-    if (variant.inventoryQuantity < quantity) {
+    const preorder = variant.inventoryQuantity === 0 && variant.product.preorderEnabled;
+    if (variant.inventoryQuantity < quantity && !preorder) {
       throw new Error("INSUFFICIENT_STOCK");
     }
     return {
@@ -483,6 +484,7 @@ async function createPaymentSession(lines, locale) {
       quantity,
       unitPrice: Number(variant.price),
       lineTotal: Number(variant.price) * quantity,
+      preorder,
     };
   });
 
@@ -629,7 +631,8 @@ function serializeCatalogProduct(product) {
       price: Number(variant.price),
       compareAtPrice: variant.compareAtPrice === null ? null : Number(variant.compareAtPrice),
       currencyCode: process.env.STORE_CURRENCY || "USD",
-      availableForSale: variant.inventoryQuantity > 0,
+      availableForSale: product.published && (variant.inventoryQuantity > 0 || product.preorderEnabled),
+      preorder: product.preorderEnabled && variant.inventoryQuantity <= 0,
     })),
   };
 }
@@ -639,6 +642,8 @@ function normalizeCatalogProduct(payload) {
   const handle = catalogHandle(payload.handle || title);
   const description = String(payload.description || "").trim();
   const status = String(payload.status || "DRAFT").toUpperCase();
+  const published = payload.published === true;
+  const preorderEnabled = payload.preorderEnabled === true;
   const tags = Array.from(new Set((Array.isArray(payload.tags) ? payload.tags : [])
     .map((tag) => String(tag).trim().toLowerCase())
     .filter(Boolean)));
@@ -691,7 +696,7 @@ function normalizeCatalogProduct(payload) {
     return { id, url, altText, position };
   });
 
-  return { title, handle, description, status, tags, variants, images };
+  return { title, handle, description, status, published, preorderEnabled, tags, variants, images };
 }
 
 function paymentInventoryLines(items) {
@@ -774,11 +779,26 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
       }
 
       for (const [variantId, quantity] of inventoryLines) {
+        const variant = await transaction.productVariant.findUnique({
+          where: { id: variantId },
+          include: { product: { select: { preorderEnabled: true } } },
+        });
+        if (!variant) {
+          throw new Error("INSUFFICIENT_STOCK_AT_PAYMENT");
+        }
+        if (variant.inventoryQuantity < quantity) {
+          if (variant.inventoryQuantity === 0 && variant.product.preorderEnabled) continue;
+          throw new Error("INSUFFICIENT_STOCK_AT_PAYMENT");
+        }
         const adjusted = await transaction.productVariant.updateMany({
           where: { id: variantId, inventoryQuantity: { gte: quantity } },
           data: { inventoryQuantity: { decrement: quantity } },
         });
         if (adjusted.count !== 1) {
+          if (variant.product.preorderEnabled) {
+            const current = await transaction.productVariant.findUnique({ where: { id: variantId } });
+            if (current?.inventoryQuantity === 0) continue;
+          }
           throw new Error("INSUFFICIENT_STOCK_AT_PAYMENT");
         }
       }
@@ -1430,7 +1450,7 @@ async function handleCatalogProducts(request, admin = false) {
   const search = getTrimmedParam(url, "search");
   const tag = getTrimmedParam(url, "tag").toLowerCase();
   const requestedStatus = getTrimmedParam(url, "status").toUpperCase();
-  const where = admin ? {} : { status: "ACTIVE" };
+  const where = admin ? {} : { status: "ACTIVE", published: true };
 
   if (admin && ["DRAFT", "ACTIVE", "ARCHIVED"].includes(requestedStatus)) {
     where.status = requestedStatus;
@@ -1462,7 +1482,7 @@ async function handleCatalogProducts(request, admin = false) {
 
 async function handleCatalogProductByHandle(handle) {
   const product = await prisma.product.findFirst({
-    where: { handle, status: "ACTIVE" },
+    where: { handle, status: "ACTIVE", published: true },
     include: CATALOG_PRODUCT_INCLUDE,
   });
   return product ? jsonResponse({ product: serializeCatalogProduct(product) }) : jsonResponse({ error: "Not found" }, 404);
@@ -1481,6 +1501,8 @@ async function handleCreateCatalogProduct(request) {
         handle: input.handle,
         description: input.description,
         status: input.status,
+        published: input.published,
+        preorderEnabled: input.preorderEnabled,
         tags: input.tags,
         variants: { create: input.variants.map((variant) => ({
           title: variant.title,
@@ -1554,6 +1576,8 @@ async function handleUpdateCatalogProduct(request, productId) {
           handle: input.handle,
           description: input.description,
           status: input.status,
+          published: input.published,
+          preorderEnabled: input.preorderEnabled,
           tags: input.tags,
         },
       });

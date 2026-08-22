@@ -18,8 +18,8 @@ export default function ShopCatalog({ locale, products, initialTag = "all" }: { 
     return matchesTag && (!deferredSearch || haystack.includes(deferredSearch));
   });
   const labels = locale === "es"
-    ? { search: "Buscar productos", all: "Todas las etiquetas", empty: "No encontramos productos con estos filtros.", view: "Ver producto", soldOut: "Agotado" }
-    : { search: "Search products", all: "All tags", empty: "No products match these filters.", view: "View product", soldOut: "Sold out" };
+    ? { search: "Buscar productos", all: "Todas las etiquetas", empty: "No encontramos productos con estos filtros.", view: "Ver producto", soldOut: "Agotado", preorder: "Preventa" }
+    : { search: "Search products", all: "All tags", empty: "No products match these filters.", view: "View product", soldOut: "Sold out", preorder: "Pre-order" };
 
   return (
     <>
@@ -34,12 +34,13 @@ export default function ShopCatalog({ locale, products, initialTag = "all" }: { 
         <div className="slowfit-product-grid">
           {filtered.map((product, index) => {
             const available = product.variants.some((variant) => variant.availableForSale);
+            const preorder = product.variants.some((variant) => variant.preorder);
             const money = new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: product.currencyCode });
             return (
               <article key={product.id} className="slowfit-product-card">
                 <div className="slowfit-product-card-media">
                   <Image src={product.image} alt={product.images[0]?.altText || product.title} fill priority={index === 0} unoptimized sizes="(max-width: 767px) 100vw, (max-width: 991px) 50vw, 33vw" className="slowfit-cover" />
-                  {!available ? <span className="slowfit-stock-badge">{labels.soldOut}</span> : null}
+                  {!available || preorder ? <span className="slowfit-stock-badge">{preorder ? labels.preorder : labels.soldOut}</span> : null}
                 </div>
                 <div className="slowfit-product-card-body">
                   <Space wrap>{product.tags.map((value) => <Tag key={value}>{value}</Tag>)}</Space>

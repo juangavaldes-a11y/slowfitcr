@@ -9,6 +9,7 @@ test("customer can add an internal product to cart and request payment", async (
       handle: "slow-core-training-tee",
       description: "A lightweight training tee with a relaxed fit.",
       status: "ACTIVE",
+      published: true,
       tags: ["training"],
       images: [{ url: "https://images.example.com/training-tee.jpg", altText: "Training tee" }],
       variants: [{ title: "M", sku: "E2E-TEE-M", price: 48, compareAtPrice: 56, inventoryQuantity: 5 }],

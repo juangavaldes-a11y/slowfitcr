@@ -93,6 +93,8 @@ test("admins manage internal products and customers filter the active catalog", 
       handle: "core-training-tee",
       description: "Lightweight training shirt",
       status: "ACTIVE",
+      published: true,
+      preorderEnabled: false,
       tags: ["Training", "Women"],
       images: [{ url: "https://cdn.example.com/core-tee.jpg", altText: "Core tee" }],
       variants: [{
@@ -109,6 +111,18 @@ test("admins manage internal products and customers filter the active catalog", 
   assert.equal(created.tags[0], "training");
   assert.equal(created.variants[0].inventoryQuantity, 7);
   assert.equal(created.variants[0].compareAtPrice, 56);
+  assert.equal(created.published, true);
+  assert.equal(created.preorderEnabled, false);
+
+  await prisma.product.create({
+    data: {
+      title: "Hidden Training Tee",
+      handle: "hidden-training-tee",
+      status: "ACTIVE",
+      tags: ["training"],
+      variants: { create: { title: "M", price: 44, inventoryQuantity: 5 } },
+    },
+  });
 
   const filteredResponse = await route(request("/api/catalog/products?tag=training"));
   assert.equal(filteredResponse.status, 200);
@@ -575,6 +589,43 @@ test("paid payment rolls back the order when inventory is no longer available", 
   assert.equal((await prisma.paymentWebhookEvent.findFirst({ where: { orderId: "pay-no-stock" } })).status, "FAILED");
 });
 
+test("paid preorders preserve zero inventory", async () => {
+  const product = await prisma.product.create({
+    data: {
+      title: "Preorder Top",
+      handle: "preorder-top",
+      status: "ACTIVE",
+      published: true,
+      preorderEnabled: true,
+      variants: { create: { title: "M", price: 72, inventoryQuantity: 0 } },
+    },
+    include: { variants: true },
+  });
+  const variantId = product.variants[0].id;
+  const body = JSON.stringify({
+    reference: "pay-preorder",
+    email: "preorder@example.com",
+    status: "paid",
+    updated_at: "2026-08-15T00:04:00Z",
+    items: [{ variantId, name: "Preorder Top", quantity: 1, preorder: true }],
+  });
+  const signature = createHmac("sha256", process.env.PAYMENT_WEBHOOK_SECRET).update(body, "utf8").digest("base64");
+  const webhook = await route(request("/api/webhooks/payments", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-slowfit-signature": signature,
+      "x-payment-topic": "payment.paid",
+      "x-payment-provider": "test-bank",
+    },
+    body,
+  }));
+
+  assert.equal(webhook.status, 200);
+  assert.equal(await prisma.order.count({ where: { externalPaymentId: "pay-preorder" } }), 1);
+  assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 0);
+});
+
 test("authenticated moderators can replay a stored webhook event", async () => {
   const event = await prisma.paymentWebhookEvent.create({
     data: {
@@ -688,11 +739,24 @@ test("checkout validates internal inventory and sends server-calculated totals t
       title: "Internal Tee",
       handle: "internal-tee",
       status: "ACTIVE",
+      published: true,
       variants: { create: { title: "M", sku: "INTERNAL-M", price: 42, inventoryQuantity: 2 } },
     },
     include: { variants: true },
   });
   const variantId = product.variants[0].id;
+
+  const preorderProduct = await prisma.product.create({
+    data: {
+      title: "Internal Preorder Tee",
+      handle: "internal-preorder-tee",
+      status: "ACTIVE",
+      published: true,
+      preorderEnabled: true,
+      variants: { create: { title: "L", sku: "PREORDER-L", price: 50, inventoryQuantity: 0 } },
+    },
+    include: { variants: true },
+  });
 
   const insufficient = await route(request("/api/cart/checkout", {
     method: "POST",
@@ -700,6 +764,14 @@ test("checkout validates internal inventory and sends server-calculated totals t
     body: JSON.stringify({ locale: "en", lines: [{ variantId, quantity: 3 }] }),
   }));
   assert.equal(insufficient.status, 409);
+
+  await prisma.product.update({ where: { id: product.id }, data: { preorderEnabled: true } });
+  const partialStock = await route(request("/api/cart/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ locale: "en", lines: [{ variantId, quantity: 3 }] }),
+  }));
+  assert.equal(partialStock.status, 409);
 
   const originalFetch = globalThis.fetch;
   let paymentPayload;
@@ -724,6 +796,14 @@ test("checkout validates internal inventory and sends server-calculated totals t
     assert.equal(payload.checkout.checkoutUrl, "https://payments.example.com/pay/123");
     assert.equal(paymentPayload.amount, 84);
     assert.equal(paymentPayload.items[0].unitPrice, 42);
+
+    const preorderCheckout = await route(request("/api/cart/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locale: "en", lines: [{ variantId: preorderProduct.variants[0].id, quantity: 1 }] }),
+    }));
+    assert.equal(preorderCheckout.status, 200);
+    assert.equal(paymentPayload.items[0].preorder, true);
   } finally {
     globalThis.fetch = originalFetch;
     delete process.env.PAYMENT_PROVIDER_URL;

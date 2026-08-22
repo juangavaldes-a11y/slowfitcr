@@ -9,6 +9,7 @@ export type CatalogVariant = {
   inventoryQuantity: number;
   currencyCode: string;
   availableForSale: boolean;
+  preorder: boolean;
 };
 
 export type CatalogProduct = {
@@ -17,6 +18,8 @@ export type CatalogProduct = {
   title: string;
   description: string;
   status: "ACTIVE";
+  published: boolean;
+  preorderEnabled: boolean;
   currencyCode: string;
   tags: string[];
   images: Array<{ id: string; url: string; altText: string }>;

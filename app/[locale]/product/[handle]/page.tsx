@@ -95,9 +95,11 @@ export default async function ProductPage({ params }: ProductPageProps) {
             url: productUrl,
             priceCurrency: product.currencyCode,
             price: product.price,
-            availability: product.variants.some((variant) => variant.availableForSale)
+            availability: product.variants.some((variant) => variant.availableForSale && !variant.preorder)
               ? "https://schema.org/InStock"
-              : "https://schema.org/OutOfStock",
+              : product.variants.some((variant) => variant.preorder)
+                ? "https://schema.org/PreOrder"
+                : "https://schema.org/OutOfStock",
             itemCondition: "https://schema.org/NewCondition",
           },
         }}

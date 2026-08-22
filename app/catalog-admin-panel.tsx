@@ -21,6 +21,7 @@ import {
   Select,
   Space,
   Spin,
+  Switch,
   Table,
   Tag,
   Typography,
@@ -48,6 +49,8 @@ type CatalogProduct = {
   handle: string;
   description: string;
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  published: boolean;
+  preorderEnabled: boolean;
   tags: string[];
   images: CatalogImage[];
   variants: CatalogVariant[];
@@ -82,6 +85,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     empty: "No hay productos para estos filtros.",
     product: "Producto",
     status: "Estado",
+    published: "Visible para compra",
+    preorder: "Permitir preventa sin inventario",
     stock: "Inventario",
     price: "Precio",
     actions: "Acciones",
@@ -127,6 +132,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     empty: "No products match these filters.",
     product: "Product",
     status: "Status",
+    published: "Visible for purchase",
+    preorder: "Allow preorder without inventory",
     stock: "Inventory",
     price: "Price",
     actions: "Actions",
@@ -216,6 +223,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       handle: "",
       description: "",
       status: "DRAFT",
+      published: false,
+      preorderEnabled: false,
       tags: [],
       images: [],
       variants: [{ title: "Default", sku: "", price: 0, compareAtPrice: null, inventoryQuantity: 0 }],
@@ -230,6 +239,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       handle: product.handle,
       description: product.description,
       status: product.status,
+      published: product.published,
+      preorderEnabled: product.preorderEnabled,
       tags: product.tags,
       images: product.images.map(({ id, url, altText }) => ({ id, url, altText })),
       variants: product.variants.map(({ id, title, sku, price, compareAtPrice, inventoryQuantity }) => ({
@@ -308,10 +319,14 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     },
     {
       title: labels.status,
-      dataIndex: "status",
-      width: 120,
-      render: (value: CatalogProduct["status"]) => (
-        <Tag color={value === "ACTIVE" ? "green" : value === "DRAFT" ? "gold" : "default"}>{value}</Tag>
+      key: "status",
+      width: 240,
+      render: (_, product) => (
+        <Space wrap size={[4, 4]}>
+          <Tag color={product.status === "ACTIVE" ? "green" : product.status === "DRAFT" ? "gold" : "default"}>{product.status}</Tag>
+          {product.published ? <Tag color="blue">{labels.published}</Tag> : null}
+          {product.preorderEnabled ? <Tag color="orange">{labels.preorder}</Tag> : null}
+        </Space>
       ),
     },
     {
@@ -375,6 +390,10 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
           <Form.Item name="handle" label={labels.handle}><Input /></Form.Item>
           <Form.Item name="description" label={labels.description}><Input.TextArea rows={4} /></Form.Item>
           <Form.Item name="tags" label={labels.tags}><Select mode="tags" tokenSeparators={[","]} placeholder={labels.tagsHint} /></Form.Item>
+          <Space wrap size="large">
+            <Form.Item name="published" label={labels.published} valuePropName="checked"><Switch /></Form.Item>
+            <Form.Item name="preorderEnabled" label={labels.preorder} valuePropName="checked"><Switch /></Form.Item>
+          </Space>
 
           <Typography.Title level={5}>{labels.images}</Typography.Title>
           <Upload accept="image/jpeg,image/png,image/webp,image/avif" showUploadList={false} beforeUpload={(file) => { void uploadImage(file); return false; }}>

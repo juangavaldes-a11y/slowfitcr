@@ -11,6 +11,7 @@ type Variant = {
   price: number;
   currencyCode: string;
   availableForSale: boolean;
+  preorder: boolean;
 };
 
 type ProductPurchaseProps = {
@@ -48,11 +49,13 @@ export default function ProductPurchase({ locale, product }: ProductPurchaseProp
       ? {
           variants: "Talla",
           add: "Agregar al carrito",
+          preorder: "Reservar en preventa",
           unavailable: "No disponible",
         }
       : {
           variants: "Size",
           add: "Add to cart",
+          preorder: "Pre-order",
           unavailable: "Unavailable",
         };
 
@@ -91,7 +94,7 @@ export default function ProductPurchase({ locale, product }: ProductPurchaseProp
         }))}
       />
       <Button type="primary" className="slowfit-secondary-cta" onClick={onAdd} disabled={!selected.availableForSale}>
-        {selected.availableForSale ? labels.add : labels.unavailable}
+        {selected.availableForSale ? (selected.preorder ? labels.preorder : labels.add) : labels.unavailable}
       </Button>
     </Space>
   );
