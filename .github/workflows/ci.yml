@@ -6,7 +6,79 @@ on:
   pull_request:
 
 jobs:
-  validate:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: slowfit_test
+          POSTGRES_USER: slowfit
+          POSTGRES_PASSWORD: slowfit
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U slowfit -d slowfit_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://slowfit:slowfit@localhost:5432/slowfit_test?schema=public
+      TEST_DATABASE_URL: postgresql://slowfit:slowfit@localhost:5432/slowfit_test?schema=public
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply database migrations
+        run: npm run db:migrate
+
+      - name: Integration tests
+        run: npm test
+
+  browser:
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -45,29 +117,9 @@ jobs:
         run: npm ci
         working-directory: backend
 
-      - name: Audit frontend dependencies
-        run: npm audit --audit-level=high
-
-      - name: Audit backend dependencies
-        run: npm audit --audit-level=high
-        working-directory: backend
-
       - name: Generate Prisma client
         run: npx prisma generate
         working-directory: backend
-
-      - name: Apply database migrations
-        run: npm run db:migrate
-        working-directory: backend
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-      - name: Backend integration tests
-        run: npm run test:backend
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium

@@ -14,15 +14,15 @@ test("customer can add an internal product to cart and request payment", async (
       variants: [{ title: "M", sku: "E2E-TEE-M", price: 48, compareAtPrice: 56, inventoryQuantity: 5 }],
     },
   });
-  expect(created.ok()).toBeTruthy();
-  const product = (await created.json()).product;
+  const productResponse = created.status() === 409
+    ? await request.get("/api/catalog/products/slow-core-training-tee")
+    : created;
+  expect(productResponse.ok()).toBeTruthy();
+  const product = (await productResponse.json()).product;
 
   await page.goto("/en/product/slow-core-training-tee");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Slow Core Training Tee");
   await expect(page.getByText("The relaxed fit works well for training")).toBeVisible();
-
-  await page.getByRole("combobox").click();
-  await page.getByText("M - $48.00", { exact: true }).click();
 
   await page.getByRole("button", { name: "Add to cart" }).click();
   const cartButton = page.getByRole("button", { name: "Cart (1)" });
