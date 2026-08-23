@@ -611,6 +611,11 @@ const CATALOG_PRODUCT_INCLUDE = {
   variants: { orderBy: { position: "asc" } },
 };
 
+const CATALOG_PRODUCT_LIST_INCLUDE = {
+  images: { orderBy: { position: "asc" }, take: 1 },
+  variants: { orderBy: { position: "asc" } },
+};
+
 function catalogHandle(value) {
   return String(value || "")
     .trim()
@@ -1470,7 +1475,7 @@ async function handleCatalogProducts(request, admin = false) {
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
-      include: CATALOG_PRODUCT_INCLUDE,
+      include: admin ? CATALOG_PRODUCT_INCLUDE : CATALOG_PRODUCT_LIST_INCLUDE,
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,

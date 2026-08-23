@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY backend/package.json ./package.json
 COPY backend/prisma ./prisma
+COPY backend/data ./data
+COPY backend/scripts ./scripts
 COPY backend/server.mjs ./server.mjs
 COPY backend/package-lock.json ./package-lock.json
 

@@ -32,6 +32,13 @@ export type CatalogProduct = {
 
 type CatalogApiProduct = Omit<CatalogProduct, "image" | "price" | "compareAtPrice" | "collectionTitle">;
 
+export type CatalogPage = {
+  products: CatalogProduct[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 function backendOrigin() {
   return process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 }
@@ -48,9 +55,11 @@ function normalizeProduct(product: CatalogApiProduct): CatalogProduct {
   };
 }
 
-async function catalogFetch<T>(path: string): Promise<T | null> {
+async function catalogFetch<T>(path: string, revalidate = 0): Promise<T | null> {
   try {
-    const response = await fetch(new URL(path, backendOrigin()), { cache: "no-store" });
+    const response = await fetch(new URL(path, backendOrigin()), revalidate
+      ? { next: { revalidate } }
+      : { cache: "no-store" });
     if (!response.ok) return null;
     return await response.json() as T;
   } catch {
@@ -58,11 +67,26 @@ async function catalogFetch<T>(path: string): Promise<T | null> {
   }
 }
 
+export async function getProductPage({ page = 1, pageSize = 24, search = "", tag = "" } = {}): Promise<CatalogPage> {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (search) params.set("search", search);
+  if (tag && tag !== "all") params.set("tag", tag);
+  const payload = await catalogFetch<{
+    products: CatalogApiProduct[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }>(`/api/catalog/products?${params}`, 60);
+  return {
+    products: payload?.products.map(normalizeProduct) || [],
+    total: payload?.total || 0,
+    page: payload?.page || page,
+    pageSize: payload?.pageSize || pageSize,
+  };
+}
+
 export async function getProducts(): Promise<CatalogProduct[]> {
-  const payload = await catalogFetch<{ products: CatalogApiProduct[] }>(
-    "/api/catalog/products?pageSize=100",
-  );
-  return payload?.products.map(normalizeProduct) || [];
+  return (await getProductPage({ pageSize: 100 })).products;
 }
 
 export async function getProductByHandle(handle: string): Promise<CatalogProduct | null> {

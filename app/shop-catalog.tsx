@@ -1,25 +1,88 @@
 "use client";
 
 import { SearchOutlined } from "@ant-design/icons";
-import { Empty, Input, Select, Space, Tag } from "antd";
+import { Alert, Button, Empty, Input, Select, Space, Tag } from "antd";
 import Image from "next/image";
 import Link from "next/link";
-import { useDeferredValue, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogProduct } from "./lib/catalog";
 
-export default function ShopCatalog({ locale, products, initialTag = "all" }: { locale: "es" | "en"; products: CatalogProduct[]; initialTag?: string }) {
+type CatalogApiProduct = Omit<CatalogProduct, "image" | "price" | "compareAtPrice" | "collectionTitle">;
+
+function normalizeProduct(product: CatalogApiProduct): CatalogProduct {
+  const sortedVariants = [...product.variants].sort((left, right) => left.price - right.price);
+  const lowest = sortedVariants[0];
+  return {
+    ...product,
+    image: product.images[0]?.url || "/slowfit/hero.jpg",
+    price: lowest?.price || 0,
+    compareAtPrice: lowest?.compareAtPrice && lowest.compareAtPrice > lowest.price ? lowest.compareAtPrice : undefined,
+    collectionTitle: product.tags[0] || "Slow Fit",
+  };
+}
+
+export default function ShopCatalog({
+  locale,
+  products,
+  total: initialTotal,
+  pageSize,
+  initialTag = "all",
+}: {
+  locale: "es" | "en";
+  products: CatalogProduct[];
+  total: number;
+  pageSize: number;
+  initialTag?: string;
+}) {
   const [search, setSearch] = useState("");
   const [tag, setTag] = useState(initialTag);
+  const [catalogProducts, setCatalogProducts] = useState(products);
+  const [total, setTotal] = useState(initialTotal);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const initialRender = useRef(true);
+  const requestSequence = useRef(0);
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
-  const tags = useMemo(() => Array.from(new Set(products.flatMap((product) => product.tags))).sort(), [products]);
-  const filtered = products.filter((product) => {
-    const matchesTag = tag === "all" || product.tags.includes(tag);
-    const haystack = `${product.title} ${product.description} ${product.tags.join(" ")}`.toLowerCase();
-    return matchesTag && (!deferredSearch || haystack.includes(deferredSearch));
-  });
+  const tags = useMemo(() => Array.from(new Set([
+    ...(initialTag === "all" ? [] : [initialTag]),
+    ...catalogProducts.flatMap((product) => product.tags),
+  ])).sort(), [catalogProducts, initialTag]);
   const labels = locale === "es"
-    ? { search: "Buscar productos", all: "Todas las etiquetas", empty: "No encontramos productos con estos filtros.", view: "Ver producto", soldOut: "Agotado", preorder: "Preventa" }
-    : { search: "Search products", all: "All tags", empty: "No products match these filters.", view: "View product", soldOut: "Sold out", preorder: "Pre-order" };
+    ? { search: "Buscar productos", all: "Todas las etiquetas", empty: "No encontramos productos con estos filtros.", view: "Ver producto", soldOut: "Agotado", preorder: "Preventa", loadMore: "Cargar más", error: "No pudimos cargar los productos." }
+    : { search: "Search products", all: "All tags", empty: "No products match these filters.", view: "View product", soldOut: "Sold out", preorder: "Pre-order", loadMore: "Load more", error: "We could not load the products." };
+
+  const loadPage = useCallback(async (nextPage: number, replace: boolean) => {
+    const requestId = ++requestSequence.current;
+    setLoading(true);
+    setLoadError(false);
+    const params = new URLSearchParams({ page: String(nextPage), pageSize: String(pageSize) });
+    if (deferredSearch) params.set("search", deferredSearch);
+    if (tag !== "all") params.set("tag", tag);
+
+    try {
+      const response = await fetch(`/api/catalog/products?${params}`);
+      if (!response.ok) throw new Error("Catalog request failed");
+      const payload = await response.json() as { products: CatalogApiProduct[]; total: number; page: number };
+      if (requestId !== requestSequence.current) return;
+      const nextProducts = payload.products.map(normalizeProduct);
+      setCatalogProducts((current) => replace ? nextProducts : [...current, ...nextProducts]);
+      setTotal(payload.total);
+      setPage(payload.page);
+    } catch {
+      if (requestId === requestSequence.current) setLoadError(true);
+    } finally {
+      if (requestId === requestSequence.current) setLoading(false);
+    }
+  }, [deferredSearch, pageSize, tag]);
+
+  useEffect(() => {
+    if (initialRender.current) {
+      initialRender.current = false;
+      return;
+    }
+    void loadPage(1, true);
+  }, [loadPage]);
 
   return (
     <>
@@ -30,9 +93,10 @@ export default function ShopCatalog({ locale, products, initialTag = "all" }: { 
           ...tags.map((value) => ({ value, label: value })),
         ]} />
       </Space>
-      {filtered.length ? (
+      {loadError ? <Alert type="error" showIcon message={labels.error} /> : null}
+      {catalogProducts.length ? (
         <div className="slowfit-product-grid">
-          {filtered.map((product, index) => {
+          {catalogProducts.map((product, index) => {
             const available = product.variants.some((variant) => variant.availableForSale);
             const preorder = product.variants.some((variant) => variant.preorder);
             const money = new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: product.currencyCode });
@@ -57,6 +121,11 @@ export default function ShopCatalog({ locale, products, initialTag = "all" }: { 
           })}
         </div>
       ) : <Empty description={labels.empty} />}
+      {catalogProducts.length < total ? (
+        <div className="slowfit-shop-load-more">
+          <Button loading={loading} onClick={() => void loadPage(page + 1, false)}>{labels.loadMore}</Button>
+        </div>
+      ) : null}
     </>
   );
 }

@@ -3,6 +3,11 @@ import { createHmac } from "node:crypto";
 import { after, before, beforeEach, test } from "node:test";
 import { PrismaClient } from "@prisma/client";
 
+if (!process.env.TEST_DATABASE_URL) {
+  throw new Error("Backend integration tests require an explicit TEST_DATABASE_URL");
+}
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+
 process.env.REVIEW_MODERATION_TOKEN = "integration-token";
 process.env.REVIEW_MODERATION_SESSION_SECRET = "integration-session-secret";
 process.env.PAYMENT_WEBHOOK_SECRET = "integration-webhook-secret";

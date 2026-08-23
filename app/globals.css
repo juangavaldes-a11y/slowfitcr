@@ -839,6 +839,12 @@ a {
   gap: 20px;
 }
 
+.slowfit-shop-load-more {
+  display: flex;
+  justify-content: center;
+  padding-top: 28px;
+}
+
 .slowfit-product-card {
   display: flex;
   flex-direction: column;

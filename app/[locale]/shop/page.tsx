@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCopy, isLocale, locales, type Locale } from "../../i18n";
-import { getProducts } from "../../lib/catalog";
+import { getProductPage } from "../../lib/catalog";
 import ShopCatalog from "../../shop-catalog";
 
 type ShopPageProps = {
@@ -59,7 +59,7 @@ export default async function ShopPage({ params, searchParams }: ShopPageProps) 
   }
 
   const copy = getCopy(locale as Locale);
-  const products = await getProducts();
+  const catalog = await getProductPage({ tag: tag || "" });
 
   return (
     <main className="slowfit-shop-page">
@@ -70,7 +70,13 @@ export default async function ShopPage({ params, searchParams }: ShopPageProps) 
       </section>
 
       <section id="collections" className="slowfit-shell slowfit-policy-section">
-        <ShopCatalog locale={locale as Locale} products={products} initialTag={tag || "all"} />
+        <ShopCatalog
+          locale={locale as Locale}
+          products={catalog.products}
+          total={catalog.total}
+          pageSize={catalog.pageSize}
+          initialTag={tag || "all"}
+        />
       </section>
 
       <section className="slowfit-shell slowfit-policy-section">
