@@ -1,5 +1,6 @@
 "use client";
 
+import { LogoutOutlined } from "@ant-design/icons";
 import { Button, Form, Input, Space, Typography } from "antd";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -56,7 +57,10 @@ export default function AdminShell({
   return (
     <main className="slowfit-policy-page">
       <section className="slowfit-shell slowfit-policy-hero">
-        <span className="slowfit-kicker">Slow Fit Admin</span>
+        <div className="slowfit-admin-header-row">
+          <span className="slowfit-kicker">Slow Fit Admin</span>
+          {authorized ? <Button icon={<LogoutOutlined />} onClick={() => void onLogout()}>{labels.signOut}</Button> : null}
+        </div>
         <Typography.Title className="slowfit-display slowfit-section-title">{title}</Typography.Title>
         <Typography.Paragraph className="slowfit-policy-lead">{subtitle}</Typography.Paragraph>
       </section>
@@ -74,7 +78,6 @@ export default function AdminShell({
               <Button>{labels.operations}</Button>
             </Link>
           </Space>
-          {authorized ? <Button onClick={() => void onLogout()}>{labels.signOut}</Button> : null}
         </Space>
 
         {!sessionReady ? (
