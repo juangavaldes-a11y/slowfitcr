@@ -42,9 +42,10 @@ test("catalog admin shows public navigation and pagination", async ({ page }) =>
 
   await page.goto("/en/admin/catalog");
 
-  for (const name of ["Shop", "Collections", "Why Slow", "Contact", "Account"]) {
+  for (const name of ["Shop", "Collections", "Why Slow", "Contact"]) {
     await expect(page.getByRole("link", { name })).toBeVisible();
   }
+  await expect(page.getByRole("button", { name: /Account/ })).toBeVisible();
   await expect(page.locator(".ant-pagination-item-1")).toBeVisible();
   await expect(page.locator(".ant-pagination-item-2")).toBeVisible();
   await expect(page.getByRole("cell", { name: "12" })).toBeVisible();

@@ -21,6 +21,17 @@ export type Copy = {
     catalog: string;
     reviews: string;
     operations: string;
+    signIn: string;
+    myAccount: string;
+    signOut: string;
+    staffAccess: string;
+    adminSignOut: string;
+    adminAccessTitle: string;
+    adminAccessCopy: string;
+    adminToken: string;
+    adminSubmit: string;
+    adminRequired: string;
+    adminLoginFailed: string;
   };
   hero: {
     eyebrow: string;
@@ -134,6 +145,17 @@ const copyByLocale: Record<Locale, Copy> = {
       catalog: "Catálogo",
       reviews: "Reseñas",
       operations: "Operaciones",
+      signIn: "Iniciar sesión",
+      myAccount: "Mi cuenta",
+      signOut: "Cerrar sesión",
+      staffAccess: "Acceso del equipo",
+      adminSignOut: "Cerrar sesión administrativa",
+      adminAccessTitle: "Acceso administrativo",
+      adminAccessCopy: "Ingresa el token del equipo para habilitar las opciones administrativas.",
+      adminToken: "Token de administración",
+      adminSubmit: "Entrar",
+      adminRequired: "Ingresa el token de administración.",
+      adminLoginFailed: "No fue posible iniciar la sesión administrativa.",
     },
     hero: {
       eyebrow: "No creemos en los resultados rápidos",
@@ -293,6 +315,17 @@ const copyByLocale: Record<Locale, Copy> = {
       catalog: "Catalog",
       reviews: "Reviews",
       operations: "Operations",
+      signIn: "Sign in",
+      myAccount: "My account",
+      signOut: "Sign out",
+      staffAccess: "Staff access",
+      adminSignOut: "Sign out of administration",
+      adminAccessTitle: "Administration access",
+      adminAccessCopy: "Enter the team token to enable administration options.",
+      adminToken: "Administration token",
+      adminSubmit: "Sign in",
+      adminRequired: "Enter the administration token.",
+      adminLoginFailed: "Could not start the administration session.",
     },
     hero: {
       eyebrow: "We do not believe in quick results",

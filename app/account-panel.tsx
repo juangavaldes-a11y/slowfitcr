@@ -269,7 +269,7 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         body: JSON.stringify({ ...values, locale }),
       });
       setCustomer(payload.customer);
-      window.dispatchEvent(new Event("slowfit:auth-changed"));
+      window.dispatchEvent(new CustomEvent("slowfit:auth-changed", { detail: { authenticated: true } }));
       await loadAccountData();
     } catch (requestError) {
       setError(formatApiError(requestError, locale, { fallback: labels.requestFailed, preserveClientMessage: true }));
@@ -286,7 +286,7 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
       setOrders([]);
       setReviews([]);
       setFavorites([]);
-      window.dispatchEvent(new Event("slowfit:auth-changed"));
+      window.dispatchEvent(new CustomEvent("slowfit:auth-changed", { detail: { authenticated: false } }));
     } catch (requestError) {
       handleAccountError(requestError);
     }

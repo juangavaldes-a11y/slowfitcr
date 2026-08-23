@@ -40,12 +40,15 @@ test("language switch completes and persists through navigation", async ({ page 
 });
 
 test("global navigation exposes public routes and gates admin routes", async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto("/en/shop");
 
   for (const name of ["Home", "Shop", "Collections", "Why SLOW?", "Contact"]) {
     await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
   }
-  await expect(page.locator('a[href="/en/account"]')).toBeVisible();
+  await expect(page.getByRole("link", { name: "Shop", exact: true })).toHaveClass(/is-active/);
+  await expect(page.getByRole("link", { name: "Contact", exact: true })).not.toHaveClass(/is-active/);
+  await expect(page.getByRole("button", { name: /Account/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /Administration/ })).toHaveCount(0);
 
   await page.getByRole("button", { name: /Information/ }).click();
@@ -60,19 +63,44 @@ test("global navigation exposes public routes and gates admin routes", async ({ 
   }
   await page.keyboard.press("Escape");
 
-  const login = await page.context().request.post("/api/admin/login", { data: { token: "e2e-token" } });
-  expect(login.ok()).toBeTruthy();
-  await page.reload();
+  await page.getByRole("button", { name: /Account/ }).click();
+  await expect(page.getByRole("menuitem", { name: "Sign in" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Staff access" }).click();
+  await page.getByLabel("Administration token").fill("e2e-token");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(/\/en\/admin\/catalog$/, { timeout: 20_000 });
 
+  await expect(page.getByRole("button", { name: /Administration/ })).toHaveClass(/is-active/);
   await page.getByRole("button", { name: /Administration/ }).click();
   const adminRoutes = [
     ["Catalog", "/en/admin/catalog"],
     ["Reviews", "/en/admin/reviews"],
     ["Operations", "/en/admin/ops"],
   ];
+  const adminMenu = page.getByRole("menu");
   for (const [name, href] of adminRoutes) {
-    await expect(page.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
+    await expect(adminMenu.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
   }
+});
+
+test("authenticated customer signs out from the Account submenu", async ({ page }) => {
+  const suffix = Date.now();
+  await page.goto("/en/account");
+  await page.getByRole("tab", { name: "Create account" }).click();
+  const registration = page.getByRole("tabpanel", { name: "Create account" });
+  await registration.locator("#firstName").fill("Navigation");
+  await registration.locator("#email").fill(`nav-${suffix}@example.com`);
+  await registration.locator("#password").fill("secure-pass-123");
+  await registration.getByRole("button", { name: "Create my account" }).click();
+
+  await expect(page.getByRole("button", { name: /My account/ })).toBeVisible();
+  await page.getByRole("button", { name: /My account/ }).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: /Sign out/ }).click();
+
+  await expect(page).toHaveURL(/\/en$/);
+  await page.getByRole("button", { name: /Account/ }).click();
+  await expect(page.getByRole("menuitem", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("menu").getByRole("menuitem", { name: /Sign out/ })).toHaveCount(0);
 });
 
 test("account reports API failures without breaking its mobile layout", async ({ page }) => {
