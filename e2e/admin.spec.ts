@@ -1,5 +1,47 @@
 import { expect, test } from "@playwright/test";
 
+test("catalog admin shows public navigation and pagination", async ({ page }) => {
+  await page.route("**/api/admin/catalog/products**", (route) => route.fulfill({
+    json: {
+      products: [{
+        id: "catalog-product-1",
+        title: "Core Training Tee",
+        handle: "core-training-tee",
+        description: "Lightweight training shirt",
+        status: "ACTIVE",
+        published: true,
+        preorderEnabled: false,
+        tags: ["training"],
+        images: [],
+        variants: [{
+          id: "catalog-variant-1",
+          title: "M",
+          size: "M",
+          color: null,
+          colorHex: null,
+          sku: "CORE-M",
+          price: 48,
+          compareAtPrice: null,
+          inventoryQuantity: 7,
+        }],
+        updatedAt: "2026-08-22T12:00:00.000Z",
+      }],
+      total: 101,
+      page: 1,
+      pageSize: 100,
+      tags: ["training"],
+    },
+  }));
+
+  await page.goto("/en/admin/catalog");
+
+  for (const name of ["Shop", "Collections", "Why Slow", "Contact", "Account"]) {
+    await expect(page.getByRole("link", { name })).toBeVisible();
+  }
+  await expect(page.locator(".ant-pagination-item-1")).toBeVisible();
+  await expect(page.locator(".ant-pagination-item-2")).toBeVisible();
+});
+
 test("moderator session persists across review and operations pages", async ({ page, request }) => {
   test.setTimeout(60_000);
   const suffix = Date.now();

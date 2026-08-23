@@ -4,6 +4,8 @@ import { LogoutOutlined } from "@ant-design/icons";
 import { Button, Form, Input, Space, Typography } from "antd";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { getCopy } from "./i18n";
+import SiteNavigation from "./site-navigation";
 
 type AdminShellProps = {
   locale: "es" | "en";
@@ -56,6 +58,7 @@ export default function AdminShell({
 
   return (
     <main className="slowfit-policy-page">
+      <SiteNavigation copy={getCopy(locale)} locale={locale} />
       <section className="slowfit-shell slowfit-policy-hero">
         <div className="slowfit-admin-header-row">
           <span className="slowfit-kicker">Slow Fit Admin</span>
