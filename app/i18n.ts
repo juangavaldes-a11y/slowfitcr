@@ -207,13 +207,13 @@ const copyByLocale: Record<Locale, Copy> = {
       items: [
         {
           title: "Pensado para un estilo de vida activo.",
-          image: "/slowfit/value-1.jpg",
-          imageAlt: "Pensado para un estilo de vida activo",
+          image: "/slowfit/value-leggings-blue.webp",
+          imageAlt: "Conjunto deportivo con leggings azul intenso",
         },
         {
           title: "Prendas seleccionadas por calidad.",
-          image: "/slowfit/value-2.jpg",
-          imageAlt: "Prendas seleccionadas por calidad",
+          image: "/slowfit/value-shorts-olive.webp",
+          imageAlt: "Short deportivo verde olivo sobre fondo blanco",
         },
         {
           title: "Diseños minimalistas.",
@@ -377,13 +377,13 @@ const copyByLocale: Record<Locale, Copy> = {
       items: [
         {
           title: "Designed for an active lifestyle.",
-          image: "/slowfit/value-1.jpg",
-          imageAlt: "Designed for an active lifestyle",
+          image: "/slowfit/value-leggings-blue.webp",
+          imageAlt: "Bright blue activewear set with leggings",
         },
         {
           title: "Garments selected for quality.",
-          image: "/slowfit/value-2.jpg",
-          imageAlt: "Garments selected for quality",
+          image: "/slowfit/value-shorts-olive.webp",
+          imageAlt: "Olive green active shorts on a white background",
         },
         {
           title: "Minimalist designs.",
