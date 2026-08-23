@@ -24,6 +24,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   Upload,
   message,
@@ -111,6 +112,10 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     draft: "Borrador",
     active: "Activo",
     archived: "Archivado",
+    draftHelp: "Borrador: no aparece en la tienda hasta cambiarlo a Activo y hacerlo visible.",
+    activeHelp: "Activo: producto publicado y visible en la tienda.",
+    preorderHelp: "Preventa: producto activo y visible que puede venderse aunque no tenga inventario.",
+    archivedHelp: "Archivado: producto retirado de la tienda.",
     details: "Datos del producto",
     name: "Nombre",
     handle: "Identificador URL",
@@ -165,6 +170,10 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     draft: "Draft",
     active: "Active",
     archived: "Archived",
+    draftHelp: "Draft: hidden from the shop until it is Active and visible.",
+    activeHelp: "Active: published and visible in the shop.",
+    preorderHelp: "Pre-order: active and visible, and can be sold without inventory.",
+    archivedHelp: "Archived: removed from the shop.",
     details: "Product details",
     name: "Name",
     handle: "URL handle",
@@ -349,14 +358,15 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     {
       title: labels.product,
       key: "product",
+      width: 340,
       sorter: true,
       sortOrder: sortBy === "title" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
       render: (_, product) => (
-        <Space>
+        <Space className="slowfit-admin-product-cell">
           {product.images[0] ? <Image src={product.images[0].url} alt={product.images[0].altText} width={54} height={54} preview={false} /> : null}
-          <Space orientation="vertical" size={0}>
-            <Typography.Text strong>{product.title}</Typography.Text>
-            <Typography.Text type="secondary">/{product.handle}</Typography.Text>
+          <Space orientation="vertical" size={0} className="slowfit-admin-product-copy">
+            <Typography.Text strong ellipsis={{ tooltip: product.title }}>{product.title}</Typography.Text>
+            <Typography.Text type="secondary" ellipsis={{ tooltip: `/${product.handle}` }}>/{product.handle}</Typography.Text>
           </Space>
         </Space>
       ),
@@ -364,16 +374,19 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     {
       title: labels.status,
       key: "status",
-      width: 240,
+      width: 140,
       sorter: true,
       sortOrder: sortBy === "status" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
-      render: (_, product) => (
-        <Space wrap size={[4, 4]}>
-          <Tag color={product.status === "ACTIVE" ? "green" : product.status === "DRAFT" ? "gold" : "default"}>{product.status}</Tag>
-          {product.published ? <Tag color="blue">{labels.published}</Tag> : null}
-          {product.preorderEnabled ? <Tag color="orange">{labels.preorder}</Tag> : null}
-        </Space>
-      ),
+      render: (_, product) => {
+        const status = product.status === "ARCHIVED"
+            ? { label: labels.archived, color: "default", help: labels.archivedHelp }
+          : product.status === "DRAFT" || !product.published
+            ? { label: locale === "es" ? "Draft" : labels.draft, color: "gold", help: labels.draftHelp }
+            : product.preorderEnabled
+              ? { label: locale === "es" ? "Preventa" : "Pre-order", color: "orange", help: labels.preorderHelp }
+              : { label: labels.active, color: "green", help: labels.activeHelp };
+        return <Tooltip title={status.help}><Tag color={status.color}>{status.label}</Tag></Tooltip>;
+      },
     },
     {
       title: labels.stock,

@@ -49,6 +49,13 @@ test("catalog admin shows public navigation and pagination", async ({ page }) =>
   await expect(page.locator(".ant-pagination-item-1")).toBeVisible();
   await expect(page.locator(".ant-pagination-item-2")).toBeVisible();
   await expect(page.getByRole("cell", { name: "12" })).toBeVisible();
+  const productWidth = await page.getByRole("columnheader", { name: "Product" }).evaluate((element) => element.getBoundingClientRect().width);
+  const statusWidth = await page.getByRole("columnheader", { name: "Status" }).evaluate((element) => element.getBoundingClientRect().width);
+  expect(productWidth).toBeGreaterThan(320);
+  expect(statusWidth).toBeLessThan(160);
+  expect(productWidth).toBeGreaterThan(statusWidth * 2);
+  await page.getByText("Active", { exact: true }).hover();
+  await expect(page.getByRole("tooltip")).toContainText("published and visible");
 
   await page.getByRole("combobox").first().click();
   await page.locator(".ant-select-item-option").filter({ hasText: "training" }).click();

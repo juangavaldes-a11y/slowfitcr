@@ -48,7 +48,6 @@ export default function ShopCatalog({
   const [loadError, setLoadError] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoriteLoadingId, setFavoriteLoadingId] = useState("");
-  const initialRender = useRef(true);
   const requestSequence = useRef(0);
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const tags = useMemo(() => Array.from(new Set([
@@ -100,11 +99,8 @@ export default function ShopCatalog({
   }, []);
 
   useEffect(() => {
-    if (initialRender.current) {
-      initialRender.current = false;
-      return;
-    }
-    void loadPage(1, true);
+    const timeout = window.setTimeout(() => void loadPage(1, true), 0);
+    return () => window.clearTimeout(timeout);
   }, [loadPage]);
 
   const toggleFavorite = async (productId: string) => {

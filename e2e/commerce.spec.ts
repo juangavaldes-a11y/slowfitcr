@@ -1,5 +1,44 @@
 import { expect, test } from "@playwright/test";
 
+test("shop refreshes after hydration and shows active preorder products", async ({ page }) => {
+  await page.route("**/api/catalog/products?**", (route) => route.fulfill({
+    json: {
+      products: [{
+        id: "preorder-product",
+        handle: "preorder-jumpsuit",
+        title: "Preorder Jumpsuit",
+        description: "Available to reserve before inventory arrives.",
+        status: "ACTIVE",
+        published: true,
+        preorderEnabled: true,
+        currencyCode: "USD",
+        tags: ["jumpsuit"],
+        images: [{ id: "preorder-image", url: "https://images.example.com/preorder.jpg", altText: "Preorder jumpsuit" }],
+        variants: [{
+          id: "preorder-variant",
+          title: "M",
+          size: "M",
+          color: null,
+          colorHex: null,
+          price: 45,
+          compareAtPrice: null,
+          inventoryQuantity: 0,
+          currencyCode: "USD",
+          availableForSale: true,
+          preorder: true,
+        }],
+      }],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+    },
+  }));
+
+  await page.goto("/en/shop");
+  await expect(page.getByRole("heading", { name: "Preorder Jumpsuit" })).toBeVisible();
+  await expect(page.getByText("Pre-order", { exact: true })).toBeVisible();
+});
+
 test("customer can add an internal product to cart and request payment", async ({ page, request }) => {
   const login = await request.post("/api/admin/login", { data: { token: "e2e-token" } });
   expect(login.ok()).toBeTruthy();

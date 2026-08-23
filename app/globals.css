@@ -1152,6 +1152,24 @@ a {
   margin-bottom: 28px;
 }
 
+.slowfit-admin-product-cell {
+  width: 100%;
+  min-width: 0;
+}
+
+.slowfit-admin-product-cell .ant-image {
+  flex: 0 0 54px;
+}
+
+.slowfit-admin-product-copy {
+  min-width: 0;
+  width: 250px;
+}
+
+.slowfit-admin-product-copy .ant-typography {
+  max-width: 100%;
+}
+
 .slowfit-admin-json {
   margin: 0;
   max-width: 460px;
