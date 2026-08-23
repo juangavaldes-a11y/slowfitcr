@@ -3,6 +3,9 @@ import "server-only";
 export type CatalogVariant = {
   id: string;
   title: string;
+  size?: string | null;
+  color?: string | null;
+  colorHex?: string | null;
   sku?: string | null;
   price: number;
   compareAtPrice?: number | null;

@@ -32,11 +32,15 @@ import type { ColumnsType } from "antd/es/table";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
 import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
+import { getProductColor, productColors } from "./lib/product-colors";
 
 type CatalogImage = { id?: string; url: string; altText: string; position?: number };
 type CatalogVariant = {
   id?: string;
   title: string;
+  size?: string | null;
+  color?: string | null;
+  colorHex?: string | null;
   sku?: string | null;
   price: number;
   compareAtPrice?: number | null;
@@ -72,6 +76,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [tag, setTag] = useState("all");
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [editing, setEditing] = useState<CatalogProduct | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -80,6 +86,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     subtitle: "Administra productos, imagenes, variantes, existencias, etiquetas, precios y ofertas.",
     search: "Buscar producto",
     allStatuses: "Todos los estados",
+    allTags: "Todas las etiquetas",
     create: "Nuevo producto",
     edit: "Editar",
     remove: "Eliminar",
@@ -107,7 +114,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     upload: "Subir a R2",
     variants: "Variantes",
     variant: "Variante",
-    variantName: "Talla / color",
+    size: "Talla",
+    color: "Color",
     sku: "SKU",
     compareAt: "Precio anterior",
     quantity: "Cantidad",
@@ -128,6 +136,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     subtitle: "Manage products, images, variants, stock, tags, prices, and sales.",
     search: "Search products",
     allStatuses: "All statuses",
+    allTags: "All tags",
     create: "New product",
     edit: "Edit",
     remove: "Delete",
@@ -155,7 +164,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     upload: "Upload to R2",
     variants: "Variants",
     variant: "Variant",
-    variantName: "Size / color",
+    size: "Size",
+    color: "Color",
     sku: "SKU",
     compareAt: "Previous price",
     quantity: "Quantity",
@@ -173,22 +183,25 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     total: (count: number) => `${count} products`,
   }, [locale]);
 
-  const loadProducts = async (requestedPage = page, requestedStatus = status) => {
+  const loadProducts = async (requestedPage = page, requestedStatus = status, requestedTag = tag) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(requestedPage), pageSize: "100" });
       if (search.trim()) params.set("search", search.trim());
       if (requestedStatus !== "all") params.set("status", requestedStatus);
-      const payload = await apiRequest<{ products: CatalogProduct[]; total: number; page: number }>(`/api/admin/catalog/products?${params}`);
+      if (requestedTag !== "all") params.set("tag", requestedTag);
+      const payload = await apiRequest<{ products: CatalogProduct[]; total: number; page: number; tags: string[] }>(`/api/admin/catalog/products?${params}`);
       setProducts(payload.products);
       setPage(payload.page);
       setTotal(payload.total);
+      setAvailableTags(payload.tags);
       setAuthorized(true);
     } catch (error) {
       if (isApiErrorStatus(error, 401)) {
         setAuthorized(false);
         setProducts([]);
         setTotal(0);
+        setAvailableTags([]);
       } else {
         api.error(formatApiError(error, locale, { fallback: labels.loadFail }));
       }
@@ -235,7 +248,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       preorderEnabled: false,
       tags: [],
       images: [],
-      variants: [{ title: "Default", sku: "", price: 0, compareAtPrice: null, inventoryQuantity: 0 }],
+      variants: [{ title: "Default", size: "One Size", color: null, colorHex: null, sku: "", price: 0, compareAtPrice: null, inventoryQuantity: 0 }],
     });
     setModalOpen(true);
   };
@@ -251,8 +264,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       preorderEnabled: product.preorderEnabled,
       tags: product.tags,
       images: product.images.map(({ id, url, altText }) => ({ id, url, altText })),
-      variants: product.variants.map(({ id, title, sku, price, compareAtPrice, inventoryQuantity }) => ({
-        id, title, sku, price, compareAtPrice, inventoryQuantity,
+      variants: product.variants.map(({ id, title, size, color, colorHex, sku, price, compareAtPrice, inventoryQuantity }) => ({
+        id, title, size: size || title, color, colorHex, sku, price, compareAtPrice, inventoryQuantity,
       })),
     });
     setModalOpen(true);
@@ -378,6 +391,10 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
             { value: "DRAFT", label: labels.draft },
             { value: "ARCHIVED", label: labels.archived },
           ]} />
+          <Select value={tag} onChange={(value) => { setTag(value); void loadProducts(1, status, value); }} options={[
+            { value: "all", label: labels.allTags },
+            ...availableTags.map((value) => ({ value, label: value })),
+          ]} />
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{labels.create}</Button>
         </Space>
         <Spin spinning={loading}>
@@ -432,15 +449,26 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
             {(fields, { add, remove }, { errors }) => <Space orientation="vertical" className="slowfit-form-list">
               {fields.map(({ key, name, ...restField }, index) => <Card key={key} size="small" title={`${labels.variant} ${index + 1}`} extra={fields.length > 1 ? <Button danger icon={<DeleteOutlined />} onClick={() => remove(name)} /> : null}>
                 <Row gutter={12}>
-                  <Col xs={24} md={8}><Form.Item {...restField} name={[name, "title"]} label={labels.variantName} rules={[{ required: true }]}><Input /></Form.Item></Col>
-                  <Col xs={24} md={8}><Form.Item {...restField} name={[name, "sku"]} label={labels.sku}><Input /></Form.Item></Col>
-                  <Col xs={12} md={4}><Form.Item {...restField} name={[name, "price"]} label={labels.price} rules={[{ required: true }]}><InputNumber min={0} precision={2} className="slowfit-full-width" /></Form.Item></Col>
-                  <Col xs={12} md={4}><Form.Item {...restField} name={[name, "compareAtPrice"]} label={labels.compareAt}><InputNumber min={0} precision={2} className="slowfit-full-width" /></Form.Item></Col>
-                  <Col xs={12} md={4}><Form.Item {...restField} name={[name, "inventoryQuantity"]} label={labels.quantity} rules={[{ required: true }]}><InputNumber min={0} precision={0} className="slowfit-full-width" /></Form.Item></Col>
+                  <Col xs={12} md={4}><Form.Item {...restField} name={[name, "size"]} label={labels.size} rules={[{ required: true }]}><Input /></Form.Item></Col>
+                  <Col xs={12} md={4}>
+                    <Form.Item {...restField} name={[name, "color"]} label={labels.color}>
+                      <Select allowClear showSearch filterOption={(input, option) => String(option?.value || "").toLowerCase().includes(input.toLowerCase())}
+                        onChange={(value) => form.setFieldValue(["variants", name, "colorHex"], getProductColor(value)?.hex || null)}
+                        options={productColors.map((color) => ({
+                          value: color.value,
+                          label: <Space><span className="slowfit-color-swatch" style={{ backgroundColor: color.hex }} />{locale === "es" ? color.labelEs : color.labelEn}</Space>,
+                        }))} />
+                    </Form.Item>
+                    <Form.Item {...restField} name={[name, "colorHex"]} hidden><Input /></Form.Item>
+                  </Col>
+                  <Col xs={24} md={6}><Form.Item {...restField} name={[name, "sku"]} label={labels.sku}><Input /></Form.Item></Col>
+                  <Col xs={8} md={3}><Form.Item {...restField} name={[name, "price"]} label={labels.price} rules={[{ required: true }]}><InputNumber min={0} precision={2} className="slowfit-full-width" /></Form.Item></Col>
+                  <Col xs={8} md={3}><Form.Item {...restField} name={[name, "compareAtPrice"]} label={labels.compareAt}><InputNumber min={0} precision={2} className="slowfit-full-width" /></Form.Item></Col>
+                  <Col xs={8} md={4}><Form.Item {...restField} name={[name, "inventoryQuantity"]} label={labels.quantity} rules={[{ required: true }]}><InputNumber min={0} precision={0} className="slowfit-full-width" /></Form.Item></Col>
                 </Row>
               </Card>)}
               <Form.ErrorList errors={errors} />
-              <Button icon={<PlusOutlined />} onClick={() => add({ title: "", sku: "", price: 0, compareAtPrice: null, inventoryQuantity: 0 })}>{labels.addVariant}</Button>
+              <Button icon={<PlusOutlined />} onClick={() => add({ title: "One Size", size: "One Size", color: null, colorHex: null, sku: "", price: 0, compareAtPrice: null, inventoryQuantity: 0 })}>{labels.addVariant}</Button>
             </Space>}
           </Form.List>
           <Space className="slowfit-modal-actions">

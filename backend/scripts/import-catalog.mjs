@@ -39,6 +39,9 @@ async function importProduct(product) {
   };
   const variants = product.variants.map((variant, position) => ({
     title: variant.title,
+    size: variant.title,
+    color: null,
+    colorHex: null,
     sku: variant.sku,
     price: variant.price,
     compareAtPrice: variant.compareAtPrice,

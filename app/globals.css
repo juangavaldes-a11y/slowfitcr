@@ -845,6 +845,34 @@ a {
   padding-top: 28px;
 }
 
+.slowfit-color-swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(47, 42, 40, 0.25);
+  border-radius: 50%;
+}
+
+.slowfit-color-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.slowfit-color-option {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(47, 42, 40, 0.28);
+  cursor: pointer;
+}
+
+.slowfit-color-option.is-selected {
+  box-shadow: 0 0 0 2px #2f2a28;
+}
+
 .slowfit-product-card {
   display: flex;
   flex-direction: column;

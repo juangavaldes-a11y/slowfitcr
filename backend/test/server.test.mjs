@@ -104,6 +104,9 @@ test("admins manage internal products and customers filter the active catalog", 
       images: [{ url: "https://cdn.example.com/core-tee.jpg", altText: "Core tee" }],
       variants: [{
         title: "M / Black",
+        size: "M",
+        color: "Black",
+        colorHex: "#111111",
         sku: "CORE-M-BLK",
         price: 48,
         compareAtPrice: 56,
@@ -115,6 +118,9 @@ test("admins manage internal products and customers filter the active catalog", 
   const created = (await json(createResponse)).product;
   assert.equal(created.tags[0], "training");
   assert.equal(created.variants[0].inventoryQuantity, 7);
+  assert.equal(created.variants[0].size, "M");
+  assert.equal(created.variants[0].color, "Black");
+  assert.equal(created.variants[0].colorHex, "#111111");
   assert.equal(created.variants[0].compareAtPrice, 56);
   assert.equal(created.published, true);
   assert.equal(created.preorderEnabled, false);
@@ -124,7 +130,7 @@ test("admins manage internal products and customers filter the active catalog", 
       title: "Hidden Training Tee",
       handle: "hidden-training-tee",
       status: "ACTIVE",
-      tags: ["training"],
+      tags: ["clearance"],
       variants: { create: { title: "M", price: 44, inventoryQuantity: 5 } },
     },
   });
@@ -134,6 +140,10 @@ test("admins manage internal products and customers filter the active catalog", 
   const filtered = await json(filteredResponse);
   assert.equal(filtered.total, 1);
   assert.equal(filtered.products[0].handle, "core-training-tee");
+
+  const adminFilteredResponse = await route(request("/api/admin/catalog/products?tag=training&pageSize=1", { headers: { Cookie: cookie } }));
+  const adminFiltered = await json(adminFilteredResponse);
+  assert.deepEqual(adminFiltered.tags, ["clearance", "training", "women"]);
 
   const updateResponse = await route(request(`/api/admin/catalog/products/${created.id}`, {
     method: "PUT",
@@ -149,6 +159,9 @@ test("admins manage internal products and customers filter the active catalog", 
   assert.equal(updated.images[0].id, created.images[0].id);
   assert.equal(updated.variants[0].inventoryQuantity, 3);
   assert.equal(updated.variants[0].compareAtPrice, null);
+  assert.equal(updated.variants[0].size, "M");
+  assert.equal(updated.variants[0].color, "Black");
+  assert.equal(updated.variants[0].colorHex, "#111111");
 
   const deleteResponse = await route(request(`/api/admin/catalog/products/${created.id}`, {
     method: "DELETE",

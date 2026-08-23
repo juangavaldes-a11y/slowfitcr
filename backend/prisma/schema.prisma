@@ -45,6 +45,9 @@ model ProductVariant {
   id                String   @id @default(uuid())
   productId         String
   title             String
+  size              String?
+  color             String?
+  colorHex          String?
   sku               String?  @unique
   price             Decimal  @db.Decimal(12, 2)
   compareAtPrice    Decimal? @db.Decimal(12, 2)

@@ -667,7 +667,10 @@ function normalizeCatalogProduct(payload) {
 
   const variants = rawVariants.map((variant, position) => {
     const id = String(variant.id || "").trim() || undefined;
-    const variantTitle = String(variant.title || "").trim();
+    const size = String(variant.size || variant.title || "").trim();
+    const color = String(variant.color || "").trim() || null;
+    const colorHex = String(variant.colorHex || "").trim().toUpperCase() || null;
+    const variantTitle = [size, color].filter(Boolean).join(" / ");
     const sku = String(variant.sku || "").trim() || null;
     const price = Number(variant.price);
     const compareAtPrice = variant.compareAtPrice === null || variant.compareAtPrice === ""
@@ -675,14 +678,15 @@ function normalizeCatalogProduct(payload) {
       : Number(variant.compareAtPrice);
     const inventoryQuantity = Number(variant.inventoryQuantity);
 
-    if (!variantTitle || variantTitle.length > 80 || (sku && sku.length > 80)
+    if (!variantTitle || variantTitle.length > 80 || !size || size.length > 40 || (color && color.length > 40)
+      || (colorHex && !/^#[0-9A-F]{6}$/.test(colorHex)) || (sku && sku.length > 80)
       || !Number.isFinite(price) || price < 0
       || (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice <= price))
       || !Number.isInteger(inventoryQuantity) || inventoryQuantity < 0) {
       throw new Error("Invalid product variant");
     }
 
-    return { id, title: variantTitle, sku, price, compareAtPrice, inventoryQuantity, position };
+    return { id, title: variantTitle, size, color, colorHex, sku, price, compareAtPrice, inventoryQuantity, position };
   });
 
   const images = rawImages.map((image, position) => {
@@ -1471,7 +1475,7 @@ async function handleCatalogProducts(request, admin = false) {
     ];
   }
 
-  const [total, products] = await Promise.all([
+  const [total, products, tagRows] = await Promise.all([
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
@@ -1480,9 +1484,13 @@ async function handleCatalogProducts(request, admin = false) {
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
+    admin ? prisma.product.findMany({ select: { tags: true } }) : Promise.resolve([]),
   ]);
 
-  return jsonResponse({ products: products.map(serializeCatalogProduct), total, page, pageSize });
+  const tags = admin
+    ? Array.from(new Set(tagRows.flatMap((product) => product.tags))).sort()
+    : undefined;
+  return jsonResponse({ products: products.map(serializeCatalogProduct), total, page, pageSize, ...(admin ? { tags } : {}) });
 }
 
 async function handleCatalogProductByHandle(handle) {
@@ -1511,6 +1519,9 @@ async function handleCreateCatalogProduct(request) {
         tags: input.tags,
         variants: { create: input.variants.map((variant) => ({
           title: variant.title,
+          size: variant.size,
+          color: variant.color,
+          colorHex: variant.colorHex,
           sku: variant.sku,
           price: variant.price,
           compareAtPrice: variant.compareAtPrice,

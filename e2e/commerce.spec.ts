@@ -12,7 +12,10 @@ test("customer can add an internal product to cart and request payment", async (
       published: true,
       tags: ["training"],
       images: [{ url: "https://images.example.com/training-tee.jpg", altText: "Training tee" }],
-      variants: [{ title: "M", sku: "E2E-TEE-M", price: 48, compareAtPrice: 56, inventoryQuantity: 5 }],
+      variants: [
+        { title: "M / Black", size: "M", color: "Black", colorHex: "#111111", sku: "E2E-TEE-M-BLK", price: 48, compareAtPrice: 56, inventoryQuantity: 5 },
+        { title: "L / Blue", size: "L", color: "Blue", colorHex: "#3267A8", sku: "E2E-TEE-L-BLU", price: 48, compareAtPrice: 56, inventoryQuantity: 5 },
+      ],
     },
   });
   const productResponse = created.status() === 409
@@ -25,18 +28,20 @@ test("customer can add an internal product to cart and request payment", async (
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Slow Core Training Tee");
   await expect(page.getByText("The relaxed fit works well for training")).toBeVisible();
 
+  await page.getByRole("button", { name: "Blue" }).click();
+  await expect(page.getByText("L - $48.00", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Add to cart" }).click();
   const cartButton = page.getByRole("button", { name: "Cart (1)" });
   await expect(cartButton).toBeVisible();
   await cartButton.click();
 
-  await expect(page.getByText(/Slow Core Training Tee - M/)).toBeVisible();
+  await expect(page.getByText(/Slow Core Training Tee - L \/ Blue/)).toBeVisible();
   await expect(page.getByText("$48.00", { exact: true }).first()).toBeVisible();
 
   const checkout = await request.post("/api/cart/checkout", {
     data: {
       locale: "en",
-      lines: [{ variantId: product.variants[0].id, quantity: 1 }],
+      lines: [{ variantId: product.variants[1].id, quantity: 1 }],
     },
   });
   expect(checkout.status()).toBe(503);

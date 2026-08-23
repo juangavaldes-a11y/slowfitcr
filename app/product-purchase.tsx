@@ -4,10 +4,14 @@ import { Button, Select, Space, Typography } from "antd";
 import { useMemo, useState } from "react";
 import { useCart } from "./cart/cart-context";
 import { trackEvent } from "./lib/analytics";
+import { getProductColor } from "./lib/product-colors";
 
 type Variant = {
   id: string;
   title: string;
+  size?: string | null;
+  color?: string | null;
+  colorHex?: string | null;
   price: number;
   currencyCode: string;
   availableForSale: boolean;
@@ -28,6 +32,14 @@ type ProductPurchaseProps = {
 export default function ProductPurchase({ locale, product }: ProductPurchaseProps) {
   const { addLine } = useCart();
   const [variantId, setVariantId] = useState(product.variants[0]?.id ?? "");
+  const [color, setColor] = useState(product.variants[0]?.color || "");
+
+  const colors = useMemo(() => Array.from(new Map(product.variants
+    .filter((variant) => variant.color)
+    .map((variant) => [variant.color, { value: variant.color || "", hex: variant.colorHex || getProductColor(variant.color)?.hex || "#D8D6D1" }])).values()), [product.variants]);
+  const sizeVariants = useMemo(() => color
+    ? product.variants.filter((variant) => variant.color === color)
+    : product.variants, [color, product.variants]);
 
   const selected = useMemo(
     () => product.variants.find((variant) => variant.id === variantId) ?? product.variants[0],
@@ -48,12 +60,14 @@ export default function ProductPurchase({ locale, product }: ProductPurchaseProp
     locale === "es"
       ? {
           variants: "Talla",
+          color: "Color",
           add: "Agregar al carrito",
           preorder: "Reservar en preventa",
           unavailable: "No disponible",
         }
       : {
           variants: "Size",
+          color: "Color",
           add: "Add to cart",
           preorder: "Pre-order",
           unavailable: "Unavailable",
@@ -81,15 +95,35 @@ export default function ProductPurchase({ locale, product }: ProductPurchaseProp
     });
   };
 
+  const onColorChange = (nextColor: string) => {
+    setColor(nextColor);
+    const nextVariant = product.variants.find((variant) => variant.color === nextColor && variant.availableForSale)
+      || product.variants.find((variant) => variant.color === nextColor);
+    if (nextVariant) setVariantId(nextVariant.id);
+  };
+
   return (
     <Space orientation="vertical" size={14} className="slowfit-product-purchase">
+      {colors.length ? (
+        <>
+          <Typography.Text>{labels.color}: {locale === "es" ? getProductColor(color)?.labelEs || color : getProductColor(color)?.labelEn || color}</Typography.Text>
+          <div className="slowfit-color-options">
+            {colors.map((option) => (
+              <button key={option.value} type="button" className={`slowfit-color-option${color === option.value ? " is-selected" : ""}`}
+                style={{ backgroundColor: option.hex }} onClick={() => onColorChange(option.value)}
+                aria-label={locale === "es" ? getProductColor(option.value)?.labelEs || option.value : getProductColor(option.value)?.labelEn || option.value}
+                aria-pressed={color === option.value} />
+            ))}
+          </div>
+        </>
+      ) : null}
       <Typography.Text>{labels.variants}</Typography.Text>
       <Select
         value={selected.id}
         onChange={(value) => setVariantId(value)}
-        options={product.variants.map((variant) => ({
+        options={sizeVariants.map((variant) => ({
           value: variant.id,
-          label: `${variant.title} - ${money.format(variant.price)}`,
+          label: `${variant.size || variant.title} - ${money.format(variant.price)}`,
           disabled: !variant.availableForSale,
         }))}
       />
