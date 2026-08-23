@@ -68,6 +68,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [editing, setEditing] = useState<CatalogProduct | null>(null);
@@ -120,6 +122,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     uploadFail: "No pudimos subir la imagen.",
     maxImage: "La imagen debe pesar menos de 8 MB.",
     required: "Este campo es obligatorio.",
+    total: (count: number) => `${count} productos`,
   } : {
     title: "Catalog and inventory",
     subtitle: "Manage products, images, variants, stock, tags, prices, and sales.",
@@ -167,21 +170,25 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     uploadFail: "We could not upload the image.",
     maxImage: "Images must be smaller than 8 MB.",
     required: "This field is required.",
+    total: (count: number) => `${count} products`,
   }, [locale]);
 
-  const loadProducts = async () => {
+  const loadProducts = async (requestedPage = page, requestedStatus = status) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ pageSize: "100" });
+      const params = new URLSearchParams({ page: String(requestedPage), pageSize: "100" });
       if (search.trim()) params.set("search", search.trim());
-      if (status !== "all") params.set("status", status);
-      const payload = await apiRequest<{ products: CatalogProduct[] }>(`/api/admin/catalog/products?${params}`);
+      if (requestedStatus !== "all") params.set("status", requestedStatus);
+      const payload = await apiRequest<{ products: CatalogProduct[]; total: number; page: number }>(`/api/admin/catalog/products?${params}`);
       setProducts(payload.products);
+      setPage(payload.page);
+      setTotal(payload.total);
       setAuthorized(true);
     } catch (error) {
       if (isApiErrorStatus(error, 401)) {
         setAuthorized(false);
         setProducts([]);
+        setTotal(0);
       } else {
         api.error(formatApiError(error, locale, { fallback: labels.loadFail }));
       }
@@ -214,6 +221,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     await apiRequest("/api/admin/logout", { method: "POST" }).catch(() => undefined);
     setAuthorized(false);
     setProducts([]);
+    setTotal(0);
   };
 
   const openCreate = () => {
@@ -362,9 +370,9 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       {contextHolder}
       <Space orientation="vertical" size={20} className="slowfit-admin-catalog">
         <Space wrap className="slowfit-admin-toolbar">
-          <Input.Search value={search} onChange={(event) => setSearch(event.target.value)} onSearch={() => void loadProducts()}
+          <Input.Search value={search} onChange={(event) => setSearch(event.target.value)} onSearch={() => void loadProducts(1)}
             placeholder={labels.search} allowClear />
-          <Select value={status} onChange={(value) => setStatus(value)} options={[
+          <Select value={status} onChange={(value) => { setStatus(value); void loadProducts(1, value); }} options={[
             { value: "all", label: labels.allStatuses },
             { value: "ACTIVE", label: labels.active },
             { value: "DRAFT", label: labels.draft },
@@ -373,7 +381,14 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{labels.create}</Button>
         </Space>
         <Spin spinning={loading}>
-          {products.length ? <Table rowKey="id" columns={columns} dataSource={products} pagination={false} scroll={{ x: 760 }} /> : <Empty description={labels.empty} />}
+          {products.length ? <Table rowKey="id" columns={columns} dataSource={products} scroll={{ x: 760 }} pagination={{
+            current: page,
+            pageSize: 100,
+            total,
+            showSizeChanger: false,
+            showTotal: labels.total,
+            onChange: (nextPage) => void loadProducts(nextPage),
+          }} /> : <Empty description={labels.empty} />}
         </Spin>
       </Space>
 
