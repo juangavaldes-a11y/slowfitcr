@@ -40,6 +40,7 @@ model Product {
   variants    ProductVariant[]
   images      ProductImage[]
   metric      ProductMetric?
+  customerFavorites CustomerFavorite[]
 
   @@index([status, updatedAt])
   @@index([title])
@@ -106,6 +107,30 @@ model Customer {
   updatedAt           DateTime @updatedAt
   orders              Order[]
   passwordResetTokens PasswordResetToken[]
+  favorites           CustomerFavorite[]
+  cart                CustomerCart?
+}
+
+model CustomerFavorite {
+  id         String   @id @default(uuid())
+  customerId String
+  productId  String
+  createdAt  DateTime @default(now())
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, productId])
+  @@index([customerId, createdAt])
+}
+
+model CustomerCart {
+  id         String   @id @default(uuid())
+  customerId String   @unique
+  lines      Json
+  cartId     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 }
 
 model PasswordResetToken {

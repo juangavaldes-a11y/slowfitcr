@@ -11,7 +11,6 @@ import Image from "next/image";
 import ContactForm from "./contact-form";
 import { trackEvent } from "./lib/analytics";
 import type { Copy, Locale } from "./i18n";
-import SiteNavigation from "./site-navigation";
 
 type HomePageProps = {
   copy: Copy;
@@ -23,8 +22,6 @@ export default function HomePage({ copy, locale }: HomePageProps) {
 
   return (
     <main className="slowfit-page">
-      <SiteNavigation copy={copy} locale={locale} />
-
       <section className="slowfit-shell slowfit-hero">
         <div className="slowfit-hero-media">
           <Image

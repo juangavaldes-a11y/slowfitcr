@@ -3,9 +3,7 @@
 import { LogoutOutlined } from "@ant-design/icons";
 import { Button, Form, Input, Space, Typography } from "antd";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { getCopy } from "./i18n";
-import SiteNavigation from "./site-navigation";
+import { useEffect, type ReactNode } from "react";
 
 type AdminShellProps = {
   locale: "es" | "en";
@@ -56,9 +54,12 @@ export default function AdminShell({
         required: "Enter the moderation token.",
       };
 
+  useEffect(() => {
+    if (sessionReady) window.dispatchEvent(new Event("slowfit:admin-auth-changed"));
+  }, [authorized, sessionReady]);
+
   return (
     <main className="slowfit-policy-page">
-      <SiteNavigation copy={getCopy(locale)} locale={locale} />
       <section className="slowfit-shell slowfit-policy-hero">
         <div className="slowfit-admin-header-row">
           <span className="slowfit-kicker">Slow Fit Admin</span>
@@ -69,7 +70,7 @@ export default function AdminShell({
       </section>
 
       <section className="slowfit-shell slowfit-policy-section">
-        <Space className="slowfit-admin-nav" wrap>
+        {authorized ? <Space className="slowfit-admin-nav" wrap>
           <Space wrap>
             <Link href={`/${locale}/admin/catalog`}>
               <Button>{labels.catalog}</Button>
@@ -81,7 +82,7 @@ export default function AdminShell({
               <Button>{labels.operations}</Button>
             </Link>
           </Space>
-        </Space>
+        </Space> : null}
 
         {!sessionReady ? (
           <article className="slowfit-policy-card slowfit-admin-auth-card">

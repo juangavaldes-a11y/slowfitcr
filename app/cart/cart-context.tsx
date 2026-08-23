@@ -37,43 +37,86 @@ type PersistedCart = {
   cartId?: string;
 };
 
+const AUTH_CHANGED_EVENT = "slowfit:auth-changed";
 const CartContext = createContext<CartContextValue | null>(null);
+
+function readPersistedCart(): PersistedCart {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { lines: [] };
+    const parsed = JSON.parse(raw) as CartLine[] | PersistedCart;
+    return Array.isArray(parsed) ? { lines: parsed } : { lines: parsed.lines ?? [], cartId: parsed.cartId };
+  } catch {
+    return { lines: [] };
+  }
+}
+
+function mergeCartLines(remoteLines: CartLine[], localLines: CartLine[]) {
+  const merged = new Map(remoteLines.map((line) => [line.variantId, line]));
+  localLines.forEach((line) => merged.set(line.variantId, line));
+  return Array.from(merged.values());
+}
 
 export function CartProvider({ children }: PropsWithChildren) {
   const [lines, setLines] = useState<CartLine[]>([]);
   const [cartId, setCartId] = useState<string | undefined>(undefined);
+  const [hydrated, setHydrated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      try {
-        const raw = window.localStorage.getItem(STORAGE_KEY);
-        if (!raw) {
-          return;
-        }
-        const parsed = JSON.parse(raw) as CartLine[] | PersistedCart;
-        if (Array.isArray(parsed)) {
-          setLines(parsed);
-          return;
-        }
+    let active = true;
 
-        setLines(parsed.lines ?? []);
-        setCartId(parsed.cartId);
-      } catch {
-        setLines([]);
-        setCartId(undefined);
+    const restoreCart = async () => {
+      const localCart = readPersistedCart();
+      if (active) {
+        setLines(localCart.lines);
+        setCartId(localCart.cartId);
       }
-    }, 0);
 
-    return () => window.clearTimeout(timeout);
+      try {
+        await apiRequest("/api/auth/session");
+        const payload = await apiRequest<{ cart: (PersistedCart & { updatedAt: string }) | null }>("/api/account/cart");
+        const mergedLines = mergeCartLines(payload.cart?.lines ?? [], localCart.lines);
+        const mergedCartId = localCart.cartId || payload.cart?.cartId;
+        if (active) {
+          setLines(mergedLines);
+          setCartId(mergedCartId);
+          setAuthenticated(true);
+        }
+      } catch {
+        if (active) setAuthenticated(false);
+      } finally {
+        if (active) setHydrated(true);
+      }
+    };
+
+    const handleAuthChanged = () => void restoreCart();
+    void restoreCart();
+    window.addEventListener(AUTH_CHANGED_EVENT, handleAuthChanged);
+
+    return () => {
+      active = false;
+      window.removeEventListener(AUTH_CHANGED_EVENT, handleAuthChanged);
+    };
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     const payload: PersistedCart = {
       lines,
       cartId,
     };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [lines, cartId]);
+
+    if (!authenticated) return;
+    const timeout = window.setTimeout(() => {
+      void apiRequest("/api/account/cart", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      }).catch(() => undefined);
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [authenticated, cartId, hydrated, lines]);
 
   const value = useMemo<CartContextValue>(() => {
     const addLine: CartContextValue["addLine"] = (line, quantity = 1) => {

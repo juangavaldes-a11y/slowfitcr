@@ -66,6 +66,10 @@ after(async () => {
 });
 
 test("admin login creates a reusable session and logout clears it", async () => {
+  const anonymousSession = await route(request("/api/admin/session"));
+  assert.equal(anonymousSession.status, 401);
+  assert.equal((await json(anonymousSession)).authenticated, false);
+
   const invalid = await route(request("/api/admin/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -74,6 +78,9 @@ test("admin login creates a reusable session and logout clears it", async () => 
   assert.equal(invalid.status, 401);
 
   const cookie = await loginCookie();
+  const session = await route(request("/api/admin/session", { headers: { Cookie: cookie } }));
+  assert.equal(session.status, 200);
+  assert.equal((await json(session)).authenticated, true);
   const protectedResponse = await route(request("/api/admin/audit-logs?page=1&pageSize=5", {
     headers: { Cookie: cookie },
   }));
@@ -267,6 +274,93 @@ test("customers can register, sign in, and access only authenticated account dat
     body: JSON.stringify({ email: "CUSTOMER@example.com", password: "secure-pass-123" }),
   }));
   assert.equal(login.status, 200);
+});
+
+test("customers filter preorders and persist favorites and carts", async () => {
+  const registration = await route(request("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: "saved@example.com",
+      password: "secure-pass-123",
+      firstName: "Saved",
+      locale: "en",
+    }),
+  }));
+  assert.equal(registration.status, 201);
+  const customerCookie = registration.headers.get("set-cookie").split(";")[0];
+
+  const preorder = await prisma.product.create({
+    data: {
+      title: "Men Preorder Tee",
+      handle: "men-preorder-tee",
+      status: "ACTIVE",
+      published: true,
+      preorderEnabled: true,
+      tags: ["men", "training"],
+      images: { create: { url: "https://cdn.example.com/preorder.jpg", altText: "Preorder tee" } },
+      variants: { create: { title: "M", size: "M", price: 42, inventoryQuantity: 0 } },
+    },
+    include: { variants: true },
+  });
+  await prisma.product.create({
+    data: {
+      title: "Hidden Preorder Tee",
+      handle: "hidden-preorder-tee",
+      status: "DRAFT",
+      published: false,
+      preorderEnabled: true,
+      tags: ["men", "training"],
+      variants: { create: { title: "M", size: "M", price: 40, inventoryQuantity: 0 } },
+    },
+  });
+
+  const catalog = await json(await route(request("/api/catalog/products?preorder=true&tag=men&tag=training")));
+  assert.equal(catalog.total, 1);
+  assert.equal(catalog.products[0].id, preorder.id);
+  assert.equal(catalog.products[0].variants[0].availableForSale, true);
+  assert.equal(catalog.products[0].variants[0].preorder, true);
+
+  assert.equal((await route(request(`/api/account/favorites/${preorder.id}`, { method: "PUT" }))).status, 401);
+  const favorite = await route(request(`/api/account/favorites/${preorder.id}`, {
+    method: "PUT",
+    headers: { Cookie: customerCookie },
+  }));
+  assert.equal(favorite.status, 200);
+  assert.equal((await route(request(`/api/account/favorites/${preorder.id}`, {
+    method: "PUT",
+    headers: { Cookie: customerCookie },
+  }))).status, 200);
+  const favorites = await json(await route(request("/api/account/favorites", { headers: { Cookie: customerCookie } })));
+  assert.deepEqual(favorites.productIds, [preorder.id]);
+
+  const line = {
+    productId: preorder.id,
+    variantId: preorder.variants[0].id,
+    title: preorder.title,
+    handle: preorder.handle,
+    image: "https://cdn.example.com/preorder.jpg",
+    price: 42,
+    currencyCode: "USD",
+    quantity: 2,
+  };
+  const savedCart = await route(request("/api/account/cart", {
+    method: "PUT",
+    headers: { Cookie: customerCookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ lines: [line], cartId: "provider-cart-1" }),
+  }));
+  assert.equal(savedCart.status, 200);
+  const restoredCart = await json(await route(request("/api/account/cart", { headers: { Cookie: customerCookie } })));
+  assert.deepEqual(restoredCart.cart.lines, [line]);
+  assert.equal(restoredCart.cart.cartId, "provider-cart-1");
+
+  const removed = await route(request(`/api/account/favorites/${preorder.id}`, {
+    method: "DELETE",
+    headers: { Cookie: customerCookie },
+  }));
+  assert.equal(removed.status, 200);
+  const emptyFavorites = await json(await route(request("/api/account/favorites", { headers: { Cookie: customerCookie } })));
+  assert.deepEqual(emptyFavorites.productIds, []);
 });
 
 test("customer login locks after repeated failures and recovers after expiry", async () => {

@@ -6,11 +6,21 @@ export const defaultLocale: Locale = "es";
 export type Copy = {
   brandTagline: string;
   nav: {
+    home: string;
     shop: string;
     collections: string;
     whySlow: string;
     contact: string;
     account: string;
+    information: string;
+    shipping: string;
+    returns: string;
+    privacy: string;
+    terms: string;
+    administration: string;
+    catalog: string;
+    reviews: string;
+    operations: string;
   };
   hero: {
     eyebrow: string;
@@ -109,11 +119,21 @@ const copyByLocale: Record<Locale, Copy> = {
   es: {
     brandTagline: "Train with Purpose.",
     nav: {
+      home: "Inicio",
       shop: "Tienda",
       collections: "Colecciones",
       whySlow: "¿Por qué SLOW?",
       contact: "Contacto",
       account: "Cuenta",
+      information: "Información",
+      shipping: "Envíos",
+      returns: "Cambios y devoluciones",
+      privacy: "Privacidad",
+      terms: "Términos",
+      administration: "Administración",
+      catalog: "Catálogo",
+      reviews: "Reseñas",
+      operations: "Operaciones",
     },
     hero: {
       eyebrow: "No creemos en los resultados rápidos",
@@ -258,11 +278,21 @@ const copyByLocale: Record<Locale, Copy> = {
   en: {
     brandTagline: "Train with Purpose.",
     nav: {
+      home: "Home",
       shop: "Shop",
       collections: "Collections",
       whySlow: "Why SLOW?",
       contact: "Contact",
       account: "Account",
+      information: "Information",
+      shipping: "Shipping",
+      returns: "Returns",
+      privacy: "Privacy",
+      terms: "Terms",
+      administration: "Administration",
+      catalog: "Catalog",
+      reviews: "Reviews",
+      operations: "Operations",
     },
     hero: {
       eyebrow: "We do not believe in quick results",

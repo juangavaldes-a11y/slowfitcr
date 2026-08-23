@@ -69,7 +69,7 @@ export default async function ShopPage({ params, searchParams }: ShopPageProps) 
         <p className="slowfit-shop-lead">{copy.shop.description}</p>
       </section>
 
-      <section id="collections" className="slowfit-shell slowfit-policy-section">
+      <section id="catalog" className="slowfit-shell slowfit-policy-section">
         <ShopCatalog
           locale={locale as Locale}
           products={catalog.products}

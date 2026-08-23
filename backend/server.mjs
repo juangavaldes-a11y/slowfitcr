@@ -1230,6 +1230,13 @@ async function handleAdminLogin(request) {
   });
 }
 
+async function handleAdminSession(request) {
+  if (!(await isModeratorAuthorized(request))) {
+    return jsonResponse({ authenticated: false }, 401);
+  }
+  return jsonResponse({ authenticated: true });
+}
+
 async function handleAdminLogout() {
   await appendAudit("admin.logout", { success: true }, "moderator");
   return jsonResponse({ ok: true }, 200, {
@@ -1492,6 +1499,111 @@ async function handleCustomerReviews(request) {
   return jsonResponse({ reviews, total, page, pageSize });
 }
 
+async function handleCustomerFavorites(request) {
+  const session = getCustomerSessionFromRequest(request);
+  if (!session) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  const favorites = await prisma.customerFavorite.findMany({
+    where: {
+      customerId: session.customerId,
+      product: { status: "ACTIVE", published: true },
+    },
+    include: { product: { include: CATALOG_PRODUCT_LIST_INCLUDE } },
+    orderBy: { createdAt: "desc" },
+  });
+  return jsonResponse({
+    productIds: favorites.map((favorite) => favorite.productId),
+    products: favorites.map((favorite) => serializeCatalogProduct(favorite.product)),
+  });
+}
+
+async function handleUpdateCustomerFavorite(request, productId, favorite) {
+  const session = getCustomerSessionFromRequest(request);
+  if (!session) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  if (favorite) {
+    const product = await prisma.product.findFirst({
+      where: { id: productId, status: "ACTIVE", published: true },
+      select: { id: true },
+    });
+    if (!product) {
+      return jsonResponse({ error: "Product not found" }, 404);
+    }
+    await prisma.customerFavorite.upsert({
+      where: { customerId_productId: { customerId: session.customerId, productId } },
+      create: { customerId: session.customerId, productId },
+      update: {},
+    });
+  } else {
+    await prisma.customerFavorite.deleteMany({ where: { customerId: session.customerId, productId } });
+  }
+
+  return jsonResponse({ ok: true, productId, favorite });
+}
+
+function normalizeCustomerCart(payload) {
+  const rawLines = Array.isArray(payload.lines) ? payload.lines : null;
+  const cartId = String(payload.cartId || "").trim() || null;
+  if (!rawLines || rawLines.length > 100 || (cartId && cartId.length > 255)) {
+    throw new Error("Invalid cart");
+  }
+
+  const lines = rawLines.map((line) => {
+    const productId = String(line.productId || "").trim();
+    const variantId = String(line.variantId || "").trim();
+    const title = String(line.title || "").trim();
+    const handle = String(line.handle || "").trim();
+    const image = String(line.image || "").trim();
+    const price = Number(line.price);
+    const currencyCode = String(line.currencyCode || "").trim().toUpperCase();
+    const quantity = Number(line.quantity);
+    if (!productId || !variantId || !title || title.length > 200 || !handle || handle.length > 160
+      || image.length > 2000 || !Number.isFinite(price) || price < 0 || !/^[A-Z]{3}$/.test(currencyCode)
+      || !Number.isInteger(quantity) || quantity < 1 || quantity > 99) {
+      throw new Error("Invalid cart line");
+    }
+    return { productId, variantId, title, handle, image, price, currencyCode, quantity };
+  });
+
+  return { lines, cartId };
+}
+
+async function handleCustomerCart(request) {
+  const session = getCustomerSessionFromRequest(request);
+  if (!session) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  const cart = await prisma.customerCart.findUnique({ where: { customerId: session.customerId } });
+  return jsonResponse({ cart: cart ? { lines: cart.lines, cartId: cart.cartId, updatedAt: cart.updatedAt } : null });
+}
+
+async function handleUpdateCustomerCart(request) {
+  const session = getCustomerSessionFromRequest(request);
+  if (!session) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const cart = normalizeCustomerCart(await readJson(request));
+    const saved = await prisma.customerCart.upsert({
+      where: { customerId: session.customerId },
+      create: { customerId: session.customerId, ...cart },
+      update: cart,
+    });
+    return jsonResponse({ cart: { lines: saved.lines, cartId: saved.cartId, updatedAt: saved.updatedAt } });
+  } catch (error) {
+    if (error instanceof SyntaxError || error?.message?.startsWith("Invalid cart")) {
+      return jsonResponse({ error: error.message || "Invalid cart" }, 400);
+    }
+    throw error;
+  }
+}
+
 async function handleCatalogProducts(request, admin = false) {
   if (admin && !(await isModeratorAuthorized(request))) {
     return jsonResponse({ error: "Unauthorized" }, 401);
@@ -1506,6 +1618,7 @@ async function handleCatalogProducts(request, admin = false) {
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean))).slice(0, 20);
   const requestedStatus = getTrimmedParam(url, "status").toUpperCase();
+  const preorderOnly = url.searchParams.get("preorder") === "true";
   const sortBy = getTrimmedParam(url, "sortBy");
   const sortOrder = getTrimmedParam(url, "sortOrder") === "asc" ? "asc" : "desc";
   const where = admin ? {} : { status: "ACTIVE", published: true };
@@ -1515,6 +1628,9 @@ async function handleCatalogProducts(request, admin = false) {
   }
   if (selectedTags.length) {
     where.tags = { hasEvery: selectedTags };
+  }
+  if (preorderOnly) {
+    where.preorderEnabled = true;
   }
   if (search) {
     where.OR = [
@@ -1966,6 +2082,10 @@ export async function route(request) {
     return handleAdminLogin(request);
   }
 
+  if (pathname === "/api/admin/session" && method === "GET") {
+    return handleAdminSession(request);
+  }
+
   if (pathname === "/api/auth/register" && method === "POST") {
     return handleCustomerRegister(request);
   }
@@ -1996,6 +2116,23 @@ export async function route(request) {
 
   if (pathname === "/api/account/reviews" && method === "GET") {
     return handleCustomerReviews(request);
+  }
+
+  if (pathname === "/api/account/favorites" && method === "GET") {
+    return handleCustomerFavorites(request);
+  }
+
+  const favoriteMatch = pathname.match(/^\/api\/account\/favorites\/([^/]+)$/);
+  if (favoriteMatch && (method === "PUT" || method === "DELETE")) {
+    return handleUpdateCustomerFavorite(request, decodeURIComponent(favoriteMatch[1]), method === "PUT");
+  }
+
+  if (pathname === "/api/account/cart" && method === "GET") {
+    return handleCustomerCart(request);
+  }
+
+  if (pathname === "/api/account/cart" && method === "PUT") {
+    return handleUpdateCustomerCart(request);
   }
 
   if (pathname === "/api/admin/logout" && method === "POST") {

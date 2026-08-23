@@ -1,11 +1,13 @@
 "use client";
 
-import { SearchOutlined } from "@ant-design/icons";
-import { Alert, Button, Empty, Input, Select, Space, Tag } from "antd";
+import { HeartFilled, HeartOutlined, SearchOutlined } from "@ant-design/icons";
+import { Alert, Button, Checkbox, Empty, Input, Segmented, Select, Space, Tag, Tooltip } from "antd";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { trackEvent } from "./lib/analytics";
+import { apiRequest, isApiErrorStatus } from "./lib/api-client";
 import type { CatalogProduct } from "./lib/catalog";
 
 type CatalogApiProduct = Omit<CatalogProduct, "image" | "price" | "compareAtPrice" | "collectionTitle">;
@@ -35,13 +37,17 @@ export default function ShopCatalog({
   pageSize: number;
   initialTag?: string;
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState(initialTag === "all" ? [] : [initialTag]);
+  const [preorderOnly, setPreorderOnly] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState(products);
   const [total, setTotal] = useState(initialTotal);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const [favoriteLoadingId, setFavoriteLoadingId] = useState("");
   const initialRender = useRef(true);
   const requestSequence = useRef(0);
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
@@ -49,9 +55,10 @@ export default function ShopCatalog({
     ...(initialTag === "all" ? [] : [initialTag]),
     ...catalogProducts.flatMap((product) => product.tags),
   ])).sort(), [catalogProducts, initialTag]);
+  const selectedGender = selectedTags.find((tag) => tag === "men" || tag === "women") || "all";
   const labels = locale === "es"
-    ? { search: "Buscar productos", all: "Todas las etiquetas", empty: "No encontramos productos con estos filtros.", view: "Ver producto", soldOut: "Agotado", preorder: "Preventa", loadMore: "Cargar más", error: "No pudimos cargar los productos." }
-    : { search: "Search products", all: "All tags", empty: "No products match these filters.", view: "View product", soldOut: "Sold out", preorder: "Pre-order", loadMore: "Load more", error: "We could not load the products." };
+    ? { search: "Buscar productos", all: "Escribe una o varias etiquetas", everyone: "Todo", men: "Hombre", women: "Mujer", empty: "No encontramos productos con estos filtros.", view: "Ver producto", soldOut: "Agotado", preorder: "Preventa", preorderOnly: "Solo preventa", favorite: "Guardar favorito", unfavorite: "Quitar de favoritos", loadMore: "Cargar más", error: "No pudimos cargar los productos." }
+    : { search: "Search products", all: "Type one or more tags", everyone: "All", men: "Men", women: "Women", empty: "No products match these filters.", view: "View product", soldOut: "Sold out", preorder: "Pre-order", preorderOnly: "Pre-order only", favorite: "Save favorite", unfavorite: "Remove favorite", loadMore: "Load more", error: "We could not load the products." };
 
   const loadPage = useCallback(async (nextPage: number, replace: boolean) => {
     const requestId = ++requestSequence.current;
@@ -60,6 +67,7 @@ export default function ShopCatalog({
     const params = new URLSearchParams({ page: String(nextPage), pageSize: String(pageSize) });
     if (deferredSearch) params.set("search", deferredSearch);
     selectedTags.forEach((tag) => params.append("tag", tag));
+    if (preorderOnly) params.set("preorder", "true");
 
     try {
       const response = await fetch(`/api/catalog/products?${params}`);
@@ -83,7 +91,13 @@ export default function ShopCatalog({
     } finally {
       if (requestId === requestSequence.current) setLoading(false);
     }
-  }, [deferredSearch, pageSize, selectedTags]);
+  }, [deferredSearch, pageSize, preorderOnly, selectedTags]);
+
+  useEffect(() => {
+    apiRequest<{ productIds: string[] }>("/api/account/favorites")
+      .then((payload) => setFavoriteIds(new Set(payload.productIds)))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (initialRender.current) {
@@ -93,13 +107,45 @@ export default function ShopCatalog({
     void loadPage(1, true);
   }, [loadPage]);
 
+  const toggleFavorite = async (productId: string) => {
+    const isFavorite = favoriteIds.has(productId);
+    setFavoriteLoadingId(productId);
+    try {
+      await apiRequest(`/api/account/favorites/${encodeURIComponent(productId)}`, {
+        method: isFavorite ? "DELETE" : "PUT",
+      });
+      setFavoriteIds((current) => {
+        const next = new Set(current);
+        if (isFavorite) next.delete(productId);
+        else next.add(productId);
+        return next;
+      });
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) router.push(`/${locale}/account`);
+    } finally {
+      setFavoriteLoadingId("");
+    }
+  };
+
   return (
     <>
       <Space wrap className="slowfit-shop-filters">
         <Input prefix={<SearchOutlined />} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={labels.search} allowClear />
-        <Select mode="multiple" allowClear showSearch value={selectedTags} onChange={setSelectedTags} placeholder={labels.all} options={[
+        <Segmented value={selectedGender} onChange={(value) => setSelectedTags((current) => [
+          ...(value === "all" ? [] : [value]),
+          ...current.filter((tag) => tag !== "men" && tag !== "women"),
+        ])} options={[
+          { value: "all", label: labels.everyone },
+          { value: "men", label: labels.men },
+          { value: "women", label: labels.women },
+        ]} />
+        <Select mode="tags" allowClear showSearch value={selectedTags.filter((tag) => tag !== "men" && tag !== "women")} onChange={(values) => setSelectedTags([
+          ...(selectedGender === "all" ? [] : [selectedGender]),
+          ...values.filter((tag) => tag !== "men" && tag !== "women"),
+        ])} tokenSeparators={[","]} placeholder={labels.all} options={[
           ...tags.map((value) => ({ value, label: value })),
         ]} />
+        <Checkbox checked={preorderOnly} onChange={(event) => setPreorderOnly(event.target.checked)}>{labels.preorderOnly}</Checkbox>
       </Space>
       {loadError ? <Alert type="error" showIcon message={labels.error} /> : null}
       {catalogProducts.length ? (
@@ -112,6 +158,11 @@ export default function ShopCatalog({
               <article key={product.id} className="slowfit-product-card">
                 <div className="slowfit-product-card-media">
                   <Image src={product.image} alt={product.images[0]?.altText || product.title} fill priority={index === 0} unoptimized sizes="(max-width: 767px) 100vw, (max-width: 991px) 50vw, 33vw" className="slowfit-cover" />
+                  <Tooltip title={favoriteIds.has(product.id) ? labels.unfavorite : labels.favorite}>
+                    <Button className="slowfit-favorite-button" type="text" shape="circle" loading={favoriteLoadingId === product.id}
+                      icon={favoriteIds.has(product.id) ? <HeartFilled /> : <HeartOutlined />} onClick={() => void toggleFavorite(product.id)}
+                      aria-label={favoriteIds.has(product.id) ? labels.unfavorite : labels.favorite} />
+                  </Tooltip>
                   {!available || preorder ? <span className="slowfit-stock-badge">{preorder ? labels.preorder : labels.soldOut}</span> : null}
                 </div>
                 <div className="slowfit-product-card-body">

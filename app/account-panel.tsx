@@ -1,6 +1,6 @@
 "use client";
 
-import { LockOutlined, LogoutOutlined, ShoppingOutlined, UserOutlined } from "@ant-design/icons";
+import { HeartFilled, LockOutlined, LogoutOutlined, ShoppingOutlined, UserOutlined } from "@ant-design/icons";
 import { Alert, Button, Collapse, Empty, Form, Input, Pagination, Rate, Space, Tabs, Tag, Typography } from "antd";
 import Image from "next/image";
 import Link from "next/link";
@@ -41,6 +41,13 @@ type CustomerReview = {
   moderatedAt: string | null;
 };
 
+type FavoriteProduct = {
+  id: string;
+  handle: string;
+  title: string;
+  images: Array<{ id: string; url: string; altText: string }>;
+};
+
 type AccountPanelProps = {
   locale: Locale;
   resetToken?: string;
@@ -51,6 +58,7 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [reviews, setReviews] = useState<CustomerReview[]>([]);
+  const [favorites, setFavorites] = useState<FavoriteProduct[]>([]);
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewTotal, setReviewTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -68,17 +76,13 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         intro: "Guarda tus datos y consulta el estado de tus pedidos en un solo lugar.",
         login: "Iniciar sesión",
         register: "Crear cuenta",
-        admin: "Administración",
         email: "Correo",
         password: "Contraseña",
         firstName: "Nombre",
         lastName: "Apellido (opcional)",
         submitLogin: "Entrar",
         submitRegister: "Crear mi cuenta",
-        adminToken: "Token de administración",
-        adminSubmit: "Entrar al panel",
         passwordHint: "Usa al menos 8 caracteres.",
-        adminHint: "Acceso reservado para el equipo de Slow Fit.",
         profile: "Tu perfil",
         orders: "Tus pedidos",
         noOrders: "Tus pedidos aparecerán aqui cuando el banco confirme una compra con este correo.",
@@ -88,6 +92,9 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         orderDetails: "Ver artículos",
         reviews: "Tus reseñas",
         noReviews: "Las reseñas enviadas con este correo aparecerán aquí.",
+        favorites: "Favoritos",
+        noFavorites: "Guarda productos desde la tienda para encontrarlos aquí.",
+        removeFavorite: "Quitar de favoritos",
         pending: "Pendiente",
         approved: "Aprobada",
         rejected: "Rechazada",
@@ -116,17 +123,13 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         intro: "Save your details and check your order status in one place.",
         login: "Sign in",
         register: "Create account",
-        admin: "Admin",
         email: "Email",
         password: "Password",
         firstName: "First name",
         lastName: "Last name (optional)",
         submitLogin: "Sign in",
         submitRegister: "Create my account",
-        adminToken: "Admin token",
-        adminSubmit: "Open admin panel",
         passwordHint: "Use at least 8 characters.",
-        adminHint: "Reserved for the Slow Fit team.",
         profile: "Your profile",
         orders: "Your orders",
         noOrders: "Orders will appear here when the payment provider confirms a purchase using this email.",
@@ -136,6 +139,9 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         orderDetails: "View items",
         reviews: "Your reviews",
         noReviews: "Reviews submitted with this email will appear here.",
+        favorites: "Favorites",
+        noFavorites: "Save products from the shop to find them here.",
+        removeFavorite: "Remove favorite",
         pending: "Pending",
         approved: "Approved",
         rejected: "Rejected",
@@ -221,7 +227,9 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
   }
 
   async function loadAccountData() {
-    await Promise.all([loadOrders(), loadReviews()]);
+    const favoritePayload = apiRequest<{ products: FavoriteProduct[] }>("/api/account/favorites")
+      .then((payload) => setFavorites(payload.products || []));
+    await Promise.all([loadOrders(), loadReviews(), favoritePayload]);
   }
 
   useEffect(() => {
@@ -230,14 +238,16 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
       .then(async (payload) => {
         if (!active) return;
         setCustomer(payload.customer);
-        const [orderPayload, reviewPayload] = await Promise.all([
+        const [orderPayload, reviewPayload, favoritePayload] = await Promise.all([
           apiRequest<{ orders: Order[] }>("/api/account/orders"),
           apiRequest<{ reviews: CustomerReview[]; total: number }>("/api/account/reviews?page=1&pageSize=6"),
+          apiRequest<{ products: FavoriteProduct[] }>("/api/account/favorites"),
         ]);
         if (active) {
           setOrders(orderPayload.orders || []);
           setReviews(reviewPayload.reviews || []);
           setReviewTotal(reviewPayload.total || 0);
+          setFavorites(favoritePayload.products || []);
         }
       })
       .catch((requestError) => {
@@ -259,22 +269,11 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         body: JSON.stringify({ ...values, locale }),
       });
       setCustomer(payload.customer);
+      window.dispatchEvent(new Event("slowfit:auth-changed"));
       await loadAccountData();
     } catch (requestError) {
       setError(formatApiError(requestError, locale, { fallback: labels.requestFailed, preserveClientMessage: true }));
     } finally {
-      setLoading(false);
-    }
-  }
-
-  async function submitAdmin(values: { token: string }) {
-    setLoading(true);
-    setError("");
-    try {
-      await apiRequest("/api/admin/login", { method: "POST", body: JSON.stringify(values) });
-      router.push(`/${locale}/admin/reviews`);
-    } catch (requestError) {
-      setError(formatApiError(requestError, locale, { fallback: labels.requestFailed, preserveClientMessage: true }));
       setLoading(false);
     }
   }
@@ -286,6 +285,8 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
       setCustomer(null);
       setOrders([]);
       setReviews([]);
+      setFavorites([]);
+      window.dispatchEvent(new Event("slowfit:auth-changed"));
     } catch (requestError) {
       handleAccountError(requestError);
     }
@@ -336,6 +337,26 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
                   </article>
                 ))}
                 <Space wrap><Link href={`/${locale}/shipping`}>{labels.shipping}</Link><Link href={`/${locale}/returns`}>{labels.returns}</Link></Space>
+              </div>,
+            },
+            {
+              key: "favorites",
+              label: `${labels.favorites} (${favorites.length})`,
+              children: !favorites.length ? <Empty description={labels.noFavorites} /> : <div className="slowfit-account-favorites">
+                {favorites.map((product) => (
+                  <article className="slowfit-account-favorite" key={product.id}>
+                    <Link href={`/${locale}/product/${product.handle}`} className="slowfit-account-favorite-media">
+                      <Image src={product.images[0]?.url || "/slowfit/hero.jpg"} alt={product.images[0]?.altText || product.title}
+                        fill unoptimized sizes="(max-width: 767px) 40vw, 180px" className="slowfit-cover" />
+                    </Link>
+                    <div>
+                      <Link href={`/${locale}/product/${product.handle}`}><Typography.Title level={4}>{product.title}</Typography.Title></Link>
+                      <Button danger type="text" icon={<HeartFilled />} onClick={() => void apiRequest(`/api/account/favorites/${encodeURIComponent(product.id)}`, { method: "DELETE" })
+                        .then(() => setFavorites((current) => current.filter((favorite) => favorite.id !== product.id)))
+                        .catch(handleAccountError)}>{labels.removeFavorite}</Button>
+                    </div>
+                  </article>
+                ))}
               </div>,
             },
             {
@@ -431,17 +452,6 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
                     <Form.Item name="email" label={labels.email} rules={emailRules}><Input prefix={<UserOutlined />} autoComplete="email" /></Form.Item>
                     <Form.Item name="password" label={labels.password} extra={labels.passwordHint} rules={passwordRules}><Input.Password prefix={<LockOutlined />} autoComplete="new-password" /></Form.Item>
                     <Button type="primary" htmlType="submit" loading={loading} block>{labels.submitRegister}</Button>
-                  </Form>
-                ),
-              },
-              {
-                key: "admin",
-                label: labels.admin,
-                children: (
-                  <Form layout="vertical" onFinish={(values) => void submitAdmin(values)}>
-                    <Typography.Paragraph>{labels.adminHint}</Typography.Paragraph>
-                    <Form.Item name="token" label={labels.adminToken} rules={[{ required: true, message: labels.required }]}><Input.Password prefix={<LockOutlined />} autoComplete="off" /></Form.Item>
-                    <Button type="primary" htmlType="submit" loading={loading} block>{labels.adminSubmit}</Button>
                   </Form>
                 ),
               },

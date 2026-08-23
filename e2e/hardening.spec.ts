@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 async function expectKeyboardFocus(page: Page) {
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     await page.keyboard.press("Tab");
     const appHasFocus = await page.evaluate(() => {
       const main = document.querySelector("main");
@@ -37,6 +37,42 @@ test("language switch completes and persists through navigation", async ({ page 
   await page.getByRole("link", { name: "Shop", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/shop$/);
   await expect(page.getByRole("heading", { name: "Activewear designed for training and purposeful living." })).toBeVisible();
+});
+
+test("global navigation exposes public routes and gates admin routes", async ({ page }) => {
+  await page.goto("/en/shop");
+
+  for (const name of ["Home", "Shop", "Collections", "Why SLOW?", "Contact"]) {
+    await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+  }
+  await expect(page.locator('a[href="/en/account"]')).toBeVisible();
+  await expect(page.getByRole("button", { name: /Administration/ })).toHaveCount(0);
+
+  await page.getByRole("button", { name: /Information/ }).click();
+  const publicRoutes = [
+    ["Shipping", "/en/shipping"],
+    ["Returns", "/en/returns"],
+    ["Privacy", "/en/privacy"],
+    ["Terms", "/en/terms"],
+  ];
+  for (const [name, href] of publicRoutes) {
+    await expect(page.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
+  }
+  await page.keyboard.press("Escape");
+
+  const login = await page.context().request.post("/api/admin/login", { data: { token: "e2e-token" } });
+  expect(login.ok()).toBeTruthy();
+  await page.reload();
+
+  await page.getByRole("button", { name: /Administration/ }).click();
+  const adminRoutes = [
+    ["Catalog", "/en/admin/catalog"],
+    ["Reviews", "/en/admin/reviews"],
+    ["Operations", "/en/admin/ops"],
+  ];
+  for (const [name, href] of adminRoutes) {
+    await expect(page.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
+  }
 });
 
 test("account reports API failures without breaking its mobile layout", async ({ page }) => {
