@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 test("catalog admin shows public navigation and pagination", async ({ page }) => {
-  await page.route("**/api/admin/catalog/products**", (route) => route.fulfill({
+  const catalogRequests: string[] = [];
+  await page.route("**/api/admin/catalog/products**", (route) => {
+    catalogRequests.push(route.request().url());
+    return route.fulfill({
     json: {
       products: [{
         id: "catalog-product-1",
@@ -11,7 +14,10 @@ test("catalog admin shows public navigation and pagination", async ({ page }) =>
         status: "ACTIVE",
         published: true,
         preorderEnabled: false,
-        tags: ["training"],
+        tags: ["training", "women"],
+        minPrice: 48,
+        inventoryTotal: 7,
+        metric: { searchImpressions: 12, clicks: 3, unitsSold: 2, revenue: 96 },
         images: [],
         variants: [{
           id: "catalog-variant-1",
@@ -29,9 +35,10 @@ test("catalog admin shows public navigation and pagination", async ({ page }) =>
       total: 101,
       page: 1,
       pageSize: 100,
-      tags: ["training"],
+      tags: ["training", "women"],
     },
-  }));
+    });
+  });
 
   await page.goto("/en/admin/catalog");
 
@@ -40,6 +47,15 @@ test("catalog admin shows public navigation and pagination", async ({ page }) =>
   }
   await expect(page.locator(".ant-pagination-item-1")).toBeVisible();
   await expect(page.locator(".ant-pagination-item-2")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "12" })).toBeVisible();
+
+  await page.getByRole("combobox").first().click();
+  await page.locator(".ant-select-item-option").filter({ hasText: "training" }).click();
+  await page.locator(".ant-select-item-option").filter({ hasText: "women" }).click();
+  await expect.poll(() => catalogRequests.at(-1)).toContain("tag=training&tag=women");
+
+  await page.getByRole("columnheader", { name: "Clicks" }).click();
+  await expect.poll(() => catalogRequests.at(-1)).toContain("sortBy=clicks");
 });
 
 test("moderator session persists across review and operations pages", async ({ page, request }) => {

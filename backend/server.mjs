@@ -611,6 +611,11 @@ const CATALOG_PRODUCT_INCLUDE = {
   variants: { orderBy: { position: "asc" } },
 };
 
+const CATALOG_ADMIN_PRODUCT_INCLUDE = {
+  ...CATALOG_PRODUCT_INCLUDE,
+  metric: true,
+};
+
 const CATALOG_PRODUCT_LIST_INCLUDE = {
   images: { orderBy: { position: "asc" }, take: 1 },
   variants: { orderBy: { position: "asc" } },
@@ -629,6 +634,13 @@ function catalogHandle(value) {
 function serializeCatalogProduct(product) {
   return {
     ...product,
+    minPrice: Number(product.minPrice),
+    ...(product.metric !== undefined ? { metric: product.metric ? { ...product.metric, revenue: Number(product.metric.revenue) } : {
+      searchImpressions: 0,
+      clicks: 0,
+      unitsSold: 0,
+      revenue: 0,
+    } } : {}),
     currencyCode: process.env.STORE_CURRENCY || "USD",
     images: product.images.map((image) => ({ ...image })),
     variants: product.variants.map((variant) => ({
@@ -790,13 +802,20 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
       for (const [variantId, quantity] of inventoryLines) {
         const variant = await transaction.productVariant.findUnique({
           where: { id: variantId },
-          include: { product: { select: { preorderEnabled: true } } },
+          include: { product: { select: { id: true, preorderEnabled: true } } },
         });
         if (!variant) {
           throw new Error("INSUFFICIENT_STOCK_AT_PAYMENT");
         }
         if (variant.inventoryQuantity < quantity) {
-          if (variant.inventoryQuantity === 0 && variant.product.preorderEnabled) continue;
+          if (variant.inventoryQuantity === 0 && variant.product.preorderEnabled) {
+            await transaction.productMetric.upsert({
+              where: { productId: variant.product.id },
+              create: { productId: variant.product.id, unitsSold: quantity, revenue: Number(variant.price) * quantity },
+              update: { unitsSold: { increment: quantity }, revenue: { increment: Number(variant.price) * quantity } },
+            });
+            continue;
+          }
           throw new Error("INSUFFICIENT_STOCK_AT_PAYMENT");
         }
         const adjusted = await transaction.productVariant.updateMany({
@@ -810,6 +829,15 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
           }
           throw new Error("INSUFFICIENT_STOCK_AT_PAYMENT");
         }
+        await transaction.product.update({
+          where: { id: variant.product.id },
+          data: { inventoryTotal: { decrement: quantity } },
+        });
+        await transaction.productMetric.upsert({
+          where: { productId: variant.product.id },
+          create: { productId: variant.product.id, unitsSold: quantity, revenue: Number(variant.price) * quantity },
+          update: { unitsSold: { increment: quantity }, revenue: { increment: Number(variant.price) * quantity } },
+        });
       }
     }, { isolationLevel: "Serializable" });
   }
@@ -902,8 +930,24 @@ async function handleEvent(request) {
     createdAt: payload.createdAt || new Date().toISOString(),
   };
 
+  const productIds = event.eventName === "product_search"
+    ? Array.from(new Set((Array.isArray(event.params.product_ids) ? event.params.product_ids : [])
+      .map((value) => String(value).trim()).filter(Boolean))).slice(0, 100)
+    : event.eventName === "product_click" && event.params.product_id
+      ? [String(event.params.product_id).trim()]
+      : [];
+  if (productIds.length) {
+    const existingProducts = await prisma.product.findMany({ where: { id: { in: productIds } }, select: { id: true } });
+    const field = event.eventName === "product_search" ? "searchImpressions" : "clicks";
+    await prisma.$transaction(existingProducts.map((product) => prisma.productMetric.upsert({
+      where: { productId: product.id },
+      create: { productId: product.id, [field]: 1 },
+      update: { [field]: { increment: 1 } },
+    })));
+  }
+
   await forwardJsonWebhook(process.env.ANALYTICS_WEBHOOK_URL, event);
-  await appendAudit("event.ingested", { eventName, page: event.page, locale: event.locale });
+  await appendAudit("event.ingested", { eventName, page: event.page, locale: event.locale, params: event.params });
   return jsonResponse({ ok: true });
 }
 
@@ -1457,15 +1501,20 @@ async function handleCatalogProducts(request, admin = false) {
   const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
   const pageSize = parsePageSize(url.searchParams.get("pageSize"), 24, 100);
   const search = getTrimmedParam(url, "search");
-  const tag = getTrimmedParam(url, "tag").toLowerCase();
+  const selectedTags = Array.from(new Set(url.searchParams.getAll("tag")
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean))).slice(0, 20);
   const requestedStatus = getTrimmedParam(url, "status").toUpperCase();
+  const sortBy = getTrimmedParam(url, "sortBy");
+  const sortOrder = getTrimmedParam(url, "sortOrder") === "asc" ? "asc" : "desc";
   const where = admin ? {} : { status: "ACTIVE", published: true };
 
   if (admin && ["DRAFT", "ACTIVE", "ARCHIVED"].includes(requestedStatus)) {
     where.status = requestedStatus;
   }
-  if (tag) {
-    where.tags = { has: tag };
+  if (selectedTags.length) {
+    where.tags = { hasEvery: selectedTags };
   }
   if (search) {
     where.OR = [
@@ -1475,12 +1524,20 @@ async function handleCatalogProducts(request, admin = false) {
     ];
   }
 
+  const scalarSortFields = new Set(["title", "status", "inventoryTotal", "minPrice", "updatedAt"]);
+  const metricSortFields = new Set(["searchImpressions", "clicks", "unitsSold", "revenue"]);
+  const orderBy = admin && scalarSortFields.has(sortBy)
+    ? { [sortBy]: sortOrder }
+    : admin && metricSortFields.has(sortBy)
+      ? { metric: { [sortBy]: sortOrder } }
+      : { updatedAt: "desc" };
+
   const [total, products, tagRows] = await Promise.all([
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
-      include: admin ? CATALOG_PRODUCT_INCLUDE : CATALOG_PRODUCT_LIST_INCLUDE,
-      orderBy: { updatedAt: "desc" },
+      include: admin ? CATALOG_ADMIN_PRODUCT_INCLUDE : CATALOG_PRODUCT_LIST_INCLUDE,
+      orderBy,
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
@@ -1517,6 +1574,9 @@ async function handleCreateCatalogProduct(request) {
         published: input.published,
         preorderEnabled: input.preorderEnabled,
         tags: input.tags,
+        minPrice: Math.min(...input.variants.map((variant) => variant.price)),
+        inventoryTotal: input.variants.reduce((total, variant) => total + variant.inventoryQuantity, 0),
+        metric: { create: {} },
         variants: { create: input.variants.map((variant) => ({
           title: variant.title,
           size: variant.size,
@@ -1534,7 +1594,7 @@ async function handleCreateCatalogProduct(request) {
           position: image.position,
         })) },
       },
-      include: CATALOG_PRODUCT_INCLUDE,
+      include: CATALOG_ADMIN_PRODUCT_INCLUDE,
     });
     await appendAudit("catalog.product.created", { productId: product.id, handle: product.handle }, "catalog-admin");
     return jsonResponse({ product: serializeCatalogProduct(product) }, 201);
@@ -1595,9 +1655,11 @@ async function handleUpdateCatalogProduct(request, productId) {
           published: input.published,
           preorderEnabled: input.preorderEnabled,
           tags: input.tags,
+          minPrice: Math.min(...input.variants.map((variant) => variant.price)),
+          inventoryTotal: input.variants.reduce((total, variant) => total + variant.inventoryQuantity, 0),
         },
       });
-      return transaction.product.findUnique({ where: { id: productId }, include: CATALOG_PRODUCT_INCLUDE });
+      return transaction.product.findUnique({ where: { id: productId }, include: CATALOG_ADMIN_PRODUCT_INCLUDE });
     });
     if (!product) {
       return jsonResponse({ error: "Not found" }, 404);

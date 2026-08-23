@@ -59,11 +59,17 @@ async function importProduct(product) {
     create: {
       handle: product.handle,
       ...data,
+      minPrice: Math.min(...variants.map((variant) => variant.price)),
+      inventoryTotal: 0,
+      metric: { create: {} },
       variants: { create: variants },
       images: { create: images },
     },
     update: {
       ...data,
+      minPrice: Math.min(...variants.map((variant) => variant.price)),
+      inventoryTotal: 0,
+      metric: { upsert: { create: {}, update: {} } },
       variants: { deleteMany: {}, create: variants },
       images: { deleteMany: {}, create: images },
     },

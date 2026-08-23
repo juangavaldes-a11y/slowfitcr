@@ -131,6 +131,7 @@ test("admins manage internal products and customers filter the active catalog", 
       handle: "hidden-training-tee",
       status: "ACTIVE",
       tags: ["clearance"],
+      metric: { create: {} },
       variants: { create: { title: "M", price: 44, inventoryQuantity: 5 } },
     },
   });
@@ -144,6 +145,17 @@ test("admins manage internal products and customers filter the active catalog", 
   const adminFilteredResponse = await route(request("/api/admin/catalog/products?tag=training&pageSize=1", { headers: { Cookie: cookie } }));
   const adminFiltered = await json(adminFilteredResponse);
   assert.deepEqual(adminFiltered.tags, ["clearance", "training", "women"]);
+
+  const multiTagResponse = await route(request("/api/admin/catalog/products?tag=training&tag=women", { headers: { Cookie: cookie } }));
+  const multiTag = await json(multiTagResponse);
+  assert.equal(multiTag.total, 1);
+  assert.equal(multiTag.products[0].id, created.id);
+
+  await prisma.productMetric.update({ where: { productId: created.id }, data: { clicks: 4 } });
+  const sortedByPrice = await json(await route(request("/api/admin/catalog/products?sortBy=minPrice&sortOrder=desc", { headers: { Cookie: cookie } })));
+  assert.equal(sortedByPrice.products[0].id, created.id);
+  const sortedByClicks = await json(await route(request("/api/admin/catalog/products?sortBy=clicks&sortOrder=desc", { headers: { Cookie: cookie } })));
+  assert.equal(sortedByClicks.products[0].metric.clicks, 4);
 
   const updateResponse = await route(request(`/api/admin/catalog/products/${created.id}`, {
     method: "PUT",
@@ -505,6 +517,8 @@ test("payment webhooks expose order status to the matching customer", async () =
       title: "Performance Top",
       handle: "performance-top",
       status: "ACTIVE",
+      inventoryTotal: 2,
+      minPrice: 79,
       variants: { create: { title: "M", price: 79, inventoryQuantity: 2 } },
     },
     include: { variants: true },
@@ -549,6 +563,8 @@ test("payment webhooks expose order status to the matching customer", async () =
   assert.equal(ordersPayload.orders[0].financialStatus, "paid");
   assert.equal(ordersPayload.orders[0].fulfillmentStatus, "unfulfilled");
   assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 1);
+  assert.equal((await prisma.product.findUnique({ where: { id: product.id } })).inventoryTotal, 1);
+  assert.equal((await prisma.productMetric.findUnique({ where: { productId: product.id } })).unitsSold, 1);
 
   const secondDeliveryBody = JSON.stringify({
     ...JSON.parse(body),
@@ -569,6 +585,7 @@ test("payment webhooks expose order status to the matching customer", async () =
   }));
   assert.equal(secondDelivery.status, 200);
   assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 1);
+  assert.equal((await prisma.productMetric.findUnique({ where: { productId: product.id } })).unitsSold, 1);
 });
 
 test("paid payment rolls back the order when inventory is no longer available", async () => {
@@ -709,6 +726,21 @@ test("contact and analytics endpoints validate and persist accepted payloads", a
   }));
   assert.equal(event.status, 200);
   assert.equal(await prisma.auditLog.count(), 2);
+
+  const product = await prisma.product.create({ data: { title: "Metric Tee", handle: "metric-tee" } });
+  await route(request("/api/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ eventName: "product_search", params: { product_ids: [product.id], search_term: "tee" } }),
+  }));
+  await route(request("/api/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ eventName: "product_click", params: { product_id: product.id } }),
+  }));
+  const metric = await prisma.productMetric.findUnique({ where: { productId: product.id } });
+  assert.equal(metric.searchImpressions, 1);
+  assert.equal(metric.clicks, 1);
 });
 
 test("outbound webhooks retry transient failures and include HMAC headers", async () => {

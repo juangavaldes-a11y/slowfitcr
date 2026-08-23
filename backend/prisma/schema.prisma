@@ -33,12 +33,33 @@ model Product {
   published   Boolean         @default(false)
   preorderEnabled Boolean     @default(false)
   tags        String[]        @default([])
+  minPrice    Decimal         @default(0) @db.Decimal(12, 2)
+  inventoryTotal Int          @default(0)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   variants    ProductVariant[]
   images      ProductImage[]
+  metric      ProductMetric?
 
   @@index([status, updatedAt])
+  @@index([title])
+  @@index([minPrice])
+  @@index([inventoryTotal])
+  @@index([tags], type: Gin)
+}
+
+model ProductMetric {
+  productId         String   @id
+  searchImpressions Int      @default(0)
+  clicks            Int      @default(0)
+  unitsSold         Int      @default(0)
+  revenue           Decimal  @default(0) @db.Decimal(14, 2)
+  updatedAt         DateTime @updatedAt
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([searchImpressions])
+  @@index([clicks])
+  @@index([unitsSold])
 }
 
 model ProductVariant {

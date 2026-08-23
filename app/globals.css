@@ -9,6 +9,18 @@
   width: 100%;
 }
 
+.slowfit-admin-search-controls {
+  width: 100%;
+}
+
+.slowfit-admin-search-controls .ant-input-group-wrapper {
+  flex: 1 1 55%;
+}
+
+.slowfit-admin-search-controls .ant-select {
+  min-width: 220px;
+}
+
 .slowfit-full-width {
   width: 100%;
 }
@@ -42,6 +54,10 @@
 @media (max-width: 767px) {
   .slowfit-admin-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .slowfit-admin-search-controls .ant-select {
+    min-width: 44%;
   }
 
   .slowfit-shop-filters {

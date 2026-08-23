@@ -56,6 +56,9 @@ type CatalogProduct = {
   published: boolean;
   preorderEnabled: boolean;
   tags: string[];
+  minPrice: number;
+  inventoryTotal: number;
+  metric: { searchImpressions: number; clicks: number; unitsSold: number; revenue: number };
   images: CatalogImage[];
   variants: CatalogVariant[];
   updatedAt: string;
@@ -76,8 +79,10 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
-  const [tag, setTag] = useState("all");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState("updatedAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [editing, setEditing] = useState<CatalogProduct | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -98,6 +103,10 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     preorder: "Permitir preventa sin inventario",
     stock: "Inventario",
     price: "Precio",
+    searches: "Busquedas",
+    clicks: "Clics",
+    sold: "Vendidos",
+    revenue: "Ingresos",
     actions: "Acciones",
     draft: "Borrador",
     active: "Activo",
@@ -148,6 +157,10 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     preorder: "Allow preorder without inventory",
     stock: "Inventory",
     price: "Price",
+    searches: "Searches",
+    clicks: "Clicks",
+    sold: "Sold",
+    revenue: "Revenue",
     actions: "Actions",
     draft: "Draft",
     active: "Active",
@@ -183,13 +196,21 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     total: (count: number) => `${count} products`,
   }, [locale]);
 
-  const loadProducts = async (requestedPage = page, requestedStatus = status, requestedTag = tag) => {
+  const loadProducts = async (
+    requestedPage = page,
+    requestedStatus = status,
+    requestedTags = selectedTags,
+    requestedSortBy = sortBy,
+    requestedSortOrder = sortOrder,
+  ) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(requestedPage), pageSize: "100" });
       if (search.trim()) params.set("search", search.trim());
       if (requestedStatus !== "all") params.set("status", requestedStatus);
-      if (requestedTag !== "all") params.set("tag", requestedTag);
+      requestedTags.forEach((tag) => params.append("tag", tag));
+      params.set("sortBy", requestedSortBy);
+      params.set("sortOrder", requestedSortOrder);
       const payload = await apiRequest<{ products: CatalogProduct[]; total: number; page: number; tags: string[] }>(`/api/admin/catalog/products?${params}`);
       setProducts(payload.products);
       setPage(payload.page);
@@ -328,6 +349,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     {
       title: labels.product,
       key: "product",
+      sorter: true,
+      sortOrder: sortBy === "title" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
       render: (_, product) => (
         <Space>
           {product.images[0] ? <Image src={product.images[0].url} alt={product.images[0].altText} width={54} height={54} preview={false} /> : null}
@@ -342,6 +365,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       title: labels.status,
       key: "status",
       width: 240,
+      sorter: true,
+      sortOrder: sortBy === "status" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
       render: (_, product) => (
         <Space wrap size={[4, 4]}>
           <Tag color={product.status === "ACTIVE" ? "green" : product.status === "DRAFT" ? "gold" : "default"}>{product.status}</Tag>
@@ -352,16 +377,51 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     },
     {
       title: labels.stock,
+      key: "inventoryTotal",
       width: 100,
-      render: (_, product) => product.variants.reduce((total, variant) => total + variant.inventoryQuantity, 0),
+      sorter: true,
+      sortOrder: sortBy === "inventoryTotal" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
+      render: (_, product) => product.inventoryTotal,
     },
     {
       title: labels.price,
+      key: "minPrice",
       width: 130,
-      render: (_, product) => {
-        const lowest = Math.min(...product.variants.map((variant) => variant.price));
-        return new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: "USD" }).format(lowest);
-      },
+      sorter: true,
+      sortOrder: sortBy === "minPrice" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
+      render: (_, product) => new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: "USD" }).format(product.minPrice),
+    },
+    {
+      title: labels.searches,
+      key: "searchImpressions",
+      width: 110,
+      sorter: true,
+      sortOrder: sortBy === "searchImpressions" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
+      render: (_, product) => product.metric.searchImpressions,
+    },
+    {
+      title: labels.clicks,
+      key: "clicks",
+      width: 90,
+      sorter: true,
+      sortOrder: sortBy === "clicks" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
+      render: (_, product) => product.metric.clicks,
+    },
+    {
+      title: labels.sold,
+      key: "unitsSold",
+      width: 90,
+      sorter: true,
+      sortOrder: sortBy === "unitsSold" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
+      render: (_, product) => product.metric.unitsSold,
+    },
+    {
+      title: labels.revenue,
+      key: "revenue",
+      width: 130,
+      sorter: true,
+      sortOrder: sortBy === "revenue" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
+      render: (_, product) => new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: "USD" }).format(product.metric.revenue),
     },
     {
       title: labels.actions,
@@ -383,28 +443,35 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       {contextHolder}
       <Space orientation="vertical" size={20} className="slowfit-admin-catalog">
         <Space wrap className="slowfit-admin-toolbar">
-          <Input.Search value={search} onChange={(event) => setSearch(event.target.value)} onSearch={() => void loadProducts(1)}
-            placeholder={labels.search} allowClear />
+          <Space.Compact className="slowfit-admin-search-controls">
+            <Input.Search value={search} onChange={(event) => setSearch(event.target.value)} onSearch={() => void loadProducts(1)}
+              placeholder={labels.search} allowClear />
+            <Select mode="multiple" allowClear showSearch maxTagCount="responsive" value={selectedTags}
+              onChange={(values) => { setSelectedTags(values); void loadProducts(1, status, values); }} placeholder={labels.allTags}
+              options={availableTags.map((value) => ({ value, label: value }))} />
+          </Space.Compact>
           <Select value={status} onChange={(value) => { setStatus(value); void loadProducts(1, value); }} options={[
             { value: "all", label: labels.allStatuses },
             { value: "ACTIVE", label: labels.active },
             { value: "DRAFT", label: labels.draft },
             { value: "ARCHIVED", label: labels.archived },
           ]} />
-          <Select value={tag} onChange={(value) => { setTag(value); void loadProducts(1, status, value); }} options={[
-            { value: "all", label: labels.allTags },
-            ...availableTags.map((value) => ({ value, label: value })),
-          ]} />
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{labels.create}</Button>
         </Space>
         <Spin spinning={loading}>
-          {products.length ? <Table rowKey="id" columns={columns} dataSource={products} scroll={{ x: 760 }} pagination={{
+          {products.length ? <Table rowKey="id" columns={columns} dataSource={products} scroll={{ x: 1360 }} onChange={(pagination, _filters, sorter) => {
+            const activeSorter = Array.isArray(sorter) ? sorter[0] : sorter;
+            const nextSortBy = activeSorter?.order ? String(activeSorter.columnKey) : "updatedAt";
+            const nextSortOrder = activeSorter?.order === "ascend" ? "asc" : "desc";
+            setSortBy(nextSortBy);
+            setSortOrder(nextSortOrder);
+            void loadProducts(pagination.current || 1, status, selectedTags, nextSortBy, nextSortOrder);
+          }} pagination={{
             current: page,
             pageSize: 100,
             total,
             showSizeChanger: false,
             showTotal: labels.total,
-            onChange: (nextPage) => void loadProducts(nextPage),
           }} /> : <Empty description={labels.empty} />}
         </Spin>
       </Space>

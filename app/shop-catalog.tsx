@@ -5,6 +5,7 @@ import { Alert, Button, Empty, Input, Select, Space, Tag } from "antd";
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { trackEvent } from "./lib/analytics";
 import type { CatalogProduct } from "./lib/catalog";
 
 type CatalogApiProduct = Omit<CatalogProduct, "image" | "price" | "compareAtPrice" | "collectionTitle">;
@@ -35,7 +36,7 @@ export default function ShopCatalog({
   initialTag?: string;
 }) {
   const [search, setSearch] = useState("");
-  const [tag, setTag] = useState(initialTag);
+  const [selectedTags, setSelectedTags] = useState(initialTag === "all" ? [] : [initialTag]);
   const [catalogProducts, setCatalogProducts] = useState(products);
   const [total, setTotal] = useState(initialTotal);
   const [page, setPage] = useState(1);
@@ -58,7 +59,7 @@ export default function ShopCatalog({
     setLoadError(false);
     const params = new URLSearchParams({ page: String(nextPage), pageSize: String(pageSize) });
     if (deferredSearch) params.set("search", deferredSearch);
-    if (tag !== "all") params.set("tag", tag);
+    selectedTags.forEach((tag) => params.append("tag", tag));
 
     try {
       const response = await fetch(`/api/catalog/products?${params}`);
@@ -69,12 +70,20 @@ export default function ShopCatalog({
       setCatalogProducts((current) => replace ? nextProducts : [...current, ...nextProducts]);
       setTotal(payload.total);
       setPage(payload.page);
+      if (deferredSearch || selectedTags.length) {
+        trackEvent("product_search", {
+          search_term: deferredSearch,
+          tags: selectedTags,
+          product_ids: nextProducts.map((product) => product.id),
+          result_count: payload.total,
+        });
+      }
     } catch {
       if (requestId === requestSequence.current) setLoadError(true);
     } finally {
       if (requestId === requestSequence.current) setLoading(false);
     }
-  }, [deferredSearch, pageSize, tag]);
+  }, [deferredSearch, pageSize, selectedTags]);
 
   useEffect(() => {
     if (initialRender.current) {
@@ -88,8 +97,7 @@ export default function ShopCatalog({
     <>
       <Space wrap className="slowfit-shop-filters">
         <Input prefix={<SearchOutlined />} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={labels.search} allowClear />
-        <Select value={tag} onChange={setTag} options={[
-          { value: "all", label: labels.all },
+        <Select mode="multiple" allowClear showSearch value={selectedTags} onChange={setSelectedTags} placeholder={labels.all} options={[
           ...tags.map((value) => ({ value, label: value })),
         ]} />
       </Space>
@@ -114,7 +122,8 @@ export default function ShopCatalog({
                     <span className="slowfit-product-price">{money.format(product.price)}</span>
                     {product.compareAtPrice ? <span className="slowfit-product-compare-price">{money.format(product.compareAtPrice)}</span> : null}
                   </div>
-                  <Link className="ant-btn slowfit-block-cta" href={`/${locale}/product/${product.handle}`}>{labels.view}</Link>
+                  <Link className="ant-btn slowfit-block-cta" href={`/${locale}/product/${product.handle}`}
+                    onClick={() => trackEvent("product_click", { product_id: product.id, product_handle: product.handle })}>{labels.view}</Link>
                 </div>
               </article>
             );

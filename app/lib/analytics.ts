@@ -6,7 +6,7 @@ declare global {
   }
 }
 
-export function trackEvent(eventName: string, params: Record<string, string | number | boolean> = {}) {
+export function trackEvent(eventName: string, params: Record<string, string | number | boolean | string[]> = {}) {
   if (typeof window === "undefined") {
     return;
   }
