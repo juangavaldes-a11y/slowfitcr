@@ -1,7 +1,7 @@
 "use client";
 
-import { HeartFilled, HeartOutlined, SearchOutlined } from "@ant-design/icons";
-import { Alert, Button, Checkbox, Empty, Input, Segmented, Select, Space, Tag, Tooltip } from "antd";
+import { HeartFilled, HeartOutlined, SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { Alert, Button, Checkbox, Empty, Input, Modal, Segmented, Select, Space, Tag, Tooltip } from "antd";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,6 +9,7 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { trackEvent } from "./lib/analytics";
 import { apiRequest, isApiErrorStatus } from "./lib/api-client";
 import type { CatalogProduct } from "./lib/catalog";
+import ProductPurchase from "./product-purchase";
 
 type CatalogApiProduct = Omit<CatalogProduct, "image" | "price" | "compareAtPrice" | "collectionTitle">;
 
@@ -48,6 +49,7 @@ export default function ShopCatalog({
   const [loadError, setLoadError] = useState(false);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [favoriteLoadingId, setFavoriteLoadingId] = useState("");
+  const [quickAddProduct, setQuickAddProduct] = useState<CatalogProduct | null>(null);
   const requestSequence = useRef(0);
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
   const tags = useMemo(() => Array.from(new Set([
@@ -56,8 +58,8 @@ export default function ShopCatalog({
   ])).sort(), [catalogProducts, initialTag]);
   const selectedGender = selectedTags.find((tag) => tag === "men" || tag === "women") || "all";
   const labels = locale === "es"
-    ? { search: "Buscar productos", all: "Escribe una o varias etiquetas", everyone: "Todo", men: "Hombre", women: "Mujer", empty: "No encontramos productos con estos filtros.", view: "Ver producto", soldOut: "Agotado", preorder: "Preventa", preorderOnly: "Solo preventa", favorite: "Guardar favorito", unfavorite: "Quitar de favoritos", loadMore: "Cargar más", error: "No pudimos cargar los productos." }
-    : { search: "Search products", all: "Type one or more tags", everyone: "All", men: "Men", women: "Women", empty: "No products match these filters.", view: "View product", soldOut: "Sold out", preorder: "Pre-order", preorderOnly: "Pre-order only", favorite: "Save favorite", unfavorite: "Remove favorite", loadMore: "Load more", error: "We could not load the products." };
+    ? { search: "Buscar productos", all: "Escribe una o varias etiquetas", everyone: "Todo", men: "Hombre", women: "Mujer", empty: "No encontramos productos con estos filtros.", view: "Ver", quickAdd: "Agregar", quickAddTitle: "Agregar al carrito", soldOut: "Agotado", preorder: "Preventa", preorderOnly: "Solo preventa", favorite: "Guardar favorito", unfavorite: "Quitar de favoritos", loadMore: "Cargar más", error: "No pudimos cargar los productos." }
+    : { search: "Search products", all: "Type one or more tags", everyone: "All", men: "Men", women: "Women", empty: "No products match these filters.", view: "View", quickAdd: "Add", quickAddTitle: "Add to cart", soldOut: "Sold out", preorder: "Pre-order", preorderOnly: "Pre-order only", favorite: "Save favorite", unfavorite: "Remove favorite", loadMore: "Load more", error: "We could not load the products." };
 
   const loadPage = useCallback(async (nextPage: number, replace: boolean) => {
     const requestId = ++requestSequence.current;
@@ -150,13 +152,19 @@ export default function ShopCatalog({
             const available = product.variants.some((variant) => variant.availableForSale);
             const preorder = product.variants.some((variant) => variant.preorder);
             const money = new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: product.currencyCode });
+            const detailHref = `/${locale}/product/${product.handle}`;
             return (
               <article key={product.id} className="slowfit-product-card">
+                <Link className="slowfit-product-card-link" href={detailHref} aria-label={`${labels.view}: ${product.title}`}
+                  onClick={() => trackEvent("product_click", { product_id: product.id, product_handle: product.handle })} />
                 <div className="slowfit-product-card-media">
                   <Image src={product.image} alt={product.images[0]?.altText || product.title} fill priority={index === 0} unoptimized sizes="(max-width: 767px) 100vw, (max-width: 991px) 50vw, 33vw" className="slowfit-cover" />
                   <Tooltip title={favoriteIds.has(product.id) ? labels.unfavorite : labels.favorite}>
                     <Button className="slowfit-favorite-button" type="text" shape="circle" loading={favoriteLoadingId === product.id}
-                      icon={favoriteIds.has(product.id) ? <HeartFilled /> : <HeartOutlined />} onClick={() => void toggleFavorite(product.id)}
+                      icon={favoriteIds.has(product.id) ? <HeartFilled /> : <HeartOutlined />} onClick={(event) => {
+                        event.stopPropagation();
+                        void toggleFavorite(product.id);
+                      }}
                       aria-label={favoriteIds.has(product.id) ? labels.unfavorite : labels.favorite} />
                   </Tooltip>
                   {!available || preorder ? <span className="slowfit-stock-badge">{preorder ? labels.preorder : labels.soldOut}</span> : null}
@@ -169,8 +177,12 @@ export default function ShopCatalog({
                     <span className="slowfit-product-price">{money.format(product.price)}</span>
                     {product.compareAtPrice ? <span className="slowfit-product-compare-price">{money.format(product.compareAtPrice)}</span> : null}
                   </div>
-                  <Link className="ant-btn slowfit-block-cta" href={`/${locale}/product/${product.handle}`}
-                    onClick={() => trackEvent("product_click", { product_id: product.id, product_handle: product.handle })}>{labels.view}</Link>
+                  <div className="slowfit-product-card-actions">
+                    <Button type="primary" icon={<ShoppingCartOutlined />} disabled={!available && !preorder}
+                      aria-label={`${labels.quickAdd}: ${product.title}`} onClick={() => setQuickAddProduct(product)}>{labels.quickAdd}</Button>
+                    <Link className="ant-btn slowfit-product-detail-link" href={detailHref}
+                      onClick={() => trackEvent("product_click", { product_id: product.id, product_handle: product.handle })}>{labels.view}</Link>
+                  </div>
                 </div>
               </article>
             );
@@ -182,6 +194,10 @@ export default function ShopCatalog({
           <Button loading={loading} onClick={() => void loadPage(page + 1, false)}>{labels.loadMore}</Button>
         </div>
       ) : null}
+      <Modal title={quickAddProduct ? `${labels.quickAddTitle}: ${quickAddProduct.title}` : labels.quickAddTitle}
+        open={Boolean(quickAddProduct)} onCancel={() => setQuickAddProduct(null)} footer={null} destroyOnHidden>
+        {quickAddProduct ? <ProductPurchase locale={locale} product={quickAddProduct} hideSingleColor /> : null}
+      </Modal>
     </>
   );
 }

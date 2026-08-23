@@ -20,6 +20,7 @@ type Variant = {
 
 type ProductPurchaseProps = {
   locale: "es" | "en";
+  hideSingleColor?: boolean;
   product: {
     id: string;
     handle: string;
@@ -29,7 +30,7 @@ type ProductPurchaseProps = {
   };
 };
 
-export default function ProductPurchase({ locale, product }: ProductPurchaseProps) {
+export default function ProductPurchase({ locale, product, hideSingleColor = false }: ProductPurchaseProps) {
   const { addLine } = useCart();
   const [variantId, setVariantId] = useState(product.variants[0]?.id ?? "");
   const [color, setColor] = useState(product.variants[0]?.color || "");
@@ -104,7 +105,7 @@ export default function ProductPurchase({ locale, product }: ProductPurchaseProp
 
   return (
     <Space orientation="vertical" size={14} className="slowfit-product-purchase">
-      {colors.length ? (
+      {colors.length && (!hideSingleColor || colors.length > 1) ? (
         <>
           <Typography.Text>{labels.color}: {locale === "es" ? getProductColor(color)?.labelEs || color : getProductColor(color)?.labelEn || color}</Typography.Text>
           <div className="slowfit-color-options">

@@ -237,6 +237,20 @@ def category_for(name: str) -> str:
     return next((category for needle, category in categories if needle in value), "activewear")
 
 
+def gender_tags_for(source_file: str) -> list[str]:
+    if source_file == "260228Unisex Daily-MIGE SPORTS.pdf":
+        return ["men", "women"]
+    if source_file == "260714MIGE SPORTS - MEN.pdf":
+        return ["men"]
+    if source_file in {
+        "260728Seamless - MIGE SPORTS.pdf",
+        "260813Non-Seamless - MIGE SPORTS.pdf",
+        "MATCHING SET - Non-Seamless - MIGE SPORTS.pdf",
+    }:
+        return ["women"]
+    raise ValueError(f"Unknown catalog gender for source document: {source_file}")
+
+
 def enhanced_description(name: str, material: str, sizes: list[str], sku: str) -> str:
     value = name.casefold()
     if " & " in name or " set" in value or "pcs" in value:
@@ -347,7 +361,7 @@ def build_product(
                 "altText": title,
             })
 
-    tags = ["pdf-import", "mige-sports", category]
+    tags = ["pdf-import", "mige-sports", category, *gender_tags_for(source.pdf_path.name)]
     if price == 0:
         tags.append("price-review")
     if sizes == ["Size pending"]:

@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { PrismaClient } from "@prisma/client";
+import { mergeCatalogGenderTags } from "./catalog-gender.mjs";
 
 const prisma = new PrismaClient();
 const defaultManifestUrl = new URL("../data/catalog-products.json", import.meta.url);
@@ -35,7 +36,7 @@ async function importProduct(product) {
     status: "DRAFT",
     published: false,
     preorderEnabled: false,
-    tags: product.tags,
+    tags: mergeCatalogGenderTags(product.tags, product.source?.file),
   };
   const variants = product.variants.map((variant, position) => ({
     title: variant.title,

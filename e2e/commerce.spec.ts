@@ -39,6 +39,65 @@ test("shop refreshes after hydration and shows active preorder products", async 
   await expect(page.getByText("Pre-order", { exact: true })).toBeVisible();
 });
 
+test("shop card opens product details and supports quick add", async ({ page }) => {
+  await page.route("**/api/catalog/products?**", (route) => route.fulfill({
+    json: {
+      products: [{
+        id: "quick-add-product",
+        handle: "quick-add-leggings",
+        title: "Quick Add Leggings",
+        description: "Training leggings with color and size options.",
+        status: "ACTIVE",
+        published: true,
+        preorderEnabled: false,
+        currencyCode: "USD",
+        tags: ["women", "leggings"],
+        images: [{ id: "quick-add-image", url: "https://images.example.com/leggings.jpg", altText: "Blue leggings" }],
+        variants: [
+          { id: "black-small", title: "S / Black", size: "S", color: "Black", colorHex: "#111111", price: 42, compareAtPrice: null, inventoryQuantity: 3, currencyCode: "USD", availableForSale: true, preorder: false },
+          { id: "blue-medium", title: "M / Blue", size: "M", color: "Blue", colorHex: "#3267A8", price: 44, compareAtPrice: null, inventoryQuantity: 3, currencyCode: "USD", availableForSale: true, preorder: false },
+        ],
+      }, {
+        id: "single-color-product",
+        handle: "single-color-shorts",
+        title: "Single Color Shorts",
+        description: "Training shorts available in one color.",
+        status: "ACTIVE",
+        published: true,
+        preorderEnabled: false,
+        currencyCode: "USD",
+        tags: ["women", "shorts"],
+        images: [{ id: "single-color-image", url: "https://images.example.com/shorts.jpg", altText: "Olive shorts" }],
+        variants: [
+          { id: "olive-small", title: "S / Olive", size: "S", color: "Olive", colorHex: "#74734A", price: 36, compareAtPrice: null, inventoryQuantity: 3, currencyCode: "USD", availableForSale: true, preorder: false },
+        ],
+      }],
+      total: 2,
+      page: 1,
+      pageSize: 24,
+    },
+  }));
+
+  await page.goto("/en/shop");
+  await page.getByRole("button", { name: "Add: Quick Add Leggings", exact: true }).click();
+  await expect(page).toHaveURL(/\/en\/shop$/);
+  await expect(page.getByRole("dialog", { name: /Add to cart: Quick Add Leggings/ })).toBeVisible();
+  await page.getByRole("button", { name: "Blue", exact: true }).click();
+  await expect(page.getByText("M - $44.00", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Add to cart", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Cart (1)" })).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("button", { name: "Add: Single Color Shorts", exact: true }).click();
+  const singleColorDialog = page.getByRole("dialog", { name: /Add to cart: Single Color Shorts/ });
+  await expect(singleColorDialog.getByText(/^Color:/)).toHaveCount(0);
+  await expect(singleColorDialog.getByText("Size", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Close" }).click();
+
+  await page.getByRole("link", { name: "View: Quick Add Leggings", exact: true }).click();
+  await expect(page).toHaveURL(/\/en\/product\/quick-add-leggings$/);
+});
+
 test("customer can add an internal product to cart and request payment", async ({ page, request }) => {
   const login = await request.post("/api/admin/login", { data: { token: "e2e-token" } });
   expect(login.ok()).toBeTruthy();

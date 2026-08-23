@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "catalog:import": "node scripts/import-catalog.mjs",
+    "catalog:tag-gender": "node scripts/tag-catalog-gender.mjs",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
     "test": "node --experimental-test-coverage --test-coverage-lines=80 --test test/*.test.mjs",

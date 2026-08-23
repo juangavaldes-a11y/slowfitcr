@@ -722,8 +722,7 @@ a {
   margin-top: auto;
 }
 
-.slowfit-shop-card .slowfit-block-cta.ant-btn,
-.slowfit-product-card .slowfit-block-cta.ant-btn {
+.slowfit-shop-card .slowfit-block-cta.ant-btn {
   width: 100%;
   min-width: 0;
 }
@@ -916,12 +915,32 @@ a {
 }
 
 .slowfit-product-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   border: 1px solid rgba(47, 42, 40, 0.08);
   border-radius: 24px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.slowfit-product-card:hover {
+  border-color: rgba(47, 42, 40, 0.2);
+  box-shadow: 0 14px 30px rgba(47, 42, 40, 0.1);
+  transform: translateY(-2px);
+}
+
+.slowfit-product-card:focus-within {
+  outline: 3px solid #176b5b;
+  outline-offset: 3px;
+}
+
+.slowfit-product-card-link {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
 }
 
 .slowfit-product-card-media {
@@ -935,6 +954,32 @@ a {
   flex-direction: column;
   gap: 10px;
   padding: 20px;
+}
+
+.slowfit-product-card-actions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.slowfit-product-card-actions .ant-btn {
+  min-height: 40px;
+}
+
+.slowfit-product-detail-link.ant-btn {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  min-width: 0;
+  min-height: 40px;
+  padding-inline: 14px;
+  border-color: rgba(47, 42, 40, 0.18);
+  background: transparent;
+  color: var(--foreground);
 }
 
 .slowfit-account-favorites {

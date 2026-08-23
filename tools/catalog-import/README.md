@@ -17,3 +17,14 @@ The import is idempotent for products tagged `pdf-import` and refuses to overwri
 - `inventoryQuantity: 0`
 
 Prices are the supplier sample prices shown in the PDFs, not approved retail prices. Records tagged `price-review` or `size-review` need manual completion before publication. Every imported product should be reviewed for title, description, price, color, fit, and imagery before its publication flag is enabled.
+
+## Gender tags for existing catalogs
+
+The source documents assign `men` to the men's catalog, `women` to the three women's catalogs, and both tags to the unisex catalog. To classify an existing database without resetting reviewed product data, run:
+
+```bash
+npm --prefix backend run catalog:tag-gender
+npm --prefix backend run catalog:tag-gender -- --apply
+```
+
+The first command is a dry run. The apply command updates only the `tags` field and preserves publication status, preorder settings, variants, prices, inventory, and images. Set `DATABASE_URL` to the intended environment before running either command.
