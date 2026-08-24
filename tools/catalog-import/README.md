@@ -6,8 +6,12 @@ The extractor converts the five Mige Sports PDFs in `reference/` into hidden dra
 python -m pip install --user -r tools/catalog-import/requirements.txt
 python tools/catalog-import/extract_catalog.py
 npm --prefix backend run catalog:import -- --dry-run
+npm --prefix backend run catalog:upload-images -- --dry-run
+npm --prefix backend run catalog:upload-images
 npm --prefix backend run catalog:import
 ```
+
+The extractor matches each PDF page to its supplier product code and retains up to ten product images per code. The upload command sends those WebP files to Cloudflare R2, skips objects already present, and updates the manifest with their public R2 URLs. Configure the five `R2_*` values in `.env.docker` before running the upload.
 
 The import is idempotent for products tagged `pdf-import` and refuses to overwrite other products. Imported products always use these defaults:
 
