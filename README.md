@@ -100,7 +100,7 @@ Create a `.env.local` file and configure:
 PAYMENT_PROVIDER_URL=https://payments.example.com/session
 PAYMENT_PROVIDER_TOKEN=set-a-provider-token
 PAYMENT_WEBHOOK_SECRET=set-a-long-random-secret
-STORE_CURRENCY=USD
+STORE_CURRENCY=CRC
 
 # Internal product media (Cloudflare R2)
 R2_ACCOUNT_ID=your-cloudflare-account-id
@@ -164,7 +164,7 @@ OUTBOUND_WEBHOOK_SECRET=set-a-long-random-secret
 PAYMENT_PROVIDER_URL=https://payments.example.com/session
 PAYMENT_PROVIDER_TOKEN=set-a-provider-token
 PAYMENT_WEBHOOK_SECRET=set-a-long-random-secret
-STORE_CURRENCY=USD
+STORE_CURRENCY=CRC
 R2_ACCOUNT_ID=your-cloudflare-account-id
 R2_ACCESS_KEY_ID=your-r2-access-key
 R2_SECRET_ACCESS_KEY=your-r2-secret

@@ -1,4 +1,5 @@
 import "server-only";
+import { getProductPresentation } from "./product-presentation";
 
 export type CatalogVariant = {
   id: string;
@@ -31,9 +32,10 @@ export type CatalogProduct = {
   price: number;
   compareAtPrice?: number;
   collectionTitle: string;
+  supplierReference: string | null;
 };
 
-type CatalogApiProduct = Omit<CatalogProduct, "image" | "price" | "compareAtPrice" | "collectionTitle">;
+type CatalogApiProduct = Omit<CatalogProduct, "image" | "price" | "compareAtPrice" | "collectionTitle" | "supplierReference">;
 
 export type CatalogPage = {
   products: CatalogProduct[];
@@ -49,8 +51,10 @@ function backendOrigin() {
 function normalizeProduct(product: CatalogApiProduct): CatalogProduct {
   const sortedVariants = [...product.variants].sort((left, right) => left.price - right.price);
   const lowest = sortedVariants[0];
+  const presentation = getProductPresentation(product);
   return {
     ...product,
+    ...presentation,
     image: product.images[0]?.url || "/slowfit/hero.jpg",
     price: lowest?.price || 0,
     compareAtPrice: lowest?.compareAtPrice && lowest.compareAtPrice > lowest.price ? lowest.compareAtPrice : undefined,

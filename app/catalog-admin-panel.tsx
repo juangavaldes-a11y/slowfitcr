@@ -402,7 +402,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       width: 130,
       sorter: true,
       sortOrder: sortBy === "minPrice" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
-      render: (_, product) => new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: "USD" }).format(product.minPrice),
+      render: (_, product) => new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: "CRC" }).format(product.minPrice),
     },
     {
       title: labels.searches,
@@ -434,7 +434,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       width: 130,
       sorter: true,
       sortOrder: sortBy === "revenue" ? (sortOrder === "asc" ? "ascend" : "descend") : null,
-      render: (_, product) => new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: "USD" }).format(product.metric.revenue),
+      render: (_, product) => new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", { style: "currency", currency: "CRC" }).format(product.metric.revenue),
     },
     {
       title: labels.actions,

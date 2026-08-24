@@ -206,7 +206,7 @@ export function CartDock() {
           subtotal: "Subtotal",
         };
 
-  const currency = lines[0]?.currencyCode ?? "USD";
+  const currency = lines[0]?.currencyCode ?? "CRC";
   const money = currencyFormatter(currency);
 
   const handleCheckout = async () => {

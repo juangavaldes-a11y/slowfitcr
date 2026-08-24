@@ -480,7 +480,7 @@ async function createPaymentSession(lines, locale) {
     return {
       variantId: variant.id,
       sku: variant.sku,
-      name: `${variant.product.title} - ${variant.title}`,
+      name: `${variant.product.title.replace(/\s*\|\s*[^|]+$/, "").trim()} - ${variant.title}`,
       quantity,
       unitPrice: Number(variant.price),
       lineTotal: Number(variant.price) * quantity,
@@ -498,7 +498,7 @@ async function createPaymentSession(lines, locale) {
   const origin = process.env.APP_ORIGIN || "https://slowfitcr.com";
   const paymentPayload = {
     reference,
-    currency: process.env.STORE_CURRENCY || "USD",
+    currency: process.env.STORE_CURRENCY || "CRC",
     amount: items.reduce((total, item) => total + item.lineTotal, 0),
     items,
     returnUrl: `${origin}/${locale}/account?payment=success&reference=${reference}`,
@@ -641,13 +641,13 @@ function serializeCatalogProduct(product) {
       unitsSold: 0,
       revenue: 0,
     } } : {}),
-    currencyCode: process.env.STORE_CURRENCY || "USD",
+    currencyCode: process.env.STORE_CURRENCY || "CRC",
     images: product.images.map((image) => ({ ...image })),
     variants: product.variants.map((variant) => ({
       ...variant,
       price: Number(variant.price),
       compareAtPrice: variant.compareAtPrice === null ? null : Number(variant.compareAtPrice),
-      currencyCode: process.env.STORE_CURRENCY || "USD",
+      currencyCode: process.env.STORE_CURRENCY || "CRC",
       availableForSale: product.published && (variant.inventoryQuantity > 0 || product.preorderEnabled),
       preorder: product.preorderEnabled && variant.inventoryQuantity <= 0,
     })),
@@ -855,7 +855,7 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
     if (apiKey && from) {
       const name = String(payload.customerName || "").trim() || "Slow Fit customer";
       const orderLabel = payload.name || `#${payload.orderNumber || externalPaymentId}`;
-      const total = `${payload.amount || "0.00"} ${payload.currency || "USD"}`;
+      const total = `${payload.amount || "0.00"} ${payload.currency || "CRC"}`;
       const items = (payload.items || [])
         .map((item) => `${item.quantity || 1}x ${item.name || "Item"}`)
         .slice(0, 8)

@@ -1063,6 +1063,38 @@ a {
   overflow: hidden;
 }
 
+.slowfit-product-gallery {
+  min-width: 0;
+}
+
+.slowfit-product-thumbnails {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 88px));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.slowfit-product-thumbnail {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+  cursor: pointer;
+}
+
+.slowfit-product-thumbnail.is-selected {
+  border-color: var(--foreground);
+}
+
+.slowfit-product-reference {
+  margin: -2px 0 4px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .slowfit-product-detail-content {
   display: flex;
   flex-direction: column;

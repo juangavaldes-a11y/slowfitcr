@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { notFound } from "next/navigation";
+import ProductGallery from "../../../product-gallery";
 import ProductPurchase from "../../../product-purchase";
 import ReviewsPanel from "../../../reviews-panel";
 import { isLocale, type Locale } from "../../../i18n";
@@ -70,9 +70,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
     maximumFractionDigits: 2,
   });
   const productUrl = `https://slowfitcr.com/${locale}/product/${product.handle}`;
-  const imageUrl = product.image.startsWith("http")
-    ? product.image
-    : `https://slowfitcr.com${product.image}`;
+  const imageUrls = product.images.map((image) => image.url.startsWith("http")
+    ? image.url
+    : `https://slowfitcr.com${image.url}`);
 
   return (
     <main className="slowfit-shop-page">
@@ -83,7 +83,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           "@id": `${productUrl}#product`,
           name: product.title,
           description: product.description,
-          image: [imageUrl],
+          image: imageUrls,
           url: productUrl,
           brand: {
             "@type": "Brand",
@@ -105,13 +105,16 @@ export default async function ProductPage({ params }: ProductPageProps) {
         }}
       />
       <section className="slowfit-shell slowfit-product-detail">
-        <div className="slowfit-product-detail-media">
-          <Image src={product.image} alt={product.images[0]?.altText || product.title} fill priority unoptimized sizes="(max-width: 991px) 100vw, 48vw" className="slowfit-cover" />
-        </div>
+        <ProductGallery images={product.images} productTitle={product.title} />
         <div className="slowfit-product-detail-content">
           <span className="slowfit-kicker">{product.collectionTitle}</span>
           <h1 className="slowfit-display slowfit-product-detail-title">{product.title}</h1>
           <p className="slowfit-shop-card-copy slowfit-product-description">{product.description}</p>
+          {product.supplierReference ? (
+            <p className="slowfit-product-reference">
+              <strong>{locale === "es" ? "Referencia" : "Reference"}:</strong> {product.supplierReference}
+            </p>
+          ) : null}
           <div className="slowfit-product-price-row">
             <span className="slowfit-product-price">{formatMoney.format(product.price)}</span>
             {typeof product.compareAtPrice === "number" ? (

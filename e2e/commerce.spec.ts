@@ -11,7 +11,7 @@ test("shop refreshes after hydration and shows active preorder products", async 
         status: "ACTIVE",
         published: true,
         preorderEnabled: true,
-        currencyCode: "USD",
+        currencyCode: "CRC",
         tags: ["jumpsuit"],
         images: [{ id: "preorder-image", url: "https://images.example.com/preorder.jpg", altText: "Preorder jumpsuit" }],
         variants: [{
@@ -23,7 +23,7 @@ test("shop refreshes after hydration and shows active preorder products", async 
           price: 45,
           compareAtPrice: null,
           inventoryQuantity: 0,
-          currencyCode: "USD",
+          currencyCode: "CRC",
           availableForSale: true,
           preorder: true,
         }],
@@ -53,10 +53,10 @@ test("shop shows loading feedback while filtering by gender", async ({ page }) =
     status: "ACTIVE",
     published: true,
     preorderEnabled: true,
-    currencyCode: "USD",
+    currencyCode: "CRC",
     tags: ["women", "jumpsuit"],
     images: [{ id: "women-image", url: "https://images.example.com/women.jpg", altText: "Women jumpsuit" }],
-    variants: [{ id: "women-small", title: "S", size: "S", color: null, colorHex: null, price: 45, compareAtPrice: null, inventoryQuantity: 0, currencyCode: "USD", availableForSale: true, preorder: true }],
+    variants: [{ id: "women-small", title: "S", size: "S", color: null, colorHex: null, price: 45, compareAtPrice: null, inventoryQuantity: 0, currencyCode: "CRC", availableForSale: true, preorder: true }],
   };
 
   await page.route("**/api/catalog/products?**", async (route) => {
@@ -88,12 +88,12 @@ test("shop card opens product details and supports quick add", async ({ page }) 
         status: "ACTIVE",
         published: true,
         preorderEnabled: false,
-        currencyCode: "USD",
+        currencyCode: "CRC",
         tags: ["women", "leggings"],
         images: [{ id: "quick-add-image", url: "https://images.example.com/leggings.jpg", altText: "Blue leggings" }],
         variants: [
-          { id: "black-small", title: "S / Black", size: "S", color: "Black", colorHex: "#111111", price: 42, compareAtPrice: null, inventoryQuantity: 3, currencyCode: "USD", availableForSale: true, preorder: false },
-          { id: "blue-medium", title: "M / Blue", size: "M", color: "Blue", colorHex: "#3267A8", price: 44, compareAtPrice: null, inventoryQuantity: 3, currencyCode: "USD", availableForSale: true, preorder: false },
+          { id: "black-small", title: "S / Black", size: "S", color: "Black", colorHex: "#111111", price: 42, compareAtPrice: null, inventoryQuantity: 3, currencyCode: "CRC", availableForSale: true, preorder: false },
+          { id: "blue-medium", title: "M / Blue", size: "M", color: "Blue", colorHex: "#3267A8", price: 44, compareAtPrice: null, inventoryQuantity: 3, currencyCode: "CRC", availableForSale: true, preorder: false },
         ],
       }, {
         id: "single-color-product",
@@ -103,11 +103,11 @@ test("shop card opens product details and supports quick add", async ({ page }) 
         status: "ACTIVE",
         published: true,
         preorderEnabled: false,
-        currencyCode: "USD",
+        currencyCode: "CRC",
         tags: ["women", "shorts"],
         images: [{ id: "single-color-image", url: "https://images.example.com/shorts.jpg", altText: "Olive shorts" }],
         variants: [
-          { id: "olive-small", title: "S / Olive", size: "S", color: "Olive", colorHex: "#74734A", price: 36, compareAtPrice: null, inventoryQuantity: 3, currencyCode: "USD", availableForSale: true, preorder: false },
+          { id: "olive-small", title: "S / Olive", size: "S", color: "Olive", colorHex: "#74734A", price: 36, compareAtPrice: null, inventoryQuantity: 3, currencyCode: "CRC", availableForSale: true, preorder: false },
         ],
       }],
       total: 2,
@@ -122,7 +122,7 @@ test("shop card opens product details and supports quick add", async ({ page }) 
   await expect(page).toHaveURL(/\/en\/shop$/);
   await expect(page.getByRole("dialog", { name: /Add to cart: Quick Add Leggings/ })).toBeVisible();
   await page.getByRole("button", { name: "Blue", exact: true }).click();
-  await expect(page.getByText("M - $44.00", { exact: true })).toBeVisible();
+  await expect(page.getByText("M - CRC 44.00", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Add to cart", exact: true }).click();
   await expect(page.getByRole("button", { name: "Cart (1)" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
@@ -140,40 +140,51 @@ test("shop card opens product details and supports quick add", async ({ page }) 
 test("customer can add an internal product to cart and request payment", async ({ page, request }) => {
   const login = await request.post("/api/admin/login", { data: { token: "e2e-token" } });
   expect(login.ok()).toBeTruthy();
+  const productData = {
+    title: "Slow Core Training Tee | E2E-TEE",
+    handle: "slow-core-training-tee",
+    description: "A lightweight training tee with a relaxed fit. Referencia del proveedor: E2E-TEE.",
+    status: "ACTIVE",
+    published: true,
+    tags: ["training"],
+    images: [
+      { url: "https://images.example.com/training-tee.jpg", altText: "Training tee front" },
+      { url: "https://images.example.com/training-tee-back.jpg", altText: "Training tee back" },
+    ],
+    variants: [
+      { title: "M / Black", size: "M", color: "Black", colorHex: "#111111", sku: "E2E-TEE-M-BLK", price: 48, compareAtPrice: 56, inventoryQuantity: 5 },
+      { title: "L / Blue", size: "L", color: "Blue", colorHex: "#3267A8", sku: "E2E-TEE-L-BLU", price: 48, compareAtPrice: 56, inventoryQuantity: 5 },
+    ],
+  };
   const created = await request.post("/api/admin/catalog/products", {
-    data: {
-      title: "Slow Core Training Tee",
-      handle: "slow-core-training-tee",
-      description: "A lightweight training tee with a relaxed fit.",
-      status: "ACTIVE",
-      published: true,
-      tags: ["training"],
-      images: [{ url: "https://images.example.com/training-tee.jpg", altText: "Training tee" }],
-      variants: [
-        { title: "M / Black", size: "M", color: "Black", colorHex: "#111111", sku: "E2E-TEE-M-BLK", price: 48, compareAtPrice: 56, inventoryQuantity: 5 },
-        { title: "L / Blue", size: "L", color: "Blue", colorHex: "#3267A8", sku: "E2E-TEE-L-BLU", price: 48, compareAtPrice: 56, inventoryQuantity: 5 },
-      ],
-    },
+    data: productData,
   });
-  const productResponse = created.status() === 409
-    ? await request.get("/api/catalog/products/slow-core-training-tee")
-    : created;
+  let productResponse = created;
+  if (created.status() === 409) {
+    const existingResponse = await request.get("/api/catalog/products/slow-core-training-tee");
+    const existing = (await existingResponse.json()).product;
+    productResponse = await request.put(`/api/admin/catalog/products/${existing.id}`, { data: productData });
+  }
   expect(productResponse.ok()).toBeTruthy();
   const product = (await productResponse.json()).product;
 
   await page.goto("/en/product/slow-core-training-tee");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Slow Core Training Tee");
+  await expect(page.getByText("Reference: E2E-TEE", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Slow Core Training Tee, 1" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Slow Core Training Tee, 2" })).toBeVisible();
+  await expect(page.getByText("E2E-TEE", { exact: true })).toHaveCount(0);
   await expect(page.getByText("The relaxed fit works well for training")).toBeVisible();
 
   await page.getByRole("button", { name: "Blue" }).click();
-  await expect(page.getByText("L - $48.00", { exact: true })).toBeVisible();
+  await expect(page.getByText("L - CRC 48.00", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Add to cart" }).click();
   const cartButton = page.getByRole("button", { name: "Cart (1)" });
   await expect(cartButton).toBeVisible();
   await cartButton.click();
 
   await expect(page.getByText(/Slow Core Training Tee - L \/ Blue/)).toBeVisible();
-  await expect(page.getByText("$48.00", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("CRC 48.00", { exact: true }).first()).toBeVisible();
 
   const checkout = await request.post("/api/cart/checkout", {
     data: {

@@ -176,8 +176,7 @@ def extract_product_name(heading: str, text: str, sku: str) -> str:
         garments = infer_garments(text)
         if garments:
             name = f"{garments} - {name}"
-    title = f"{name} | {sku}"
-    return title if len(title) <= 120 else f"{title[:108].rstrip()} | {sku[-9:]}"
+    return name[:120].rstrip()
 
 
 def extract_sizes(text: str) -> list[str]:
@@ -291,7 +290,7 @@ def enhanced_description(name: str, material: str, sizes: list[str], sku: str) -
     )
 
 
-def image_candidate(document: pymupdf.Document, page: pymupdf.Page) -> bytes | None:
+def image_candidates(document: pymupdf.Document, page: pymupdf.Page) -> list[bytes]:
     candidates: list[tuple[int, int]] = []
     seen: set[int] = set()
     for image in page.get_images(full=True):
@@ -304,12 +303,14 @@ def image_candidate(document: pymupdf.Document, page: pymupdf.Page) -> bytes | N
         if width * height < 120_000:
             continue
         candidates.append((width * height, xref))
-    if candidates:
-        _, xref = max(candidates)
+    images: list[bytes] = []
+    for _, xref in sorted(candidates, reverse=True)[:10]:
         try:
-            return document.extract_image(xref)["image"]
+            images.append(document.extract_image(xref)["image"])
         except (RuntimeError, ValueError):
-            pass
+            continue
+    if images:
+        return images
 
     photo_area = pymupdf.Rect(
         page.rect.x0,
@@ -318,7 +319,7 @@ def image_candidate(document: pymupdf.Document, page: pymupdf.Page) -> bytes | N
         page.rect.y1,
     )
     rendered = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), clip=photo_area, alpha=False)
-    return rendered.tobytes("png")
+    return [rendered.tobytes("png")]
 
 
 def save_webp(image_data: bytes, destination: Path) -> None:
@@ -352,10 +353,11 @@ def build_product(
     images: list[dict] = []
 
     if document is not None and source.page_index < len(document):
-        image_data = image_candidate(document, document[source.page_index])
-        if image_data:
-            filename = f"{handle}.webp"
-            save_webp(image_data, assets_dir / filename)
+        image_data = image_candidates(document, document[source.page_index])
+        for index, image in enumerate(image_data):
+            suffix = "" if index == 0 else f"-{index + 1}"
+            filename = f"{handle}{suffix}.webp"
+            save_webp(image, assets_dir / filename)
             images.append({
                 "url": f"{base_url.rstrip('/')}/{filename}",
                 "altText": title,

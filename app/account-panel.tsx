@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Locale } from "./i18n";
 import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
+import { getPublicProductTitle } from "./lib/product-presentation";
 
 type Customer = {
   id: string;
@@ -346,11 +347,11 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
                 {favorites.map((product) => (
                   <article className="slowfit-account-favorite" key={product.id}>
                     <Link href={`/${locale}/product/${product.handle}`} className="slowfit-account-favorite-media">
-                      <Image src={product.images[0]?.url || "/slowfit/hero.jpg"} alt={product.images[0]?.altText || product.title}
+                      <Image src={product.images[0]?.url || "/slowfit/hero.jpg"} alt={product.images[0]?.altText || getPublicProductTitle(product.title)}
                         fill unoptimized sizes="(max-width: 767px) 40vw, 180px" className="slowfit-cover" />
                     </Link>
                     <div>
-                      <Link href={`/${locale}/product/${product.handle}`}><Typography.Title level={4}>{product.title}</Typography.Title></Link>
+                      <Link href={`/${locale}/product/${product.handle}`}><Typography.Title level={4}>{getPublicProductTitle(product.title)}</Typography.Title></Link>
                       <Button danger type="text" icon={<HeartFilled />} onClick={() => void apiRequest(`/api/account/favorites/${encodeURIComponent(product.id)}`, { method: "DELETE" })
                         .then(() => setFavorites((current) => current.filter((favorite) => favorite.id !== product.id)))
                         .catch(handleAccountError)}>{labels.removeFavorite}</Button>
