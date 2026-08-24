@@ -11,6 +11,8 @@ async function proxy(request: Request, params: Promise<{ path: string[] }>) {
 
   const headers = new Headers(request.headers);
   headers.delete("host");
+  const isPublicCatalogGet = request.method.toUpperCase() === "GET"
+    && (targetPath === "catalog/products" || targetPath.startsWith("catalog/products/"));
 
   let body: string | undefined;
   if (!["GET", "HEAD"].includes(request.method.toUpperCase())) {
@@ -29,12 +31,15 @@ async function proxy(request: Request, params: Promise<{ path: string[] }>) {
     method: request.method,
     headers,
     body,
-    cache: "no-store",
+    ...(isPublicCatalogGet ? { next: { revalidate: 60 } } : { cache: "no-store" }),
   });
 
   const responseHeaders = new Headers(response.headers);
   responseHeaders.delete("content-encoding");
   responseHeaders.delete("content-length");
+  if (isPublicCatalogGet && response.ok) {
+    responseHeaders.set("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+  }
 
   return new NextResponse(response.body, {
     status: response.status,

@@ -16,6 +16,15 @@ async function expectNoHorizontalOverflow(page: Page) {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 }
 
+test("public catalog caching does not apply to customer sessions", async ({ request }) => {
+  const catalog = await request.get("/api/catalog/products?page=1&pageSize=1");
+  expect(catalog.ok()).toBeTruthy();
+  expect(catalog.headers()["cache-control"]).toContain("public");
+
+  const session = await request.get("/api/auth/session");
+  expect(session.headers()["cache-control"] || "").not.toContain("public");
+});
+
 test("not-found recovery is localized and keyboard accessible", async ({ page }) => {
   await page.goto("/en/product/missing-product");
   await expect(page.getByRole("heading", { name: "This page is not available." })).toBeVisible();

@@ -39,6 +39,44 @@ test("shop refreshes after hydration and shows active preorder products", async 
   await expect(page.getByText("Pre-order", { exact: true })).toBeVisible();
 });
 
+test("shop shows loading feedback while filtering by gender", async ({ page }) => {
+  let releaseWomenRequest: () => void = () => undefined;
+  const womenRequestGate = new Promise<void>((resolve) => {
+    releaseWomenRequest = resolve;
+  });
+  let requestedWomen = false;
+  const product = {
+    id: "women-product",
+    handle: "women-jumpsuit",
+    title: "Women Performance Jumpsuit",
+    description: "A training jumpsuit from the women catalog.",
+    status: "ACTIVE",
+    published: true,
+    preorderEnabled: true,
+    currencyCode: "USD",
+    tags: ["women", "jumpsuit"],
+    images: [{ id: "women-image", url: "https://images.example.com/women.jpg", altText: "Women jumpsuit" }],
+    variants: [{ id: "women-small", title: "S", size: "S", color: null, colorHex: null, price: 45, compareAtPrice: null, inventoryQuantity: 0, currencyCode: "USD", availableForSale: true, preorder: true }],
+  };
+
+  await page.route("**/api/catalog/products?**", async (route) => {
+    const tags = new URL(route.request().url()).searchParams.getAll("tag");
+    if (tags.includes("women")) {
+      requestedWomen = true;
+      await womenRequestGate;
+    }
+    await route.fulfill({ json: { products: [product], total: 1, page: 1, pageSize: 24 } });
+  });
+
+  await page.goto("/en/shop");
+  await page.getByText("Women", { exact: true }).click();
+  await expect(page.getByText("Loading products", { exact: true })).toBeVisible();
+  expect(requestedWomen).toBeTruthy();
+  releaseWomenRequest();
+  await expect(page.getByText("Loading products", { exact: true })).toBeHidden();
+  await expect(page.getByRole("heading", { name: product.title })).toBeVisible();
+});
+
 test("shop card opens product details and supports quick add", async ({ page }) => {
   await page.route("**/api/catalog/products?**", (route) => route.fulfill({
     json: {
@@ -79,6 +117,7 @@ test("shop card opens product details and supports quick add", async ({ page }) 
   }));
 
   await page.goto("/en/shop");
+  await page.getByText("Women", { exact: true }).click();
   await page.getByRole("button", { name: "Add: Quick Add Leggings", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/shop$/);
   await expect(page.getByRole("dialog", { name: /Add to cart: Quick Add Leggings/ })).toBeVisible();

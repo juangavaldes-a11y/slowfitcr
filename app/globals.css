@@ -654,6 +654,41 @@ a {
   background: #f7f3ee;
 }
 
+.slowfit-shop-loading {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 16px;
+  min-height: calc(100svh - 88px);
+  color: var(--ink-soft);
+}
+
+.slowfit-loading-spinner {
+  width: 42px;
+  height: 42px;
+  border: 3px solid rgba(47, 42, 40, 0.16);
+  border-top-color: var(--foreground);
+  border-radius: 50%;
+  animation: slowfit-spin 0.8s linear infinite;
+}
+
+.slowfit-shop-loading p {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.slowfit-policy-section > .ant-spin-nested-loading {
+  min-height: 220px;
+}
+
+@keyframes slowfit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .slowfit-shop-hero,
 .slowfit-policy-hero {
   padding: 72px 0 32px;
