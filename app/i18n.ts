@@ -6,11 +6,32 @@ export const defaultLocale: Locale = "es";
 export type Copy = {
   brandTagline: string;
   nav: {
+    home: string;
     shop: string;
     collections: string;
     whySlow: string;
     contact: string;
     account: string;
+    myAccount: string;
+    signIn: string;
+    signOut: string;
+    staffAccess: string;
+    adminSignOut: string;
+    administration: string;
+    information: string;
+    shipping: string;
+    returns: string;
+    privacy: string;
+    terms: string;
+    catalog: string;
+    reviews: string;
+    operations: string;
+    adminAccessTitle: string;
+    adminAccessCopy: string;
+    adminToken: string;
+    adminRequired: string;
+    adminSubmit: string;
+    adminLoginFailed: string;
   };
   hero: {
     eyebrow: string;
@@ -109,11 +130,32 @@ const copyByLocale: Record<Locale, Copy> = {
   es: {
     brandTagline: "Train with Purpose.",
     nav: {
+      home: "Inicio",
       shop: "Tienda",
       collections: "Colecciones",
       whySlow: "¿Por qué SLOW?",
       contact: "Contacto",
       account: "Cuenta",
+      myAccount: "Mi cuenta",
+      signIn: "Iniciar sesión",
+      signOut: "Cerrar sesión",
+      staffAccess: "Acceso del equipo",
+      adminSignOut: "Cerrar sesión de administración",
+      administration: "Administración",
+      information: "Información",
+      shipping: "Envíos",
+      returns: "Cambios y devoluciones",
+      privacy: "Privacidad",
+      terms: "Términos",
+      catalog: "Catálogo",
+      reviews: "Reseñas",
+      operations: "Operaciones",
+      adminAccessTitle: "Acceso de administración",
+      adminAccessCopy: "Ingresa el token de administración para continuar.",
+      adminToken: "Token de administración",
+      adminRequired: "El token es obligatorio.",
+      adminSubmit: "Iniciar sesión",
+      adminLoginFailed: "No pudimos iniciar sesión. Revisa el token.",
     },
     hero: {
       eyebrow: "No creemos en los resultados rápidos",
@@ -258,11 +300,32 @@ const copyByLocale: Record<Locale, Copy> = {
   en: {
     brandTagline: "Train with Purpose.",
     nav: {
+      home: "Home",
       shop: "Shop",
       collections: "Collections",
       whySlow: "Why SLOW?",
       contact: "Contact",
       account: "Account",
+      myAccount: "My account",
+      signIn: "Sign in",
+      signOut: "Sign out",
+      staffAccess: "Staff access",
+      adminSignOut: "Sign out of administration",
+      administration: "Administration",
+      information: "Information",
+      shipping: "Shipping",
+      returns: "Returns",
+      privacy: "Privacy",
+      terms: "Terms",
+      catalog: "Catalog",
+      reviews: "Reviews",
+      operations: "Operations",
+      adminAccessTitle: "Administration access",
+      adminAccessCopy: "Enter the administration token to continue.",
+      adminToken: "Administration token",
+      adminRequired: "The token is required.",
+      adminSubmit: "Sign in",
+      adminLoginFailed: "We could not sign you in. Check the token.",
     },
     hero: {
       eyebrow: "We do not believe in quick results",

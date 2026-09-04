@@ -176,14 +176,18 @@ a {
 }
 
 .slowfit-brand-block {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: block;
+  flex: 0 0 142px;
+  width: 142px;
+  height: 62px;
+  overflow: hidden;
+  background: #171513 url("/slowfit/hero-mark.png") center center / 249px 249px no-repeat;
 }
 
-.slowfit-brand-copy {
-  color: var(--muted);
-  font-size: 0.98rem;
+.slowfit-brand-wordmark {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .slowfit-nav-actions {

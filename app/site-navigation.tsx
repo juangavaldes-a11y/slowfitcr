@@ -168,8 +168,7 @@ export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
       <header className="slowfit-site-header">
         <section className="slowfit-shell slowfit-nav">
           <Link href={homeHref} className="slowfit-brand-block">
-            <span className="slowfit-kicker">Slow Fit CR</span>
-            <Typography.Text className="slowfit-brand-copy">{copy.brandTagline}</Typography.Text>
+            <span className="slowfit-brand-wordmark" role="img" aria-label="Slow Fit CR" />
           </Link>
           <div className="slowfit-nav-actions">
             <Space size={12} wrap>
