@@ -196,3 +196,64 @@ test("customer can add an internal product to cart and request payment", async (
   const payload = await checkout.json();
   expect(payload.error).toBe("Payment provider is not configured");
 });
+
+test("preorder customers pay a 50% deposit and skip delivery flow", async ({ page, request }) => {
+  const login = await request.post("/api/admin/login", { data: { token: "e2e-token" } });
+  expect(login.ok()).toBeTruthy();
+
+  const productData = {
+    title: "Preorder Run Kit | E2E-PREORDER",
+    handle: "preorder-run-kit",
+    description: "Reserve a new running set before stock arrives.",
+    status: "ACTIVE",
+    published: true,
+    preorderEnabled: true,
+    tags: ["women", "training"],
+    images: [
+      { url: "https://images.example.com/preorder-kit.jpg", altText: "Preorder run kit" },
+    ],
+    variants: [
+      { title: "M / Black", size: "M", color: "Black", colorHex: "#111111", sku: "E2E-PREORDER-M-BLK", price: 100, compareAtPrice: 120, inventoryQuantity: 0 },
+    ],
+  };
+
+  const created = await request.post("/api/admin/catalog/products", { data: productData });
+  let productResponse = created;
+  if (created.status() === 409) {
+    const existingResponse = await request.get("/api/catalog/products/preorder-run-kit");
+    const existing = (await existingResponse.json()).product;
+    productResponse = await request.put(`/api/admin/catalog/products/${existing.id}`, { data: productData });
+  }
+  expect(productResponse.ok()).toBeTruthy();
+  const product = (await productResponse.json()).product;
+
+  await page.route("**/api/cart/checkout", async (route) => {
+    const payload = await route.request().postDataJSON();
+    expect(payload.locale).toBe("en");
+    expect(payload.deliveryId).toBeUndefined();
+    expect(payload.lines).toEqual([{ variantId: product.variants[0].id, quantity: 1 }]);
+    await route.fulfill({
+      json: {
+        ok: true,
+        checkout: {
+          cartId: "preorder-ref-123",
+          checkoutUrl: "https://example.com/pay/preorder",
+        },
+      },
+    });
+  });
+
+  await page.goto(`/en/product/${product.handle}`);
+  await page.getByRole("button", { name: "Add to cart" }).click();
+  await page.getByRole("button", { name: "Cart (1)" }).click();
+
+  await expect(page.getByRole("heading", { name: "Preorder Run Kit" })).toBeVisible();
+  await expect(page.getByText("Delivery details")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Go to checkout" }).click();
+  await expect(page).toHaveURL(/https:\/\/example\.com\/pay\/preorder|\/en\/product\/preorder-run-kit/);
+
+  await page.goto("/en/account?payment=success&reference=preorder-ref-123");
+  await expect(page.getByRole("alert").filter({ hasText: /Your preorder is confirmed\./i })).toBeVisible();
+  await expect(page.getByText(/50% deposit/i)).toBeVisible();
+});

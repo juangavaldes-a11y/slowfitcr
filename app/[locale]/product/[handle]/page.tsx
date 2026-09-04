@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound } from "next/navigation";
-import ProductGallery from "../../../product-gallery";
 import ProductPurchase from "../../../product-purchase";
 import ReviewsPanel from "../../../reviews-panel";
 import { isLocale, type Locale } from "../../../i18n";
-import { getProductByHandle } from "../../../lib/catalog";
+import { getProductByHandle } from "../../../lib/shopify";
 import StructuredData from "../../../structured-data";
 
 type ProductPageProps = {
@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: ProductPageProps): Promise<Me
     return {};
   }
 
-  const product = await getProductByHandle(handle);
+  const product = await getProductByHandle(handle, locale as Locale);
 
   if (!product) {
     return {};
@@ -58,7 +58,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
-  const product = await getProductByHandle(handle);
+  const product = await getProductByHandle(handle, locale as Locale);
 
   if (!product) {
     notFound();
@@ -70,9 +70,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
     maximumFractionDigits: 2,
   });
   const productUrl = `https://slowfitcr.com/${locale}/product/${product.handle}`;
-  const imageUrls = product.images.map((image) => image.url.startsWith("http")
-    ? image.url
-    : `https://slowfitcr.com${image.url}`);
+  const imageUrl = product.image.startsWith("http")
+    ? product.image
+    : `https://slowfitcr.com${product.image}`;
 
   return (
     <main className="slowfit-shop-page">
@@ -83,7 +83,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
           "@id": `${productUrl}#product`,
           name: product.title,
           description: product.description,
-          image: imageUrls,
+          image: [imageUrl],
           url: productUrl,
           brand: {
             "@type": "Brand",
@@ -95,26 +95,21 @@ export default async function ProductPage({ params }: ProductPageProps) {
             url: productUrl,
             priceCurrency: product.currencyCode,
             price: product.price,
-            availability: product.variants.some((variant) => variant.availableForSale && !variant.preorder)
+            availability: product.variants.some((variant) => variant.availableForSale)
               ? "https://schema.org/InStock"
-              : product.variants.some((variant) => variant.preorder)
-                ? "https://schema.org/PreOrder"
-                : "https://schema.org/OutOfStock",
+              : "https://schema.org/OutOfStock",
             itemCondition: "https://schema.org/NewCondition",
           },
         }}
       />
       <section className="slowfit-shell slowfit-product-detail">
-        <ProductGallery images={product.images} productTitle={product.title} />
+        <div className="slowfit-product-detail-media">
+          <Image src={product.image} alt={product.title} fill priority sizes="(max-width: 991px) 100vw, 48vw" className="slowfit-cover" />
+        </div>
         <div className="slowfit-product-detail-content">
           <span className="slowfit-kicker">{product.collectionTitle}</span>
           <h1 className="slowfit-display slowfit-product-detail-title">{product.title}</h1>
           <p className="slowfit-shop-card-copy slowfit-product-description">{product.description}</p>
-          {product.supplierReference ? (
-            <p className="slowfit-product-reference">
-              <strong>{locale === "es" ? "Referencia" : "Reference"}:</strong> {product.supplierReference}
-            </p>
-          ) : null}
           <div className="slowfit-product-price-row">
             <span className="slowfit-product-price">{formatMoney.format(product.price)}</span>
             {typeof product.compareAtPrice === "number" ? (

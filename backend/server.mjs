@@ -6,6 +6,15 @@ import { promisify } from "node:util";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PrismaClient } from "@prisma/client";
+import {
+  cancelProvider,
+  configuredDeliveryProviders,
+  configuredPickup,
+  dispatchProvider,
+  normalizeDeliveryDestination,
+  quoteProvider,
+  verifyProviderWebhook,
+} from "./delivery-providers.mjs";
 
 const prisma = new PrismaClient();
 
@@ -157,6 +166,30 @@ export function validateProductionConfiguration() {
 
   if (new Set(Object.values(secrets)).size !== Object.keys(secrets).length) {
     throw new Error("Production authentication secrets must be distinct");
+  }
+
+  const uberValues = [
+    process.env.UBER_DIRECT_CLIENT_ID,
+    process.env.UBER_DIRECT_CLIENT_SECRET,
+    process.env.UBER_DIRECT_CUSTOMER_ID,
+    process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY,
+  ];
+  if (uberValues.some(Boolean) && !uberValues.every(Boolean)) {
+    throw new Error("Uber Direct requires client ID, client secret, customer ID, and webhook signing key");
+  }
+  const didiValues = [
+    process.env.DIDI_DELIVERY_GATEWAY_URL,
+    process.env.DIDI_DELIVERY_GATEWAY_TOKEN,
+    process.env.DIDI_DELIVERY_WEBHOOK_SECRET,
+  ];
+  if (didiValues.some(Boolean) && !didiValues.every(Boolean)) {
+    throw new Error("DiDi delivery requires gateway URL, gateway token, and webhook secret");
+  }
+  if (process.env.DIDI_DELIVERY_GATEWAY_URL && new URL(process.env.DIDI_DELIVERY_GATEWAY_URL).protocol !== "https:") {
+    throw new Error("DiDi delivery gateway must use HTTPS");
+  }
+  if (uberValues.every(Boolean) || didiValues.every(Boolean)) {
+    configuredPickup();
   }
 }
 
@@ -452,7 +485,7 @@ async function appendAudit(action, details, actor = "system") {
   });
 }
 
-async function createPaymentSession(lines, locale) {
+async function resolveCartItems(lines) {
   const quantities = new Map();
   for (const line of lines) {
     const variantId = String(line?.variantId || "").trim();
@@ -471,7 +504,7 @@ async function createPaymentSession(lines, locale) {
     throw new Error("INVALID_CART");
   }
 
-  const items = variants.map((variant) => {
+  return variants.map((variant) => {
     const quantity = quantities.get(variant.id);
     const preorder = variant.inventoryQuantity === 0 && variant.product.preorderEnabled;
     if (variant.inventoryQuantity < quantity && !preorder) {
@@ -487,6 +520,15 @@ async function createPaymentSession(lines, locale) {
       preorder,
     };
   });
+}
+
+async function createPaymentSession(lines, locale, deliveryId) {
+  const items = await resolveCartItems(lines);
+  const hasPreorderItems = items.some((item) => item.preorder);
+
+  if (hasPreorderItems && deliveryId) {
+    throw new Error("PREORDER_ITEMS_DO_NOT_USE_DELIVERY");
+  }
 
   const providerUrl = process.env.PAYMENT_PROVIDER_URL;
   const providerToken = process.env.PAYMENT_PROVIDER_TOKEN;
@@ -496,24 +538,135 @@ async function createPaymentSession(lines, locale) {
 
   const reference = randomUUID();
   const origin = process.env.APP_ORIGIN || "https://slowfitcr.com";
+  let delivery = null;
+  if (!hasPreorderItems && deliveryId) {
+    delivery = await prisma.delivery.findFirst({
+      where: { id: deliveryId, status: "QUOTED", paymentReference: null, quoteExpiresAt: { gt: new Date() } },
+    });
+    if (!delivery) throw new Error("INVALID_DELIVERY_QUOTE");
+    if (delivery.currency !== (process.env.STORE_CURRENCY || "CRC").toUpperCase()) {
+      throw new Error("DELIVERY_CURRENCY_MISMATCH");
+    }
+    const claimed = await prisma.delivery.updateMany({
+      where: { id: delivery.id, status: "QUOTED", paymentReference: null, quoteExpiresAt: { gt: new Date() } },
+      data: { paymentReference: reference, status: "PAYMENT_PENDING" },
+    });
+    if (claimed.count !== 1) throw new Error("INVALID_DELIVERY_QUOTE");
+  }
+
+  const subtotal = items.reduce((total, item) => total + item.lineTotal, 0);
+  const shippingAmount = delivery ? delivery.feeMinor / 100 : 0;
+  const preorderDepositAmount = hasPreorderItems ? subtotal / 2 : 0;
   const paymentPayload = {
     reference,
     currency: process.env.STORE_CURRENCY || "CRC",
-    amount: items.reduce((total, item) => total + item.lineTotal, 0),
+    amount: hasPreorderItems ? preorderDepositAmount : subtotal + shippingAmount,
     items,
+    ...(hasPreorderItems ? { orderType: "PREORDER_DEPOSIT", depositPercent: 50 } : {}),
+    ...(delivery ? {
+      shipping: {
+        amount: shippingAmount,
+        deliveryId: delivery.id,
+        provider: delivery.provider,
+      },
+    } : {}),
     returnUrl: `${origin}/${locale}/account?payment=success&reference=${reference}`,
     cancelUrl: `${origin}/${locale}/shop?payment=cancelled`,
   };
-  const response = await fetch(providerUrl, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${providerToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify(paymentPayload),
-  });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok || !result.checkoutUrl) {
-    throw new Error("PAYMENT_PROVIDER_ERROR");
+  try {
+    const response = await fetch(providerUrl, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${providerToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify(paymentPayload),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.checkoutUrl) {
+      throw new Error("PAYMENT_PROVIDER_ERROR");
+    }
+    return { cartId: reference, checkoutUrl: result.checkoutUrl };
+  } catch (error) {
+    if (delivery) {
+      await prisma.delivery.updateMany({
+        where: { id: delivery.id, paymentReference: reference, status: "PAYMENT_PENDING" },
+        data: { paymentReference: null, status: "QUOTED" },
+      });
+    }
+    throw error;
   }
-  return { cartId: reference, checkoutUrl: result.checkoutUrl };
+}
+
+async function handleDeliveryProviders() {
+  return jsonResponse({ providers: configuredDeliveryProviders() });
+}
+
+async function handleDeliveryQuotes(request) {
+  const payload = await readJson(request);
+  const lines = Array.isArray(payload.lines) ? payload.lines : [];
+  if (!lines.length) return jsonResponse({ error: "Cart is empty" }, 400);
+
+  try {
+    const providers = configuredDeliveryProviders();
+    if (!providers.length) return jsonResponse({ error: "Delivery providers are not configured" }, 503);
+    const [items, pickup] = await Promise.all([resolveCartItems(lines), Promise.resolve(configuredPickup())]);
+    const destination = normalizeDeliveryDestination(payload.destination);
+    const manifest = items.map((item) => ({ name: item.name, quantity: item.quantity }));
+    const results = await Promise.allSettled(providers.map(({ id }) => quoteProvider(id, {
+      pickup,
+      dropoff: destination,
+      manifest,
+    })));
+
+    const quotes = [];
+    const unavailable = [];
+    for (let index = 0; index < results.length; index += 1) {
+      const result = results[index];
+      const provider = providers[index];
+      if (result.status === "rejected") {
+        unavailable.push({ provider: provider.id, error: String(result.reason?.message || "QUOTE_FAILED") });
+        continue;
+      }
+      const quote = result.value;
+      if (!Number.isInteger(quote.feeMinor) || quote.feeMinor < 0 || !quote.expiresAt) {
+        unavailable.push({ provider: provider.id, error: "INVALID_PROVIDER_QUOTE" });
+        continue;
+      }
+      const record = await prisma.delivery.create({
+        data: {
+          provider: quote.provider,
+          externalQuoteId: quote.externalQuoteId,
+          feeMinor: quote.feeMinor,
+          currency: quote.currency,
+          quoteExpiresAt: new Date(quote.expiresAt),
+          pickup,
+          dropoff: { address: destination.address, notes: destination.notes },
+          contact: { name: destination.name, phone: destination.phone },
+          manifest,
+          dropoffEta: quote.dropoffEta ? new Date(quote.dropoffEta) : null,
+          rawQuote: quote.raw,
+        },
+      });
+      quotes.push({
+        id: record.id,
+        provider: provider.id,
+        label: provider.label,
+        feeMinor: record.feeMinor,
+        currency: record.currency,
+        expiresAt: record.quoteExpiresAt,
+        dropoffEta: record.dropoffEta,
+      });
+    }
+
+    if (!quotes.length) return jsonResponse({ error: "Delivery is unavailable", unavailable }, 422);
+    await appendAudit("delivery.quoted", { providers: quotes.map((quote) => quote.provider) }, "customer");
+    return jsonResponse({ quotes, unavailable });
+  } catch (error) {
+    if (String(error?.message || "").startsWith("INVALID_DELIVERY_") || error?.message === "INVALID_CART") {
+      return jsonResponse({ error: "Invalid delivery details" }, 400);
+    }
+    if (error?.message === "INSUFFICIENT_STOCK") return jsonResponse({ error: "Insufficient stock" }, 409);
+    log("error", "delivery.quote.failed", { error: String(error?.message || "unknown_error") });
+    return jsonResponse({ error: "Unable to quote delivery" }, 502);
+  }
 }
 
 async function forwardJsonWebhook(url, payload) {
@@ -787,6 +940,13 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
         },
       });
 
+      if (topic === "payment.paid") {
+        await transaction.delivery.updateMany({
+          where: { paymentReference: externalPaymentId, status: "PAYMENT_PENDING" },
+          data: { orderId: order.id, status: "READY_TO_DISPATCH" },
+        });
+      }
+
       if (!inventoryLines) {
         return;
       }
@@ -860,6 +1020,7 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
         .map((item) => `${item.quantity || 1}x ${item.name || "Item"}`)
         .slice(0, 8)
         .join(", ");
+      const isPreorder = (payload.items || []).some((item) => item?.preorder === true) || payload.orderType === "PREORDER_DEPOSIT";
 
       await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -961,12 +1122,16 @@ async function handleCheckout(request) {
   }
 
   try {
-    const checkout = await createPaymentSession(lines, locale);
-    await appendAudit("checkout.created", { locale, reference: checkout.cartId, lineCount: lines.length }, "customer");
+    const deliveryId = String(payload.deliveryId || "").trim() || null;
+    const checkout = await createPaymentSession(lines, locale, deliveryId);
+    await appendAudit("checkout.created", { locale, reference: checkout.cartId, lineCount: lines.length, deliveryId }, "customer");
     return jsonResponse({ ok: true, checkout });
   } catch (error) {
     if (error?.message === "INVALID_CART") return jsonResponse({ error: "Invalid cart" }, 400);
     if (error?.message === "INSUFFICIENT_STOCK") return jsonResponse({ error: "Insufficient stock" }, 409);
+    if (error?.message === "INVALID_DELIVERY_QUOTE") return jsonResponse({ error: "Delivery quote is invalid or expired" }, 409);
+    if (error?.message === "DELIVERY_CURRENCY_MISMATCH") return jsonResponse({ error: "Delivery currency is not supported" }, 409);
+    if (error?.message === "PREORDER_ITEMS_DO_NOT_USE_DELIVERY") return jsonResponse({ error: "Preorder items skip the delivery flow and require a 50% deposit" }, 400);
     if (error?.message === "PAYMENT_NOT_CONFIGURED") return jsonResponse({ error: "Payment provider is not configured" }, 503);
     log("error", "checkout.failed", { error: String(error?.message || "unknown_error") });
     return jsonResponse({ error: "Unable to create payment session" }, 502);
@@ -1457,6 +1622,16 @@ async function handleCustomerOrders(request) {
       items: true,
       paymentCreatedAt: true,
       updatedAt: true,
+      delivery: {
+        select: {
+          provider: true,
+          status: true,
+          feeMinor: true,
+          currency: true,
+          dropoffEta: true,
+          trackingUrl: true,
+        },
+      },
     },
   });
   return jsonResponse({ orders });
@@ -2020,6 +2195,172 @@ async function handlePaymentWebhook(request) {
   }
 }
 
+function publicDelivery(delivery) {
+  return {
+    id: delivery.id,
+    orderId: delivery.orderId,
+    paymentReference: delivery.paymentReference,
+    provider: delivery.provider,
+    status: delivery.status,
+    feeMinor: delivery.feeMinor,
+    currency: delivery.currency,
+    dropoff: delivery.dropoff,
+    contact: delivery.contact,
+    dropoffEta: delivery.dropoffEta,
+    trackingUrl: delivery.trackingUrl,
+    errorMessage: delivery.errorMessage,
+    approvedAt: delivery.approvedAt,
+    dispatchedAt: delivery.dispatchedAt,
+    completedAt: delivery.completedAt,
+    createdAt: delivery.createdAt,
+    updatedAt: delivery.updatedAt,
+  };
+}
+
+async function handleAdminDeliveries(request) {
+  if (!(await isModeratorAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
+  const url = parseUrl(request);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 10, 100);
+  const status = getTrimmedParam(url, "status");
+  const where = status && status !== "all" ? { status } : {};
+  const [total, deliveries] = await Promise.all([
+    prisma.delivery.count({ where }),
+    prisma.delivery.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+  return jsonResponse({ total, deliveries: deliveries.map(publicDelivery) });
+}
+
+async function handleAdminDispatchDelivery(request, deliveryId) {
+  if (!(await isModeratorAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
+  const delivery = await prisma.delivery.findUnique({ where: { id: deliveryId } });
+  if (!delivery || !["READY_TO_DISPATCH", "FAILED"].includes(delivery.status)) {
+    return jsonResponse({ error: "Delivery is not ready to dispatch" }, 409);
+  }
+  const claimed = await prisma.delivery.updateMany({
+    where: { id: deliveryId, status: { in: ["READY_TO_DISPATCH", "FAILED"] } },
+    data: { status: "DISPATCHING", approvedAt: new Date(), errorMessage: null },
+  });
+  if (claimed.count !== 1) return jsonResponse({ error: "Delivery is already being dispatched" }, 409);
+
+  try {
+    const dropoff = { ...delivery.dropoff, ...delivery.contact };
+    const quote = await quoteProvider(delivery.provider, {
+      pickup: delivery.pickup,
+      dropoff,
+      manifest: delivery.manifest,
+    });
+    const result = await dispatchProvider({
+      ...delivery,
+      externalQuoteId: quote.externalQuoteId,
+    });
+    const updated = await prisma.delivery.update({
+      where: { id: deliveryId },
+      data: {
+        status: "ACTIVE",
+        externalQuoteId: quote.externalQuoteId,
+        externalDeliveryId: result.externalDeliveryId,
+        quoteExpiresAt: new Date(quote.expiresAt),
+        rawQuote: quote.raw,
+        rawDelivery: result.raw,
+        trackingUrl: result.trackingUrl,
+        dropoffEta: result.dropoffEta ? new Date(result.dropoffEta) : null,
+        dispatchedAt: new Date(),
+      },
+    });
+    await appendAudit("delivery.dispatched", { deliveryId, provider: delivery.provider }, "moderator");
+    return jsonResponse({ ok: true, delivery: publicDelivery(updated) });
+  } catch (error) {
+    await prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status: "FAILED", errorMessage: String(error?.message || "unknown_error") },
+    });
+    await appendAudit("delivery.dispatch.failed", {
+      deliveryId,
+      provider: delivery.provider,
+      error: String(error?.message || "unknown_error"),
+    }, "moderator");
+    return jsonResponse({ error: "Unable to dispatch delivery" }, 502);
+  }
+}
+
+async function handleAdminCancelDelivery(request, deliveryId) {
+  if (!(await isModeratorAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
+  const delivery = await prisma.delivery.findUnique({ where: { id: deliveryId } });
+  if (!delivery || !["ACTIVE", "DISPATCHING"].includes(delivery.status)) {
+    return jsonResponse({ error: "Delivery cannot be cancelled" }, 409);
+  }
+  try {
+    await cancelProvider(delivery);
+    const updated = await prisma.delivery.update({
+      where: { id: deliveryId },
+      data: { status: "CANCELLED" },
+    });
+    await appendAudit("delivery.cancelled", { deliveryId, provider: delivery.provider }, "moderator");
+    return jsonResponse({ ok: true, delivery: publicDelivery(updated) });
+  } catch (error) {
+    await appendAudit("delivery.cancel.failed", {
+      deliveryId,
+      provider: delivery.provider,
+      error: String(error?.message || "unknown_error"),
+    }, "moderator");
+    return jsonResponse({ error: "Unable to cancel delivery" }, 502);
+  }
+}
+
+function deliveryStatus(providerStatus) {
+  const normalized = String(providerStatus || "").toLowerCase();
+  if (["delivered", "completed", "complete"].includes(normalized)) return "COMPLETED";
+  if (["cancelled", "canceled", "returned"].includes(normalized)) return "CANCELLED";
+  if (["failed", "undeliverable"].includes(normalized)) return "FAILED";
+  return "ACTIVE";
+}
+
+async function handleDeliveryWebhook(request, provider) {
+  const secret = provider === "uber"
+    ? process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY
+    : process.env.DIDI_DELIVERY_WEBHOOK_SECRET;
+  const signature = provider === "uber"
+    ? request.headers.get("x-uber-signature") || request.headers.get("x-postmates-signature")
+    : request.headers.get("x-didi-signature");
+  const rawBody = await request.text();
+  if (!verifyProviderWebhook(rawBody, signature, secret)) return jsonResponse({ error: "Invalid signature" }, 401);
+
+  let payload;
+  try {
+    payload = JSON.parse(rawBody);
+  } catch {
+    return jsonResponse({ error: "Invalid JSON" }, 400);
+  }
+  const externalDeliveryId = String(payload.delivery_id || payload.id || payload.data?.id || "").trim();
+  const providerStatus = payload.status || payload.data?.status;
+  if (!externalDeliveryId || !providerStatus) return jsonResponse({ error: "Invalid delivery event" }, 400);
+  const status = deliveryStatus(providerStatus);
+  const updated = await prisma.delivery.updateMany({
+    where: { externalDeliveryId, provider },
+    data: {
+      status,
+      rawDelivery: payload,
+      ...(payload.tracking_url || payload.trackingUrl || payload.data?.tracking_url || payload.data?.trackingUrl
+        ? { trackingUrl: payload.tracking_url || payload.trackingUrl || payload.data?.tracking_url || payload.data?.trackingUrl }
+        : {}),
+      ...(payload.dropoff_eta || payload.dropoffEta || payload.data?.dropoff_eta || payload.data?.dropoffEta
+        ? { dropoffEta: new Date(payload.dropoff_eta || payload.dropoffEta || payload.data?.dropoff_eta || payload.data?.dropoffEta) }
+        : {}),
+      ...(status === "COMPLETED" ? { completedAt: new Date() } : {}),
+      ...(status === "FAILED" ? { errorMessage: String(payload.undeliverable_reason || payload.error || providerStatus) } : {}),
+    },
+  });
+  if (!updated.count) return jsonResponse({ ok: true, ignored: true });
+  await appendAudit("delivery.webhook.processed", { provider, externalDeliveryId, status }, `${provider}-webhook`);
+  return jsonResponse({ ok: true });
+}
+
 export async function route(request) {
   const url = parseUrl(request);
   const pathname = url.pathname;
@@ -2056,6 +2397,14 @@ export async function route(request) {
 
   if (pathname === "/api/cart/checkout" && method === "POST") {
     return handleCheckout(request);
+  }
+
+  if (pathname === "/api/delivery/providers" && method === "GET") {
+    return handleDeliveryProviders();
+  }
+
+  if (pathname === "/api/delivery/quotes" && method === "POST") {
+    return handleDeliveryQuotes(request);
   }
 
   if (pathname === "/api/reviews" && method === "GET") {
@@ -2181,8 +2530,25 @@ export async function route(request) {
     return handleReplayPaymentWebhook(request);
   }
 
+  if (pathname === "/api/admin/deliveries" && method === "GET") {
+    return handleAdminDeliveries(request);
+  }
+
+  const adminDeliveryMatch = pathname.match(/^\/api\/admin\/deliveries\/([^/]+)\/(dispatch|cancel)$/);
+  if (adminDeliveryMatch && method === "POST") {
+    const deliveryId = decodeURIComponent(adminDeliveryMatch[1]);
+    return adminDeliveryMatch[2] === "dispatch"
+      ? handleAdminDispatchDelivery(request, deliveryId)
+      : handleAdminCancelDelivery(request, deliveryId);
+  }
+
   if (pathname === "/api/webhooks/payments" && method === "POST") {
     return handlePaymentWebhook(request);
+  }
+
+  const deliveryWebhookMatch = pathname.match(/^\/api\/webhooks\/deliveries\/(uber|didi)$/);
+  if (deliveryWebhookMatch && method === "POST") {
+    return handleDeliveryWebhook(request, deliveryWebhookMatch[1]);
   }
 
   return jsonResponse({ error: "Not found" }, 404);

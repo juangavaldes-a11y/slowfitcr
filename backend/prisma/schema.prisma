@@ -24,6 +24,17 @@ enum ProductStatus {
   ARCHIVED
 }
 
+enum DeliveryStatus {
+  QUOTED
+  PAYMENT_PENDING
+  READY_TO_DISPATCH
+  DISPATCHING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
 model Product {
   id          String          @id @default(uuid())
   handle      String          @unique
@@ -161,9 +172,41 @@ model Order {
   updatedAt      DateTime   @updatedAt
   customerId     String?
   customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  delivery       Delivery?
 
   @@index([email])
   @@index([customerId, updatedAt])
+}
+
+model Delivery {
+  id                 String         @id @default(uuid())
+  orderId            String?        @unique
+  paymentReference   String?        @unique
+  provider           String
+  status             DeliveryStatus @default(QUOTED)
+  externalQuoteId    String
+  externalDeliveryId String?        @unique
+  feeMinor           Int
+  currency           String
+  quoteExpiresAt     DateTime
+  pickup             Json
+  dropoff            Json
+  contact            Json
+  manifest           Json
+  dropoffEta         DateTime?
+  trackingUrl        String?
+  rawQuote           Json?
+  rawDelivery        Json?
+  errorMessage       String?
+  approvedAt         DateTime?
+  dispatchedAt       DateTime?
+  completedAt        DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  order              Order?         @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([provider, createdAt])
 }
 
 model Review {

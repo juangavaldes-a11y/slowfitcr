@@ -1206,6 +1206,38 @@ a {
   margin: 14px 0;
 }
 
+.slowfit-delivery-location-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.slowfit-delivery-quotes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.slowfit-delivery-quotes .ant-radio-button-wrapper {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-height: 82px;
+  padding: 10px 14px;
+  border: 1px solid rgba(47, 42, 40, 0.16);
+  border-radius: 6px;
+  line-height: 1.35;
+}
+
+.slowfit-delivery-quotes .ant-radio-button-wrapper::before {
+  display: none;
+}
+
+.slowfit-delivery-quotes small {
+  color: var(--ink-soft);
+}
+
 .slowfit-admin-toolbar {
   width: 100%;
   justify-content: space-between;
@@ -1649,6 +1681,11 @@ a {
 }
 
 @media (max-width: 575px) {
+  .slowfit-delivery-location-row,
+  .slowfit-delivery-quotes {
+    grid-template-columns: 1fr;
+  }
+
   .slowfit-manifesto-title.ant-typography {
     font-size: clamp(2.3rem, 14vw, 3.1rem);
     line-height: 0.92;

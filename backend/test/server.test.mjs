@@ -948,6 +948,8 @@ test("checkout validates internal inventory and sends server-calculated totals t
     }));
     assert.equal(preorderCheckout.status, 200);
     assert.equal(paymentPayload.items[0].preorder, true);
+    assert.equal(paymentPayload.amount, 25);
+    assert.equal(paymentPayload.shipping, undefined);
   } finally {
     globalThis.fetch = originalFetch;
     delete process.env.PAYMENT_PROVIDER_URL;
@@ -1056,6 +1058,71 @@ test("admin listings paginate and replay rejects missing identifiers", async () 
     body: JSON.stringify({ eventId: "missing" }),
   }));
   assert.equal(missingEvent.status, 404);
+});
+
+test("empty JSON bodies default to empty objects and partial production secrets reject invalid setup", async () => {
+  const emptyBody = await route(request("/api/events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "",
+  }));
+  assert.equal(emptyBody.status, 400);
+  assert.equal((await json(emptyBody)).error, "Missing eventName");
+
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousUberId = process.env.UBER_DIRECT_CLIENT_ID;
+  const previousUberSecret = process.env.UBER_DIRECT_CLIENT_SECRET;
+  const previousUberCustomer = process.env.UBER_DIRECT_CUSTOMER_ID;
+  const previousUberWebhook = process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY;
+  const previousDidiUrl = process.env.DIDI_DELIVERY_GATEWAY_URL;
+  const previousDidiToken = process.env.DIDI_DELIVERY_GATEWAY_TOKEN;
+  const previousDidiSecret = process.env.DIDI_DELIVERY_WEBHOOK_SECRET;
+  const previousReviewSecret = process.env.REVIEW_MODERATION_TOKEN;
+  const previousReviewSessionSecret = process.env.REVIEW_MODERATION_SESSION_SECRET;
+  const previousCustomerSecret = process.env.CUSTOMER_SESSION_SECRET;
+
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.REVIEW_MODERATION_TOKEN = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    process.env.REVIEW_MODERATION_SESSION_SECRET = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    process.env.CUSTOMER_SESSION_SECRET = "cccccccccccccccccccccccccccccccc";
+
+    delete process.env.UBER_DIRECT_CLIENT_ID;
+    process.env.UBER_DIRECT_CLIENT_SECRET = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    process.env.UBER_DIRECT_CUSTOMER_ID = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY = "cccccccccccccccccccccccccccccccc";
+    assert.throws(() => validateProductionConfiguration(), {
+      message: "Uber Direct requires client ID, client secret, customer ID, and webhook signing key",
+    });
+
+    process.env.UBER_DIRECT_CLIENT_ID = "dddddddddddddddddddddddddddddddd";
+    process.env.UBER_DIRECT_CLIENT_SECRET = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    process.env.UBER_DIRECT_CUSTOMER_ID = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY = "cccccccccccccccccccccccccccccccc";
+    delete process.env.DIDI_DELIVERY_GATEWAY_URL;
+    process.env.DIDI_DELIVERY_GATEWAY_TOKEN = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    process.env.DIDI_DELIVERY_WEBHOOK_SECRET = "ffffffffffffffffffffffffffffffff";
+    assert.throws(() => validateProductionConfiguration(), {
+      message: "DiDi delivery requires gateway URL, gateway token, and webhook secret",
+    });
+
+    process.env.DIDI_DELIVERY_GATEWAY_URL = "http://example.com/delivery";
+    assert.throws(() => validateProductionConfiguration(), {
+      message: "DiDi delivery gateway must use HTTPS",
+    });
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousNodeEnv;
+    if (previousUberId === undefined) delete process.env.UBER_DIRECT_CLIENT_ID; else process.env.UBER_DIRECT_CLIENT_ID = previousUberId;
+    if (previousUberSecret === undefined) delete process.env.UBER_DIRECT_CLIENT_SECRET; else process.env.UBER_DIRECT_CLIENT_SECRET = previousUberSecret;
+    if (previousUberCustomer === undefined) delete process.env.UBER_DIRECT_CUSTOMER_ID; else process.env.UBER_DIRECT_CUSTOMER_ID = previousUberCustomer;
+    if (previousUberWebhook === undefined) delete process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY; else process.env.UBER_DIRECT_WEBHOOK_SIGNING_KEY = previousUberWebhook;
+    if (previousDidiUrl === undefined) delete process.env.DIDI_DELIVERY_GATEWAY_URL; else process.env.DIDI_DELIVERY_GATEWAY_URL = previousDidiUrl;
+    if (previousDidiToken === undefined) delete process.env.DIDI_DELIVERY_GATEWAY_TOKEN; else process.env.DIDI_DELIVERY_GATEWAY_TOKEN = previousDidiToken;
+    if (previousDidiSecret === undefined) delete process.env.DIDI_DELIVERY_WEBHOOK_SECRET; else process.env.DIDI_DELIVERY_WEBHOOK_SECRET = previousDidiSecret;
+    if (previousReviewSecret === undefined) delete process.env.REVIEW_MODERATION_TOKEN; else process.env.REVIEW_MODERATION_TOKEN = previousReviewSecret;
+    if (previousReviewSessionSecret === undefined) delete process.env.REVIEW_MODERATION_SESSION_SECRET; else process.env.REVIEW_MODERATION_SESSION_SECRET = previousReviewSessionSecret;
+    if (previousCustomerSecret === undefined) delete process.env.CUSTOMER_SESSION_SECRET; else process.env.CUSTOMER_SESSION_SECRET = previousCustomerSecret;
+  }
 });
 
 test("HTTP server adapter translates requests and contains route errors", async () => {

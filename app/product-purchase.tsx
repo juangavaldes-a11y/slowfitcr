@@ -63,14 +63,14 @@ export default function ProductPurchase({ locale, product, hideSingleColor = fal
           variants: "Talla",
           color: "Color",
           add: "Agregar al carrito",
-          preorder: "Reservar en preventa",
+          preorder: "Agregar al carrito",
           unavailable: "No disponible",
         }
       : {
           variants: "Size",
           color: "Color",
           add: "Add to cart",
-          preorder: "Pre-order",
+          preorder: "Add to cart",
           unavailable: "Unavailable",
         };
 
@@ -84,6 +84,7 @@ export default function ProductPurchase({ locale, product, hideSingleColor = fal
         image: product.image,
         price: selected.price,
         currencyCode: selected.currencyCode,
+        preorder: selected.preorder,
       },
       1,
     );

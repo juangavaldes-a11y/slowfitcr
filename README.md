@@ -102,6 +102,28 @@ PAYMENT_PROVIDER_TOKEN=set-a-provider-token
 PAYMENT_WEBHOOK_SECRET=set-a-long-random-secret
 STORE_CURRENCY=CRC
 
+# Delivery pickup location
+DELIVERY_PICKUP_NAME=Slow Fit
+DELIVERY_PICKUP_PHONE=+50688919417
+DELIVERY_PICKUP_ADDRESS=Jardines del Dr. Naranjo, 200 m sur y 10 m este
+DELIVERY_PICKUP_CITY=Barva
+DELIVERY_PICKUP_STATE=Heredia
+DELIVERY_PICKUP_COUNTRY=CR
+DELIVERY_PICKUP_LATITUDE=set-an-exact-latitude
+DELIVERY_PICKUP_LONGITUDE=set-an-exact-longitude
+DELIVERY_PICKUP_NOTES=set-store-hours-and-pickup-instructions
+
+# Uber Direct (enable after regional account approval)
+UBER_DIRECT_CLIENT_ID=set-uber-client-id
+UBER_DIRECT_CLIENT_SECRET=set-uber-client-secret
+UBER_DIRECT_CUSTOMER_ID=set-uber-customer-id
+UBER_DIRECT_WEBHOOK_SIGNING_KEY=set-uber-webhook-signing-key
+
+# DiDi private API adapter (enable after receiving the commercial API contract)
+DIDI_DELIVERY_GATEWAY_URL=https://your-didi-adapter.example.com/
+DIDI_DELIVERY_GATEWAY_TOKEN=set-a-gateway-token
+DIDI_DELIVERY_WEBHOOK_SECRET=set-a-long-random-secret
+
 # Internal product media (Cloudflare R2)
 R2_ACCOUNT_ID=your-cloudflare-account-id
 R2_ACCESS_KEY_ID=your-r2-access-key
@@ -171,6 +193,31 @@ R2_SECRET_ACCESS_KEY=your-r2-secret
 R2_BUCKET_NAME=slowfit-products
 R2_PUBLIC_URL=https://media.slowfitcr.com
 ```
+
+## Last-mile delivery
+
+Checkout collects a Costa Rica delivery address and requests live quotes from every configured provider. The customer chooses a quote, its fee is added to the payment amount, and the delivery is linked to the payment reference. A successful `payment.paid` webhook moves it to `READY_TO_DISPATCH`; an operator then approves it from `/{locale}/admin/ops`. Approval refreshes the expired quote before dispatching, and provider webhooks update customer tracking.
+
+Delivery endpoints:
+
+- `GET /api/delivery/providers` lists enabled providers.
+- `POST /api/delivery/quotes` validates cart and destination and persists provider quotes.
+- `GET /api/admin/deliveries` lists deliveries for operations.
+- `POST /api/admin/deliveries/{id}/dispatch` approves or retries dispatch.
+- `POST /api/admin/deliveries/{id}/cancel` cancels an active provider delivery.
+- `POST /api/webhooks/deliveries/uber` accepts Uber HMAC-SHA256 events through `x-uber-signature`.
+- `POST /api/webhooks/deliveries/didi` accepts adapter HMAC-SHA256 events through `x-didi-signature`.
+
+Uber Direct uses the official OAuth client-credentials, delivery quote, create delivery, cancel delivery, tracking URL, and webhook flows. Register the production webhook URL in the Uber Direct dashboard after the Costa Rica account is approved.
+
+DiDi does not expose a public Costa Rica parcel-delivery API. `DIDI_DELIVERY_GATEWAY_URL` is therefore an anti-corruption adapter for the private contract supplied during commercial onboarding. It must implement:
+
+- `POST quotes`: accepts `{ pickup, dropoff, manifest }`; returns `{ id, feeMinor, currency, expiresAt, dropoffEta? }`.
+- `POST deliveries`: accepts the persisted delivery object; returns `{ id, status, trackingUrl?, dropoffEta? }`.
+- `POST deliveries/{id}/cancel`: cancels a dispatched delivery.
+- Webhooks: send `{ id, status, trackingUrl?, dropoffEta? }` signed as lowercase hexadecimal HMAC-SHA256 of the raw body.
+
+Provider money values use minor currency units. Exact pickup coordinates and store pickup hours should be configured before enabling live quotes.
 
 Production startup requires the moderation token and both session secrets to contain at least 32 characters and to be distinct.
 

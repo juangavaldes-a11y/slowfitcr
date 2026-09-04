@@ -1,7 +1,7 @@
 "use client";
 
 import { DeleteOutlined, MinusOutlined, PlusOutlined, ShoppingOutlined } from "@ant-design/icons";
-import { Button, Drawer, Space, Typography, message } from "antd";
+import { Alert, Button, Drawer, Form, Input, Modal, Radio, Space, Typography, message } from "antd";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { trackEvent } from "../lib/analytics";
@@ -15,6 +15,7 @@ export type CartLine = {
   image: string;
   price: number;
   currencyCode: string;
+  preorder?: boolean;
   quantity: number;
 };
 
@@ -184,7 +185,13 @@ function currencyFormatter(currencyCode: string) {
 
 export function CartDock() {
   const [open, setOpen] = useState(false);
+  const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [quoting, setQuoting] = useState(false);
+  const [quotes, setQuotes] = useState<DeliveryQuote[]>([]);
+  const [unavailableProviders, setUnavailableProviders] = useState<string[]>([]);
+  const [selectedDeliveryId, setSelectedDeliveryId] = useState<string>();
+  const [deliveryForm] = Form.useForm<DeliveryFormValues>();
   const pathname = usePathname();
   const [api, contextHolder] = message.useMessage();
   const { lines, cartId, setCartId, totalItems, subtotal, updateLineQuantity, removeLine, clearCart } = useCart();
@@ -195,6 +202,20 @@ export function CartDock() {
           cart: "Carrito",
           empty: "Tu carrito esta vacio.",
           checkout: "Ir al checkout",
+          deliveryTitle: "Datos de entrega",
+          deliveryCopy: "Ingresa una direccion precisa para consultar precio y tiempo con cada proveedor.",
+          name: "Nombre de quien recibe",
+          phone: "Telefono",
+          province: "Provincia",
+          canton: "Canton",
+          address: "Distrito y direccion exacta",
+          addressExtra: "Apartamento, local o referencia adicional",
+          notes: "Instrucciones para el repartidor",
+          quote: "Cotizar entrega",
+          quoteAgain: "Volver a cotizar",
+          chooseDelivery: "Selecciona una entrega",
+          providerUnavailable: "Algunos proveedores no ofrecieron cobertura para esta direccion.",
+          required: "Este dato es requerido.",
           clear: "Vaciar",
           subtotal: "Subtotal",
         }
@@ -202,15 +223,93 @@ export function CartDock() {
           cart: "Cart",
           empty: "Your cart is empty.",
           checkout: "Go to checkout",
+          deliveryTitle: "Delivery details",
+          deliveryCopy: "Enter a precise address to request price and timing from each provider.",
+          name: "Recipient name",
+          phone: "Phone",
+          province: "Province",
+          canton: "Canton",
+          address: "District and exact address",
+          addressExtra: "Apartment, suite, or additional reference",
+          notes: "Courier instructions",
+          quote: "Get delivery quotes",
+          quoteAgain: "Quote again",
+          chooseDelivery: "Choose a delivery",
+          providerUnavailable: "Some providers did not offer coverage for this address.",
+          required: "This field is required.",
           clear: "Clear",
           subtotal: "Subtotal",
         };
 
   const currency = lines[0]?.currencyCode ?? "CRC";
   const money = currencyFormatter(currency);
+  const hasPreorderItems = lines.some((line) => line.preorder);
+
+  const requestDeliveryQuotes = async (values: DeliveryFormValues) => {
+    setQuoting(true);
+    try {
+      const payload = await apiRequest<{ quotes: DeliveryQuote[]; unavailable?: { provider: string }[] }>(
+        "/api/delivery/quotes",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            lines: lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
+            destination: { ...values, country: "CR" },
+          }),
+        },
+      );
+      setQuotes(payload.quotes);
+      setUnavailableProviders((payload.unavailable ?? []).map((item) => item.provider));
+      setSelectedDeliveryId(payload.quotes[0]?.id);
+    } catch (error) {
+      api.error(formatApiError(error, locale, {
+        fallback: locale === "es" ? "No fue posible cotizar la entrega" : "Could not quote delivery",
+      }));
+    } finally {
+      setQuoting(false);
+    }
+  };
 
   const handleCheckout = async () => {
     if (!lines.length || submitting) {
+      return;
+    }
+    if (hasPreorderItems) {
+      try {
+        setSubmitting(true);
+        const payload = await apiRequest<{ checkout?: { checkoutUrl: string; cartId: string } }>("/api/cart/checkout", {
+          method: "POST",
+          body: JSON.stringify({
+            locale,
+            cartId,
+            lines: lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
+          }),
+        });
+
+        const checkoutUrl = payload.checkout?.checkoutUrl;
+        const nextCartId = payload.checkout?.cartId;
+        if (!checkoutUrl) {
+          throw new Error("checkout_missing_url");
+        }
+
+        if (nextCartId) {
+          setCartId(nextCartId);
+        }
+
+        trackEvent("begin_checkout", { totalItems, subtotal, currency, preorder: true });
+        window.location.assign(checkoutUrl);
+      } catch (error) {
+        api.error(formatApiError(error, locale, {
+          fallback: locale === "es" ? "No fue posible iniciar la preventa" : "Could not start preorder checkout",
+        }));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (!selectedDeliveryId) {
+      setDeliveryOpen(true);
       return;
     }
 
@@ -221,6 +320,7 @@ export function CartDock() {
         body: JSON.stringify({
           locale,
           cartId,
+          deliveryId: selectedDeliveryId,
           lines: lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
         }),
       });
@@ -235,6 +335,7 @@ export function CartDock() {
         setCartId(nextCartId);
       }
 
+      setDeliveryOpen(false);
       trackEvent("begin_checkout", { totalItems, subtotal, currency });
       window.location.assign(checkoutUrl);
     } catch (error) {
@@ -307,6 +408,102 @@ export function CartDock() {
           </div>
         )}
       </Drawer>
+      <Modal
+        title={labels.deliveryTitle}
+        open={deliveryOpen}
+        onCancel={() => setDeliveryOpen(false)}
+        footer={quotes.length ? (
+          <Space>
+            <Button onClick={() => {
+              setQuotes([]);
+              setSelectedDeliveryId(undefined);
+            }}>
+              {labels.quoteAgain}
+            </Button>
+            <Button type="primary" loading={submitting} disabled={!selectedDeliveryId} onClick={handleCheckout}>
+              {labels.checkout}
+            </Button>
+          </Space>
+        ) : (
+          <Button type="primary" htmlType="submit" form="slowfit-delivery-form" loading={quoting}>
+            {labels.quote}
+          </Button>
+        )}
+      >
+        <Typography.Paragraph type="secondary">{labels.deliveryCopy}</Typography.Paragraph>
+        {unavailableProviders.length ? <Alert type="warning" showIcon title={labels.providerUnavailable} /> : null}
+        <Form
+          id="slowfit-delivery-form"
+          form={deliveryForm}
+          layout="vertical"
+          onFinish={requestDeliveryQuotes}
+          requiredMark={false}
+        >
+          {!quotes.length ? (
+            <>
+              <Form.Item name="name" label={labels.name} rules={[{ required: true, message: labels.required }]}>
+                <Input autoComplete="name" maxLength={100} />
+              </Form.Item>
+              <Form.Item name="phone" label={labels.phone} rules={[{ required: true, message: labels.required }]}>
+                <Input type="tel" autoComplete="tel" placeholder="+506 8888 8888" maxLength={20} />
+              </Form.Item>
+              <div className="slowfit-delivery-location-row">
+                <Form.Item name="state" label={labels.province} rules={[{ required: true, message: labels.required }]}>
+                  <Input autoComplete="address-level1" maxLength={100} />
+                </Form.Item>
+                <Form.Item name="city" label={labels.canton} rules={[{ required: true, message: labels.required }]}>
+                  <Input autoComplete="address-level2" maxLength={100} />
+                </Form.Item>
+              </div>
+              <Form.Item name="streetAddress" label={labels.address} rules={[{ required: true, message: labels.required }]}>
+                <Input.TextArea autoComplete="street-address" maxLength={200} rows={2} />
+              </Form.Item>
+              <Form.Item name="addressLine2" label={labels.addressExtra}>
+                <Input maxLength={120} />
+              </Form.Item>
+              <Form.Item name="notes" label={labels.notes}>
+                <Input.TextArea maxLength={500} rows={2} />
+              </Form.Item>
+            </>
+          ) : (
+            <Form.Item label={labels.chooseDelivery}>
+              <Radio.Group
+                className="slowfit-delivery-quotes"
+                value={selectedDeliveryId}
+                onChange={(event) => setSelectedDeliveryId(event.target.value)}
+              >
+                {quotes.map((quote) => (
+                  <Radio.Button key={quote.id} value={quote.id}>
+                    <strong>{quote.label}</strong>
+                    <span>{currencyFormatter(quote.currency).format(quote.feeMinor / 100)}</span>
+                    {quote.dropoffEta ? <small>{new Date(quote.dropoffEta).toLocaleString(locale === "es" ? "es-CR" : "en-US")}</small> : null}
+                  </Radio.Button>
+                ))}
+              </Radio.Group>
+            </Form.Item>
+          )}
+        </Form>
+      </Modal>
     </>
   );
 }
+
+type DeliveryFormValues = {
+  name: string;
+  phone: string;
+  state: string;
+  city: string;
+  streetAddress: string;
+  addressLine2?: string;
+  notes?: string;
+};
+
+type DeliveryQuote = {
+  id: string;
+  provider: "uber" | "didi";
+  label: string;
+  feeMinor: number;
+  currency: string;
+  expiresAt: string;
+  dropoffEta?: string | null;
+};

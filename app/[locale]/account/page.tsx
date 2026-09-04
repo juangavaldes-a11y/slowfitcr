@@ -5,7 +5,7 @@ import { isLocale, locales, type Locale } from "../../i18n";
 
 type AccountPageProps = {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ resetToken?: string }>;
+  searchParams: Promise<{ resetToken?: string; payment?: string; reference?: string }>;
 };
 
 export function generateStaticParams() {
@@ -22,7 +22,12 @@ export async function generateMetadata({ params }: AccountPageProps): Promise<Me
 
 export default async function AccountPage({ params, searchParams }: AccountPageProps) {
   const { locale } = await params;
-  const { resetToken } = await searchParams;
+  const { resetToken, payment, reference } = await searchParams;
   if (!isLocale(locale)) notFound();
-  return <AccountPanel locale={locale as Locale} resetToken={resetToken} />;
+  return <AccountPanel
+    locale={locale as Locale}
+    resetToken={resetToken}
+    paymentStatus={payment === "success" ? "success" : payment === "cancelled" ? "cancelled" : undefined}
+    reference={reference}
+  />;
 }

@@ -6,32 +6,11 @@ export const defaultLocale: Locale = "es";
 export type Copy = {
   brandTagline: string;
   nav: {
-    home: string;
     shop: string;
     collections: string;
     whySlow: string;
     contact: string;
     account: string;
-    information: string;
-    shipping: string;
-    returns: string;
-    privacy: string;
-    terms: string;
-    administration: string;
-    catalog: string;
-    reviews: string;
-    operations: string;
-    signIn: string;
-    myAccount: string;
-    signOut: string;
-    staffAccess: string;
-    adminSignOut: string;
-    adminAccessTitle: string;
-    adminAccessCopy: string;
-    adminToken: string;
-    adminSubmit: string;
-    adminRequired: string;
-    adminLoginFailed: string;
   };
   hero: {
     eyebrow: string;
@@ -130,32 +109,11 @@ const copyByLocale: Record<Locale, Copy> = {
   es: {
     brandTagline: "Train with Purpose.",
     nav: {
-      home: "Inicio",
       shop: "Tienda",
       collections: "Colecciones",
       whySlow: "¿Por qué SLOW?",
       contact: "Contacto",
       account: "Cuenta",
-      information: "Información",
-      shipping: "Envíos",
-      returns: "Cambios y devoluciones",
-      privacy: "Privacidad",
-      terms: "Términos",
-      administration: "Administración",
-      catalog: "Catálogo",
-      reviews: "Reseñas",
-      operations: "Operaciones",
-      signIn: "Iniciar sesión",
-      myAccount: "Mi cuenta",
-      signOut: "Cerrar sesión",
-      staffAccess: "Acceso del equipo",
-      adminSignOut: "Cerrar sesión administrativa",
-      adminAccessTitle: "Acceso administrativo",
-      adminAccessCopy: "Ingresa el token del equipo para habilitar las opciones administrativas.",
-      adminToken: "Token de administración",
-      adminSubmit: "Entrar",
-      adminRequired: "Ingresa el token de administración.",
-      adminLoginFailed: "No fue posible iniciar la sesión administrativa.",
     },
     hero: {
       eyebrow: "No creemos en los resultados rápidos",
@@ -207,13 +165,13 @@ const copyByLocale: Record<Locale, Copy> = {
       items: [
         {
           title: "Pensado para un estilo de vida activo.",
-          image: "/slowfit/value-leggings-blue.webp",
-          imageAlt: "Conjunto deportivo con leggings azul intenso",
+          image: "/slowfit/value-1.jpg",
+          imageAlt: "Pensado para un estilo de vida activo",
         },
         {
           title: "Prendas seleccionadas por calidad.",
-          image: "/slowfit/value-shorts-olive.webp",
-          imageAlt: "Short deportivo verde olivo sobre fondo blanco",
+          image: "/slowfit/value-2.jpg",
+          imageAlt: "Prendas seleccionadas por calidad",
         },
         {
           title: "Diseños minimalistas.",
@@ -256,7 +214,7 @@ const copyByLocale: Record<Locale, Copy> = {
       supportTitle: "Soporte directo",
       supportCopy: "WhatsApp y formulario de contacto para resolver dudas de talla, stock o entrega.",
       secureTitle: "Pago seguro",
-      secureCopy: "Checkout bancario seguro y seguimiento claro de cada pedido.",
+      secureCopy: "La siguiente fase conectará checkout seguro con Shopify y seguimiento de pedidos.",
     },
     policies: {
       privacy: {
@@ -300,32 +258,11 @@ const copyByLocale: Record<Locale, Copy> = {
   en: {
     brandTagline: "Train with Purpose.",
     nav: {
-      home: "Home",
       shop: "Shop",
       collections: "Collections",
       whySlow: "Why SLOW?",
       contact: "Contact",
       account: "Account",
-      information: "Information",
-      shipping: "Shipping",
-      returns: "Returns",
-      privacy: "Privacy",
-      terms: "Terms",
-      administration: "Administration",
-      catalog: "Catalog",
-      reviews: "Reviews",
-      operations: "Operations",
-      signIn: "Sign in",
-      myAccount: "My account",
-      signOut: "Sign out",
-      staffAccess: "Staff access",
-      adminSignOut: "Sign out of administration",
-      adminAccessTitle: "Administration access",
-      adminAccessCopy: "Enter the team token to enable administration options.",
-      adminToken: "Administration token",
-      adminSubmit: "Sign in",
-      adminRequired: "Enter the administration token.",
-      adminLoginFailed: "Could not start the administration session.",
     },
     hero: {
       eyebrow: "We do not believe in quick results",
@@ -377,13 +314,13 @@ const copyByLocale: Record<Locale, Copy> = {
       items: [
         {
           title: "Designed for an active lifestyle.",
-          image: "/slowfit/value-leggings-blue.webp",
-          imageAlt: "Bright blue activewear set with leggings",
+          image: "/slowfit/value-1.jpg",
+          imageAlt: "Designed for an active lifestyle",
         },
         {
           title: "Garments selected for quality.",
-          image: "/slowfit/value-shorts-olive.webp",
-          imageAlt: "Olive green active shorts on a white background",
+          image: "/slowfit/value-2.jpg",
+          imageAlt: "Garments selected for quality",
         },
         {
           title: "Minimalist designs.",
@@ -426,7 +363,7 @@ const copyByLocale: Record<Locale, Copy> = {
       supportTitle: "Direct support",
       supportCopy: "WhatsApp and a contact form will help with sizing, stock, or delivery questions.",
       secureTitle: "Secure payments",
-      secureCopy: "Secure bank checkout and clear tracking for every order.",
+      secureCopy: "The next phase connects Shopify-powered secure checkout and order tracking.",
     },
     policies: {
       privacy: {

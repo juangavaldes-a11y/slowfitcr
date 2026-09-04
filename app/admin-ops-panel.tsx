@@ -22,6 +22,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
+import DeliveryOpsPanel from "./delivery-ops-panel";
 import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
 
 type AuditRow = {
@@ -481,6 +482,8 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
                 {labels.refresh}
               </Button>
             </Space>
+
+            <DeliveryOpsPanel locale={locale} onUnauthorized={() => setAuthorized(false)} />
 
             <section className="slowfit-policy-card slowfit-admin-card">
               <Space className="slowfit-admin-controls" wrap>

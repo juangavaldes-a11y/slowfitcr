@@ -29,6 +29,14 @@ type Order = {
   items: Array<{ title?: string; quantity?: number }>;
   paymentCreatedAt: string | null;
   updatedAt: string;
+  delivery: {
+    provider: string;
+    status: string;
+    feeMinor: number;
+    currency: string;
+    dropoffEta: string | null;
+    trackingUrl: string | null;
+  } | null;
 };
 
 type CustomerReview = {
@@ -52,9 +60,11 @@ type FavoriteProduct = {
 type AccountPanelProps = {
   locale: Locale;
   resetToken?: string;
+  paymentStatus?: "success" | "cancelled";
+  reference?: string;
 };
 
-export default function AccountPanel({ locale, resetToken }: AccountPanelProps) {
+export default function AccountPanel({ locale, resetToken, paymentStatus, reference }: AccountPanelProps) {
   const router = useRouter();
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -89,6 +99,10 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         noOrders: "Tus pedidos aparecerán aqui cuando el banco confirme una compra con este correo.",
         paid: "Pago",
         fulfillment: "Entrega",
+        deliveryProvider: "Proveedor",
+        deliveryFee: "Costo de entrega",
+        deliveryEta: "Llegada estimada",
+        trackDelivery: "Seguir entrega",
         items: "artículos",
         orderDetails: "Ver artículos",
         reviews: "Tus reseñas",
@@ -117,6 +131,8 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         resetRequested: "Si existe una cuenta, recibirás un enlace de recuperación por correo.",
         resetCompleted: "Tu contraseña fue actualizada. Ya puedes iniciar sesión.",
         resetFailed: "El enlace es inválido o venció. Solicita uno nuevo.",
+        preorderConfirmation: "Tu preventa quedó confirmada. Hemos recibido el pago del 50% y no se aplicará el flujo de entrega para este pedido.",
+        orderConfirmation: "Tu pedido quedó confirmado.",
       }
     : {
         kicker: "Slow Fit account",
@@ -136,6 +152,10 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         noOrders: "Orders will appear here when the payment provider confirms a purchase using this email.",
         paid: "Payment",
         fulfillment: "Delivery",
+        deliveryProvider: "Provider",
+        deliveryFee: "Delivery cost",
+        deliveryEta: "Estimated arrival",
+        trackDelivery: "Track delivery",
         items: "items",
         orderDetails: "View items",
         reviews: "Your reviews",
@@ -164,6 +184,8 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
         resetRequested: "If an account exists, you will receive a recovery link by email.",
         resetCompleted: "Your password was updated. You can now sign in.",
         resetFailed: "This link is invalid or expired. Request a new one.",
+        preorderConfirmation: "Your preorder is confirmed. We received the 50% deposit and no delivery flow will be used for this order.",
+        orderConfirmation: "Your order is confirmed.",
       };
 
   async function requestPasswordReset(values: { email: string }) {
@@ -293,6 +315,18 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
     }
   }
 
+  const paymentSuccessNotice = paymentStatus === "success" ? (
+    <Alert
+      type="success"
+      showIcon
+      message={reference ? `${labels.orderConfirmation} #${reference.slice(0, 8)}` : labels.orderConfirmation}
+      description={labels.preorderConfirmation}
+      closable
+      onClose={() => setSuccess("")}
+      style={{ marginBottom: 16 }}
+    />
+  ) : null;
+
   if (customer) {
     return (
       <main className="slowfit-policy-page">
@@ -312,6 +346,7 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
 
         <section className="slowfit-shell slowfit-account-dashboard">
           {error ? <Alert type="error" showIcon title={error} closable onClose={() => setError("")} /> : null}
+          {paymentSuccessNotice}
           <aside className="slowfit-account-profile">
             <UserOutlined />
             <Typography.Title level={3}>{labels.profile}</Typography.Title>
@@ -331,9 +366,28 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
                     </div>
                     <div className="slowfit-order-status">
                       <span>{labels.paid}: <Tag color={order.financialStatus === "paid" ? "success" : "warning"}>{order.financialStatus || "pending"}</Tag></span>
-                      <span>{labels.fulfillment}: <Tag color={order.fulfillmentStatus === "fulfilled" ? "success" : "warning"}>{order.fulfillmentStatus || "unfulfilled"}</Tag></span>
+                      <span>{labels.fulfillment}: <Tag color={order.delivery?.status === "COMPLETED" || order.fulfillmentStatus === "fulfilled" ? "success" : "warning"}>{order.delivery?.status || order.fulfillmentStatus || "unfulfilled"}</Tag></span>
                     </div>
                     <Typography.Text strong>{order.total ? `${order.total} ${order.currency || ""}` : ""}</Typography.Text>
+                    {order.delivery ? (
+                      <Space wrap>
+                        <Typography.Text>{labels.deliveryProvider}: {order.delivery.provider === "uber" ? "Uber Direct" : "DiDi"}</Typography.Text>
+                        <Typography.Text>
+                          {labels.deliveryFee}: {new Intl.NumberFormat(locale === "es" ? "es-CR" : "en-US", {
+                            style: "currency",
+                            currency: order.delivery.currency,
+                          }).format(order.delivery.feeMinor / 100)}
+                        </Typography.Text>
+                        {order.delivery.dropoffEta ? (
+                          <Typography.Text>{labels.deliveryEta}: {new Date(order.delivery.dropoffEta).toLocaleString(locale === "es" ? "es-CR" : "en-US")}</Typography.Text>
+                        ) : null}
+                        {order.delivery.trackingUrl ? (
+                          <Button type="link" href={order.delivery.trackingUrl} target="_blank" rel="noreferrer">
+                            {labels.trackDelivery}
+                          </Button>
+                        ) : null}
+                      </Space>
+                    ) : null}
                     <Collapse ghost items={[{ key: "items", label: `${labels.orderDetails} (${Array.isArray(order.items) ? order.items.length : 0})`, children: Array.isArray(order.items) && order.items.length ? order.items.map((item, index) => <Typography.Paragraph key={`${item.title}-${index}`}>{item.quantity || 1} × {item.title || labels.items}</Typography.Paragraph>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} /> }]} />
                   </article>
                 ))}
@@ -398,6 +452,7 @@ export default function AccountPanel({ locale, resetToken }: AccountPanelProps) 
 
   return (
     <main className="slowfit-account-page">
+      {paymentSuccessNotice}
       <section className="slowfit-account-media">
         <Image src="/slowfit/performance-collection.jpg" alt="Slow Fit Performance Collection" fill priority sizes="(max-width: 900px) 100vw, 48vw" className="slowfit-cover" />
       </section>

@@ -42,6 +42,22 @@ Backend secrets:
 - `PAYMENT_PROVIDER_TOKEN`
 - `PAYMENT_WEBHOOK_SECRET`
 - `STORE_CURRENCY`
+- `DELIVERY_PICKUP_NAME`
+- `DELIVERY_PICKUP_PHONE`
+- `DELIVERY_PICKUP_ADDRESS`
+- `DELIVERY_PICKUP_CITY`
+- `DELIVERY_PICKUP_STATE`
+- `DELIVERY_PICKUP_COUNTRY`
+- `DELIVERY_PICKUP_LATITUDE`
+- `DELIVERY_PICKUP_LONGITUDE`
+- `DELIVERY_PICKUP_NOTES`
+- `UBER_DIRECT_CLIENT_ID`
+- `UBER_DIRECT_CLIENT_SECRET`
+- `UBER_DIRECT_CUSTOMER_ID`
+- `UBER_DIRECT_WEBHOOK_SIGNING_KEY`
+- `DIDI_DELIVERY_GATEWAY_URL`
+- `DIDI_DELIVERY_GATEWAY_TOKEN`
+- `DIDI_DELIVERY_WEBHOOK_SECRET`
 - `R2_ACCOUNT_ID`
 - `R2_ACCESS_KEY_ID`
 - `R2_SECRET_ACCESS_KEY`
@@ -78,6 +94,10 @@ Requirements:
 - Set `APP_ORIGIN` to the canonical storefront origin used in password recovery links.
 - Review `LOGIN_FAILURE_LIMIT` and `LOGIN_LOCKOUT_MS` with customer support before launch.
 - Request and complete a password reset in each locale to verify Resend delivery and link routing.
+- Confirm Uber Direct availability in Costa Rica, complete its pilot, and register `/api/webhooks/deliveries/uber` before enabling production credentials.
+- Obtain DiDi's private merchant API contract and implement its field mapping behind the documented gateway before setting `DIDI_DELIVERY_GATEWAY_URL`.
+- Geocode the Barva pickup address, verify its map pin, and define pickup hours and courier instructions.
+- Exercise quote expiry, provider unavailability, dispatch retry, cancellation, and completed-delivery tracking in staging.
 - Store secrets in platform secret managers, never committed files.
 - Restrict production database credentials to the backend runtime.
 - Document secret rotation ownership and cadence.

@@ -30,10 +30,6 @@ export const metadata: Metadata = {
     "Ropa deportiva y accesorios para entrenar y vivir con propósito en Costa Rica. Compra las colecciones de Slow Fit CR en línea.",
   applicationName: "Slow Fit CR",
   category: "Ropa deportiva",
-  icons: {
-    icon: [{ url: "/icon.png", type: "image/png" }],
-    shortcut: "/icon.png",
-  },
 };
 
 export default async function RootLayout({
