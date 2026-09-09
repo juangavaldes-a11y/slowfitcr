@@ -1020,8 +1020,6 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
         .map((item) => `${item.quantity || 1}x ${item.name || "Item"}`)
         .slice(0, 8)
         .join(", ");
-      const isPreorder = (payload.items || []).some((item) => item?.preorder === true) || payload.orderType === "PREORDER_DEPOSIT";
-
       await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {

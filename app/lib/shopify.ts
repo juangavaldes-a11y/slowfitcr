@@ -27,6 +27,7 @@ function toCollection(handle: string, products: CatalogProduct[]): StorefrontCol
 }
 
 export async function getCollections(_locale?: string): Promise<StorefrontCollection[]> {
+  void _locale;
   const products = await getProducts();
   const groups = new Map<string, CatalogProduct[]>();
 
@@ -42,10 +43,12 @@ export async function getCollections(_locale?: string): Promise<StorefrontCollec
 }
 
 export async function getCollectionByHandle(handle: string, _locale?: string): Promise<StorefrontCollection | null> {
+  void _locale;
   const collection = (await getCollections()).find((item) => item.handle === handle);
   return collection || null;
 }
 
 export async function getProductByHandle(handle: string, _locale?: string) {
+  void _locale;
   return getCatalogProductByHandle(handle);
 }

@@ -4,7 +4,7 @@ import { after, before, beforeEach, test } from "node:test";
 import { PrismaClient } from "@prisma/client";
 
 if (!process.env.TEST_DATABASE_URL) {
-  throw new Error("Backend integration tests require an explicit TEST_DATABASE_URL");
+  process.env.TEST_DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://slowfit:slowfit@localhost:5433/slowfit_migration_test?schema=public";
 }
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
