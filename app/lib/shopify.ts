@@ -1,5 +1,5 @@
 import "server-only";
-import { getProductByHandle as getCatalogProductByHandle, getProducts, type CatalogProduct } from "./catalog";
+import { getProductByHandle as getCatalogProductByHandle, getProducts, type CatalogProduct } from "../../packages/commerce";
 
 export type StorefrontCollection = {
   id: string;
