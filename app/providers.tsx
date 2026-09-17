@@ -2,27 +2,30 @@
 
 import { ConfigProvider } from "antd";
 import type { PropsWithChildren } from "react";
+import { projectConfig } from "../packages/core/config";
 import { CartDock, CartProvider } from "./cart/cart-context";
 
 export default function Providers({ children }: PropsWithChildren) {
+  const theme = projectConfig.theme;
+
   return (
     <CartProvider>
       <ConfigProvider
         theme={{
           token: {
-            colorPrimary: "#69676c",
-            colorInfo: "#69676c",
-            colorText: "#2f2a28",
-            colorTextSecondary: "#6d6968",
-            colorBgBase: "#f5f0e8",
-            colorBorder: "#d7d2cd",
-            borderRadius: 18,
-            fontFamily: "var(--font-body)",
+            colorPrimary: theme.primaryColor,
+            colorInfo: theme.infoColor,
+            colorText: theme.textColor,
+            colorTextSecondary: theme.textSecondaryColor,
+            colorBgBase: theme.bgBase,
+            colorBorder: theme.borderColor,
+            borderRadius: theme.borderRadius,
+            fontFamily: theme.bodyFontVar,
           },
         }}
       >
         {children}
-        <CartDock />
+        {projectConfig.featureFlags.showCartDock ? <CartDock /> : null}
       </ConfigProvider>
     </CartProvider>
   );

@@ -7,6 +7,7 @@ import "./globals.css";
 import Analytics from "./analytics";
 import { getPreferredLocale } from "./i18n";
 import Providers from "./providers";
+import { projectConfig } from "../packages/core/config";
 
 const displayFont = Cormorant_Garamond({
   variable: "--font-display",
@@ -23,12 +24,12 @@ const bodyFont = Questrial({
 export const metadata: Metadata = {
   metadataBase: new URL("https://slowfitcr.com"),
   title: {
-    default: "Slow Fit CR | Ropa deportiva en Costa Rica",
-    template: "%s | Slow Fit CR",
+    default: `${projectConfig.brand.name} CR | Ropa deportiva en Costa Rica`,
+    template: `%s | ${projectConfig.brand.name} CR`,
   },
   description:
-    "Ropa deportiva y accesorios para entrenar y vivir con propósito en Costa Rica. Compra las colecciones de Slow Fit CR en línea.",
-  applicationName: "Slow Fit CR",
+    `Ropa deportiva y accesorios para entrenar y vivir con propósito en Costa Rica. Compra las colecciones de ${projectConfig.brand.name} CR en línea.`,
+  applicationName: `${projectConfig.brand.name} CR`,
   category: "Ropa deportiva",
 };
 
