@@ -124,11 +124,11 @@ export default function ReviewModerationPanel({ locale }: ReviewModerationPanelP
     return () => window.clearTimeout(timeout);
   }, []);
 
-  const onLogin = async ({ token }: { token: string }) => {
+  const onLogin = async (credentials: { token?: string; email?: string; password?: string; otp?: string }) => {
     setLoginLoading(true);
     try {
       await apiRequest<{ ok: true }>("/api/admin/login", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(credentials),
       });
       await loadReviews(query);
     } catch (error) {

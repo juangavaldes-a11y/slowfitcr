@@ -72,6 +72,8 @@ Backend secrets:
 - `RESEND_API_KEY`
 - `ORDER_CONFIRM_FROM`
 - `ACCOUNT_RESET_FROM`
+- `ADMIN_BOOTSTRAP_EMAIL` / `ADMIN_BOOTSTRAP_PASSWORD` (one-time operator provisioning)
+- `ADMIN_BOOTSTRAP_TOTP_SECRET` (optional Base32 TOTP secret; store in the secret manager)
 
 Backend delivery and request limits:
 
@@ -180,6 +182,7 @@ Before launch:
 
 - Centralize backend JSON logs with request ID, status, duration, and environment.
 - Add uptime checks for frontend, `/health/live`, and `/health/ready`.
+- Add a protected dashboard check for `/health/metrics` and alert on failed outbox jobs or active reservation growth.
 - Alert on elevated 5xx rates, readiness failures, webhook failures, and database saturation.
 - Configure error tracking for frontend and backend exceptions.
 - Define log retention without storing unnecessary customer data.

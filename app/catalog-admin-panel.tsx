@@ -247,10 +247,10 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     return () => window.clearTimeout(timeout);
   }, []);
 
-  const onLogin = async ({ token }: { token: string }) => {
+  const onLogin = async (credentials: { token?: string; email?: string; password?: string; otp?: string }) => {
     setLoginLoading(true);
     try {
-      await apiRequest("/api/admin/login", { method: "POST", body: JSON.stringify({ token }) });
+      await apiRequest("/api/admin/login", { method: "POST", body: JSON.stringify(credentials) });
       await loadProducts();
     } catch (error) {
       api.error(formatApiError(error, locale, { preserveClientMessage: false }));

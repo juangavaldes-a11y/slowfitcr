@@ -64,6 +64,16 @@ type WebhookQuery = {
   status: string;
 };
 
+type OutboxRow = {
+  id: string;
+  kind: string;
+  destination: string;
+  status: "PENDING" | "PROCESSING" | "DELIVERED" | "FAILED";
+  attempts: number;
+  lastError?: string | null;
+  createdAt: string;
+};
+
 const DEFAULT_AUDIT_QUERY: AuditQuery = {
   page: 1,
   pageSize: 8,
@@ -118,6 +128,8 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const [webhookQuery, setWebhookQuery] = useState<WebhookQuery>(DEFAULT_WEBHOOK_QUERY);
   const [selectedEvent, setSelectedEvent] = useState<WebhookRow | null>(null);
   const [replayingEventId, setReplayingEventId] = useState<string | null>(null);
+  const [outbox, setOutbox] = useState<OutboxRow[]>([]);
+  const [outboxLoading, setOutboxLoading] = useState(false);
 
   const labels = useMemo(
     () =>
@@ -289,6 +301,21 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
     }
   };
 
+  const loadOutbox = async () => {
+    setOutboxLoading(true);
+    try {
+      const payload = await apiRequest<{ events: OutboxRow[] }>("/api/admin/outbox?status=FAILED&pageSize=20", { cache: "no-store" });
+      setOutbox(payload.events);
+      return true;
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) setAuthorized(false);
+      else api.error(formatApiError(error, locale, { fallback: labels.loadFail }));
+      return false;
+    } finally {
+      setOutboxLoading(false);
+    }
+  };
+
   const refreshAll = async () => {
     const auditOk = await loadAuditLogs(auditQuery);
     if (!auditOk) {
@@ -296,6 +323,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
     }
 
     await loadWebhookEvents(webhookQuery);
+    await loadOutbox();
   };
 
   const loadInitialData = useEffectEvent(() => refreshAll());
@@ -308,13 +336,13 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
     return () => window.clearTimeout(timeout);
   }, []);
 
-  const onLogin = async ({ token }: { token: string }) => {
+  const onLogin = async (credentials: { token?: string; email?: string; password?: string; otp?: string }) => {
     setLoginLoading(true);
     try {
       await apiRequest<{ ok: true }>("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify(credentials),
       });
 
       await refreshAll();
@@ -333,6 +361,19 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
     setEvents([]);
     setAuditTotal(0);
     setWebhookTotal(0);
+    setOutbox([]);
+  };
+
+  const replayOutbox = async (eventId: string) => {
+    setReplayingEventId(eventId);
+    try {
+      await apiRequest("/api/admin/outbox/replay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventId }) });
+      await loadOutbox();
+    } catch (error) {
+      api.error(formatApiError(error, locale, { fallback: labels.replayFail }));
+    } finally {
+      setReplayingEventId(null);
+    }
   };
 
   const replayWebhook = async (eventId: string) => {
@@ -571,6 +612,34 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
                   ) : null}
                 </Spin>
               )}
+            </section>
+
+            <section className="slowfit-policy-card slowfit-admin-card">
+              <Typography.Title level={4}>Failed outbox jobs</Typography.Title>
+              <Button onClick={() => void loadOutbox()} loading={outboxLoading}>Refresh</Button>
+              <Table
+                rowKey="id"
+                columns={[
+                  { title: "Type", dataIndex: "kind", key: "kind" },
+                  { title: "Destination", dataIndex: "destination", key: "destination" },
+                  { title: "Attempts", dataIndex: "attempts", key: "attempts" },
+                  { title: "Error", dataIndex: "lastError", key: "lastError" },
+                  {
+                    title: "",
+                    key: "replay",
+                    render: (_value: unknown, record: OutboxRow) => (
+                      <Button size="small" icon={<RedoOutlined />} loading={replayingEventId === record.id} onClick={() => void replayOutbox(record.id)}>
+                        Replay
+                      </Button>
+                    ),
+                  },
+                ]}
+                dataSource={outbox}
+                loading={outboxLoading}
+                pagination={false}
+                locale={{ emptyText: labels.tableEmpty }}
+                scroll={{ x: 800 }}
+              />
             </section>
 
             <section className="slowfit-policy-card slowfit-admin-card">

@@ -21,6 +21,7 @@ const prisma = new PrismaClient();
 const PORT = Number.parseInt(process.env.PORT || "8080", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 const DEFAULT_LOCALE = "es";
+const STARTED_AT = Date.now();
 
 const SESSION_COOKIE_NAME = "slowfit_admin_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
@@ -266,6 +267,19 @@ function createAdminSessionToken() {
   return `${encoded}.${signature}`;
 }
 
+function createAdminUserSessionToken(admin) {
+  const secret = getSessionSecret();
+  if (!secret) throw new Error("Missing moderation session secret");
+  const encoded = toBase64Url(JSON.stringify({
+    iat: Date.now(),
+    exp: Date.now() + SESSION_MAX_AGE_SECONDS * 1000,
+    role: admin.role,
+    adminId: admin.id,
+    email: admin.email,
+  }));
+  return `${encoded}.${signPayload(encoded, secret)}`;
+}
+
 function verifyAdminSessionToken(token) {
   const secret = getSessionSecret();
   if (!secret || !token || !token.includes(".")) {
@@ -290,7 +304,7 @@ function verifyAdminSessionToken(token) {
       && decoded.iat <= now + SESSION_CLOCK_SKEW_MS
       && decoded.exp > now
       && decoded.exp <= decoded.iat + SESSION_MAX_AGE_SECONDS * 1000
-      && decoded.role === "review-moderator",
+      && (decoded.role === "review-moderator" || Boolean(decoded.adminId && decoded.email)),
     );
   } catch {
     return false;
@@ -346,6 +360,31 @@ async function verifyPassword(password, storedHash) {
 
 function hashResetToken(token) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+function decodeBase32(value) {
+  const normalized = String(value || "").toUpperCase().replace(/=+$/, "").replace(/[^A-Z2-7]/g, "");
+  let bits = "";
+  for (const character of normalized) bits += Number("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".indexOf(character)).toString(2).padStart(5, "0");
+  const bytes = [];
+  for (let index = 0; index + 8 <= bits.length; index += 8) bytes.push(Number.parseInt(bits.slice(index, index + 8), 2));
+  return Buffer.from(bytes);
+}
+
+function verifyTotp(secret, suppliedCode, timestamp = Date.now()) {
+  const code = String(suppliedCode || "").replace(/\s/g, "");
+  if (!/^[0-9]{6}$/.test(code) || !secret) return false;
+  const key = decodeBase32(secret);
+  const counter = Math.floor(timestamp / 30000);
+  for (let offset = -1; offset <= 1; offset += 1) {
+    const buffer = Buffer.alloc(8);
+    buffer.writeBigUInt64BE(BigInt(counter + offset));
+    const digest = createHmac("sha1", key).update(buffer).digest();
+    const position = digest[digest.length - 1] & 15;
+    const value = ((digest[position] & 127) << 24) | (digest[position + 1] << 16) | (digest[position + 2] << 8) | digest[position + 3];
+    if (safeCompare(String(value % 1000000).padStart(6, "0"), code)) return true;
+  }
+  return false;
 }
 
 async function sendPasswordResetEmail({ email, locale, token }) {
@@ -1285,6 +1324,20 @@ async function handleReadyHealth() {
   }
 }
 
+async function handleMetricsHealth() {
+  const [pendingOutbox, failedOutbox, pendingReservations] = await Promise.all([
+    prisma.outboxEvent.count({ where: { status: { in: ["PENDING", "PROCESSING"] } } }),
+    prisma.outboxEvent.count({ where: { status: "FAILED" } }),
+    prisma.inventoryReservation.count({ where: { status: "ACTIVE" } }),
+  ]);
+  return jsonResponse({
+    ok: true,
+    uptimeSeconds: Math.floor((Date.now() - STARTED_AT) / 1000),
+    outbox: { pending: pendingOutbox, failed: failedOutbox },
+    inventoryReservations: { active: pendingReservations },
+  });
+}
+
 async function handleContact(request) {
   const payload = await readJson(request);
   const name = String(payload.name || "").trim();
@@ -1616,6 +1669,37 @@ async function handleModerateReview(request) {
 async function handleAdminLogin(request) {
   const payload = await readJson(request);
   const token = String(payload.token || "");
+  const email = String(payload.email || "").trim().toLowerCase();
+  const password = String(payload.password || "");
+  const otp = String(payload.otp || "");
+
+  if (email && password) {
+    const admin = await prisma.adminUser.findUnique({ where: { email } });
+    if (admin?.active && (!admin.lockedUntil || admin.lockedUntil <= new Date())) {
+      const passwordOk = await verifyPassword(password, admin.passwordHash);
+      const otpOk = !admin.totpSecret || verifyTotp(admin.totpSecret, otp);
+      if (passwordOk && otpOk) {
+        await prisma.adminUser.update({ where: { id: admin.id }, data: { failedAttempts: 0, lockedUntil: null, lastLoginAt: new Date() } });
+        await appendAudit("admin.login", { adminId: admin.id, role: admin.role, mfa: Boolean(admin.totpSecret) }, `admin:${maskedEmail(admin.email)}`);
+        return jsonResponse({ ok: true, admin: { id: admin.id, email: admin.email, displayName: admin.displayName, role: admin.role } }, 200, {
+          "Set-Cookie": buildSessionCookie(createAdminUserSessionToken(admin)),
+        });
+      }
+      if (admin) {
+        const failedAttempts = admin.failedAttempts + 1;
+        await prisma.adminUser.update({
+          where: { id: admin.id },
+          data: {
+            failedAttempts: failedAttempts >= LOGIN_FAILURE_LIMIT ? 0 : failedAttempts,
+            lockedUntil: failedAttempts >= LOGIN_FAILURE_LIMIT ? new Date(Date.now() + LOGIN_LOCKOUT_MS) : null,
+          },
+        });
+      }
+    }
+    await appendAudit("admin.login.failed", { reason: "invalid_credentials", email: maskedEmail(email) }, "unknown");
+    return jsonResponse({ error: "Invalid credentials" }, 401);
+  }
+
   if (!process.env.REVIEW_MODERATION_TOKEN || !safeCompare(token, process.env.REVIEW_MODERATION_TOKEN)) {
     await appendAudit("admin.login.failed", { reason: "invalid_credentials" }, "unknown");
     return jsonResponse({ error: "Invalid credentials" }, 401);
@@ -1640,6 +1724,25 @@ async function handleAdminLogout() {
   return jsonResponse({ ok: true }, 200, {
     "Set-Cookie": clearSessionCookie(),
   });
+}
+
+async function ensureBootstrapAdmin() {
+  const email = String(process.env.ADMIN_BOOTSTRAP_EMAIL || "").trim().toLowerCase();
+  const password = String(process.env.ADMIN_BOOTSTRAP_PASSWORD || "");
+  if (!email || !password) return;
+  const existing = await prisma.adminUser.findUnique({ where: { email } });
+  if (existing) return;
+  if (password.length < 12) throw new Error("ADMIN_BOOTSTRAP_PASSWORD must contain at least 12 characters");
+  const admin = await prisma.adminUser.create({
+    data: {
+      email,
+      passwordHash: await hashPassword(password),
+      displayName: process.env.ADMIN_BOOTSTRAP_NAME || "Slow Fit Admin",
+      role: "owner",
+      totpSecret: process.env.ADMIN_BOOTSTRAP_TOTP_SECRET || null,
+    },
+  });
+  await appendAudit("admin.created", { adminId: admin.id, source: "bootstrap" }, "system");
 }
 
 function customerResponse(customer) {
@@ -2348,6 +2451,37 @@ async function handleAdminPaymentWebhooks(request) {
   return jsonResponse({ events, total, page, pageSize });
 }
 
+async function handleAdminOutbox(request) {
+  if (!(await isModeratorAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
+  const url = parseUrl(request);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 20, 100);
+  const status = getTrimmedParam(url, "status");
+  const search = getTrimmedParam(url, "search");
+  const where = {
+    ...(status && ["PENDING", "PROCESSING", "DELIVERED", "FAILED"].includes(status) ? { status } : {}),
+    ...(search ? { OR: [{ kind: { contains: search, mode: "insensitive" } }, { destination: { contains: search, mode: "insensitive" } }] } : {}),
+  };
+  const [total, events] = await Promise.all([
+    prisma.outboxEvent.count({ where }),
+    prisma.outboxEvent.findMany({ where, orderBy: { createdAt: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
+  ]);
+  return jsonResponse({ events, total, page, pageSize });
+}
+
+async function handleReplayOutbox(request) {
+  if (!(await isModeratorAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
+  const payload = await readJson(request);
+  const eventId = String(payload.eventId || "").trim();
+  if (!eventId) return jsonResponse({ error: "eventId is required" }, 400);
+  const event = await prisma.outboxEvent.findUnique({ where: { id: eventId } });
+  if (!event) return jsonResponse({ error: "Outbox event not found" }, 404);
+  await prisma.outboxEvent.update({ where: { id: event.id }, data: { status: "PENDING", availableAt: new Date(), lockedAt: null, lastError: null } });
+  await drainOutbox(1);
+  await appendAudit("outbox.replayed", { eventId: event.id, kind: event.kind }, String(payload.actor || "admin"));
+  return jsonResponse({ ok: true });
+}
+
 async function handleReplayPaymentWebhook(request) {
   if (!(await isModeratorAuthorized(request))) {
     return jsonResponse({ error: "Unauthorized" }, 401);
@@ -2642,6 +2776,10 @@ export async function route(request) {
     return handleReadyHealth();
   }
 
+  if (pathname === "/health/metrics" && method === "GET") {
+    return handleMetricsHealth();
+  }
+
   if (pathname === "/api/contact" && method === "POST") {
     return handleContact(request);
   }
@@ -2785,6 +2923,14 @@ export async function route(request) {
     return handleReplayPaymentWebhook(request);
   }
 
+  if (pathname === "/api/admin/outbox" && method === "GET") {
+    return handleAdminOutbox(request);
+  }
+
+  if (pathname === "/api/admin/outbox/replay" && method === "POST") {
+    return handleReplayOutbox(request);
+  }
+
   if (pathname === "/api/admin/deliveries" && method === "GET") {
     return handleAdminDeliveries(request);
   }
@@ -2882,6 +3028,7 @@ export function createRequestListener() {
 
 export function startServer() {
   validateProductionConfiguration();
+  void ensureBootstrapAdmin().catch((error) => log("error", "admin.bootstrap.failed", { error: String(error?.message || "unknown_error") }));
   const outboxInterval = setInterval(() => {
     void releaseExpiredReservations().catch((error) => log("error", "inventory.reservation.cleanup_failed", { error: String(error?.message || "unknown_error") }));
     void drainOutbox().catch((error) => log("error", "outbox.drain_failed", { error: String(error?.message || "unknown_error") }));

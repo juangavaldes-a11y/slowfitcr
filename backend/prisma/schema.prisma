@@ -250,6 +250,23 @@ model AuditLog {
   @@index([action])
 }
 
+model AdminUser {
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String
+  displayName     String
+  role            String   @default("operator")
+  totpSecret      String?
+  active          Boolean  @default(true)
+  failedAttempts  Int      @default(0)
+  lockedUntil     DateTime?
+  lastLoginAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([active, role])
+}
+
 model PaymentWebhookEvent {
   id             String        @id @default(uuid())
   idempotencyKey String        @unique

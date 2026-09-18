@@ -12,7 +12,7 @@ type AdminShellProps = {
   sessionReady: boolean;
   authorized: boolean;
   loginLoading: boolean;
-  onLogin: (values: { token: string }) => Promise<void>;
+  onLogin: (values: { token?: string; email?: string; password?: string; otp?: string }) => Promise<void>;
   onLogout: () => Promise<void>;
   children: ReactNode;
 };
@@ -36,6 +36,9 @@ export default function AdminShell({
         authTitle: "Acceso de moderacion",
         authCopy: "La sesion permanece activa hasta que expire o cierres sesion.",
         token: "Token de moderacion",
+        email: "Email del administrador",
+        password: "Contrasena",
+        otp: "Codigo MFA (si esta habilitado)",
         signIn: "Entrar",
         signOut: "Salir",
         checking: "Verificando sesion...",
@@ -48,6 +51,9 @@ export default function AdminShell({
         authTitle: "Moderation access",
         authCopy: "Your session remains active until it expires or you sign out.",
         token: "Moderation token",
+        email: "Admin email",
+        password: "Password",
+        otp: "MFA code (if enabled)",
         signIn: "Sign in",
         signOut: "Sign out",
         checking: "Checking session...",
@@ -93,7 +99,16 @@ export default function AdminShell({
             <Typography.Title level={4}>{labels.authTitle}</Typography.Title>
             <Typography.Paragraph className="slowfit-policy-lead">{labels.authCopy}</Typography.Paragraph>
             <Form layout="vertical" onFinish={onLogin}>
-              <Form.Item name="token" label={labels.token} rules={[{ required: true, message: labels.required }]}>
+              <Form.Item name="email" label={labels.email}>
+                <Input autoComplete="username" />
+              </Form.Item>
+              <Form.Item name="password" label={labels.password}>
+                <Input.Password autoComplete="current-password" />
+              </Form.Item>
+              <Form.Item name="otp" label={labels.otp}>
+                <Input inputMode="numeric" autoComplete="one-time-code" />
+              </Form.Item>
+              <Form.Item name="token" label={labels.token}>
                 <Input.Password autoComplete="off" />
               </Form.Item>
               <Button type="primary" htmlType="submit" loading={loginLoading}>

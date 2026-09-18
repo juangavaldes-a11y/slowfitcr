@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHmac } from "node:crypto";
+import { createHmac, scryptSync } from "node:crypto";
 import { after, before, beforeEach, test } from "node:test";
 import { PrismaClient } from "@prisma/client";
 
@@ -56,6 +56,7 @@ beforeEach(async () => {
   await prisma.rateLimitBucket.deleteMany();
   await prisma.outboxEvent.deleteMany();
   await prisma.inventoryReservation.deleteMany();
+  await prisma.adminUser.deleteMany();
   await prisma.product.deleteMany();
   await prisma.paymentWebhookEvent.deleteMany();
   await prisma.order.deleteMany();
@@ -95,6 +96,63 @@ test("admin login creates a reusable session and logout clears it", async () => 
   const logout = await route(request("/api/admin/logout", { method: "POST", headers: { Cookie: cookie } }));
   assert.equal(logout.status, 200);
   assert.match(logout.headers.get("set-cookie"), /Max-Age=0/);
+});
+
+test("admin accounts authenticate with password and TOTP and expose operations metrics", async () => {
+  const salt = "admin-test-salt";
+  const passwordHash = `${salt}.${scryptSync("admin-password", salt, 64).toString("hex")}`;
+  await prisma.adminUser.create({
+    data: {
+      email: "operator@example.com",
+      passwordHash,
+      displayName: "Operator",
+      role: "operator",
+      totpSecret: "JBSWY3DPEHPK3PXP",
+    },
+  });
+
+  const invalid = await route(request("/api/admin/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "operator@example.com", password: "wrong", otp: "000000" }),
+  }));
+  assert.equal(invalid.status, 401);
+
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const secretBytes = [];
+  for (let index = 0; index < "JBSWY3DPEHPK3PXP".length; index += 8) {
+    const chunk = "JBSWY3DPEHPK3PXP".slice(index, index + 8);
+    let bits = "";
+    for (const character of chunk) bits += alphabet.indexOf(character).toString(2).padStart(5, "0");
+    for (let offset = 0; offset + 8 <= bits.length; offset += 8) secretBytes.push(Number.parseInt(bits.slice(offset, offset + 8), 2));
+  }
+  const counter = Math.floor(Date.now() / 30000);
+  const counterBuffer = Buffer.alloc(8);
+  counterBuffer.writeBigUInt64BE(BigInt(counter));
+  const digest = createHmac("sha1", Buffer.from(secretBytes)).update(counterBuffer).digest();
+  const position = digest[digest.length - 1] & 15;
+  const totp = String((((digest[position] & 127) << 24) | (digest[position + 1] << 16) | (digest[position + 2] << 8) | digest[position + 3]) % 1000000).padStart(6, "0");
+  const accountLogin = await route(request("/api/admin/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "operator@example.com", password: "admin-password", otp: totp }),
+  }));
+  assert.equal(accountLogin.status, 200);
+
+  const metrics = await route(request("/health/metrics"));
+  assert.equal(metrics.status, 200);
+  assert.equal((await json(metrics)).ok, true);
+
+  const outbox = await prisma.outboxEvent.create({ data: { kind: "unsupported", destination: "internal", payload: {} } });
+  const legacyCookie = await loginCookie();
+  const listing = await route(request("/api/admin/outbox?status=FAILED", { headers: { Cookie: legacyCookie } }));
+  assert.equal(listing.status, 200);
+  const replay = await route(request("/api/admin/outbox/replay", {
+    method: "POST",
+    headers: { Cookie: legacyCookie, "Content-Type": "application/json" },
+    body: JSON.stringify({ eventId: outbox.id }),
+  }));
+  assert.equal(replay.status, 200);
 });
 
 test("admins manage internal products and customers filter the active catalog", async () => {
