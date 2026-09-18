@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AdminOpsPanel from "../../../admin-ops-panel";
 import { isLocale, locales, type Locale } from "../../../i18n";
+import { isModuleEnabled } from "../../../../packages/core/config";
 
 type AdminOpsPageProps = {
   params: Promise<{
@@ -33,6 +34,10 @@ export default async function AdminOpsPage({ params }: AdminOpsPageProps) {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
+    notFound();
+  }
+
+  if (!isModuleEnabled("admin")) {
     notFound();
   }
 

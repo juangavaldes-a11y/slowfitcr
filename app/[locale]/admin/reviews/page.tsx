@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ReviewModerationPanel from "../../../review-moderation-panel";
 import { isLocale, locales, type Locale } from "../../../i18n";
+import { isModuleEnabled } from "../../../../packages/core/config";
 
 type AdminReviewsPageProps = {
   params: Promise<{
@@ -33,6 +34,10 @@ export default async function AdminReviewsPage({ params }: AdminReviewsPageProps
   const { locale } = await params;
 
   if (!isLocale(locale)) {
+    notFound();
+  }
+
+  if (!isModuleEnabled("admin") || !isModuleEnabled("reviews")) {
     notFound();
   }
 

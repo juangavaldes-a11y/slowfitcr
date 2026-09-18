@@ -11,6 +11,7 @@ import Image from "next/image";
 import ContactForm from "./contact-form";
 import { trackEvent } from "./lib/analytics";
 import type { Copy, Locale } from "./i18n";
+import { isRuntimeFeatureEnabled } from "../packages/core/config";
 
 type HomePageProps = {
   copy: Copy;
@@ -159,7 +160,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
 
       <section id="contacto" className="slowfit-contact-section">
         <div className="slowfit-shell">
-          <ContactForm copy={copy.contactForm} locale={locale} />
+          {isRuntimeFeatureEnabled("contactForm") ? <ContactForm copy={copy.contactForm} locale={locale} /> : null}
         </div>
       </section>
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCopy, isLocale, locales, type Locale } from "../../i18n";
 import { getCollections } from "../../lib/shopify";
+import { isModuleEnabled } from "../../../packages/core/config";
 
 type ShopPageProps = {
   params: Promise<{
@@ -54,6 +55,10 @@ export default async function ShopPage({ params }: ShopPageProps) {
   const { locale } = await params;
 
   if (!isLocale(locale)) {
+    notFound();
+  }
+
+  if (!isModuleEnabled("catalog")) {
     notFound();
   }
 

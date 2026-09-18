@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AccountPanel from "../../account-panel";
 import { isLocale, locales, type Locale } from "../../i18n";
+import { isModuleEnabled } from "../../../packages/core/config";
 
 type AccountPageProps = {
   params: Promise<{ locale: string }>;
@@ -24,6 +25,7 @@ export default async function AccountPage({ params, searchParams }: AccountPageP
   const { locale } = await params;
   const { resetToken, payment, reference } = await searchParams;
   if (!isLocale(locale)) notFound();
+  if (!isModuleEnabled("customerAccount")) notFound();
   return <AccountPanel
     locale={locale as Locale}
     resetToken={resetToken}

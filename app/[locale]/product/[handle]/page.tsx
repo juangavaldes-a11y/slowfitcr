@@ -6,6 +6,7 @@ import ReviewsPanel from "../../../reviews-panel";
 import { isLocale, type Locale } from "../../../i18n";
 import { getProductByHandle } from "../../../lib/shopify";
 import StructuredData from "../../../structured-data";
+import { isModuleEnabled } from "../../../../packages/core/config";
 
 type ProductPageProps = {
   params: Promise<{
@@ -55,6 +56,10 @@ export default async function ProductPage({ params }: ProductPageProps) {
   const { locale, handle } = await params;
 
   if (!isLocale(locale)) {
+    notFound();
+  }
+
+  if (!isModuleEnabled("catalog")) {
     notFound();
   }
 
@@ -129,7 +134,9 @@ export default async function ProductPage({ params }: ProductPageProps) {
             }}
           />
 
-          <ReviewsPanel locale={locale as Locale} productHandle={product.handle} />
+          {isModuleEnabled("reviews") ? (
+            <ReviewsPanel locale={locale as Locale} productHandle={product.handle} />
+          ) : null}
         </div>
       </section>
     </main>
