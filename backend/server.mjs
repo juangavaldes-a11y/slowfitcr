@@ -649,6 +649,33 @@ async function reserveInventory(reference, items) {
   return reference;
 }
 
+async function refreshPreorderAvailability(productId) {
+  const variants = await prisma.productVariant.findMany({
+    where: { productId },
+    select: { id: true, inventoryQuantity: true },
+  });
+  const inventory = new Map(variants.map((variant) => [variant.id, variant.inventoryQuantity]));
+  const orders = await prisma.order.findMany({
+    where: { preorderStatus: "DEPOSIT_PAID" },
+    select: { id: true, items: true },
+  });
+
+  for (const order of orders) {
+    const preorderItems = (Array.isArray(order.items) ? order.items : []).filter((item) => item?.preorder !== false);
+    const hasProductVariant = preorderItems.length > 0 && preorderItems.every((item) => {
+      const variantId = String(item?.variantId || "");
+      const quantity = Number(item?.quantity || 0);
+      return inventory.has(variantId) && (inventory.get(variantId) || 0) >= quantity;
+    });
+    if (hasProductVariant) {
+      await prisma.order.updateMany({
+        where: { id: order.id, preorderStatus: "DEPOSIT_PAID" },
+        data: { preorderStatus: "STOCK_AVAILABLE" },
+      });
+    }
+  }
+}
+
 async function releaseInventoryReservation(reference, status = "RELEASED") {
   if (!reference) return;
   await prisma.$transaction(async (transaction) => {
@@ -722,6 +749,7 @@ async function createPaymentSession(lines, locale, deliveryId) {
     currency: process.env.STORE_CURRENCY || "CRC",
     amount: hasPreorderItems ? preorderDepositAmount : subtotal + shippingAmount,
     items,
+    ...(hasPreorderItems ? { fullAmount: subtotal } : {}),
     ...(hasPreorderItems ? { orderType: "PREORDER_DEPOSIT", depositPercent: 50 } : {}),
     ...(delivery ? {
       shipping: {
@@ -1147,6 +1175,10 @@ function paymentInventoryLines(items) {
 async function processOrderEvent({ topic, provider, payload }, options = { replay: false }) {
   const email = String(payload.email || "").trim().toLowerCase();
   const externalPaymentId = String(payload.reference || payload.id || "").trim();
+  const linkedPreorderId = String(payload.linkedPreorderId || "").trim();
+  const isPreorderDeposit = topic === "payment.paid"
+    && (payload.orderType === "PREORDER_DEPOSIT" || (Array.isArray(payload.items) && payload.items.some((item) => item?.preorder)));
+  const isPreorderFinalPayment = topic === "payment.paid" && Boolean(linkedPreorderId);
   if (topic === "payment.paid" && (!externalPaymentId || !email)) {
     throw new Error("INVALID_PAID_PAYMENT");
   }
@@ -1167,33 +1199,64 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
     const customer = await prisma.customer.findUnique({ where: { email }, select: { id: true } });
     const inventoryLines = topic === "payment.paid" ? paymentInventoryLines(payload.items) : null;
     await prisma.$transaction(async (transaction) => {
-      const order = await transaction.order.upsert({
-        where: { externalPaymentId },
-        create: {
-          externalPaymentId,
-          orderNumber: payload.orderNumber ? String(payload.orderNumber) : null,
-          name: payload.name ? String(payload.name) : null,
-          email,
-          financialStatus: payload.status ? String(payload.status) : null,
-          fulfillmentStatus: payload.fulfillmentStatus ? String(payload.fulfillmentStatus) : null,
-          total: payload.amount === undefined ? null : String(payload.amount),
-          currency: payload.currency ? String(payload.currency) : null,
-          items: payload.items || [],
-          paymentCreatedAt: payload.createdAt ? new Date(payload.createdAt) : null,
-          customerId: customer?.id,
-        },
-        update: {
-          orderNumber: payload.orderNumber ? String(payload.orderNumber) : null,
-          name: payload.name ? String(payload.name) : null,
-          email,
-          financialStatus: payload.status ? String(payload.status) : null,
-          fulfillmentStatus: payload.fulfillmentStatus ? String(payload.fulfillmentStatus) : null,
-          total: payload.amount === undefined ? null : String(payload.amount),
-          currency: payload.currency ? String(payload.currency) : null,
-          items: payload.items || [],
-          customerId: customer?.id,
-        },
-      });
+      const order = isPreorderFinalPayment
+        ? await transaction.order.findUnique({ where: { externalPaymentId: linkedPreorderId } })
+        : await transaction.order.upsert({
+          where: { externalPaymentId },
+          create: {
+            externalPaymentId,
+            orderNumber: payload.orderNumber ? String(payload.orderNumber) : null,
+            name: payload.name ? String(payload.name) : null,
+            email,
+            financialStatus: payload.status ? String(payload.status) : null,
+            fulfillmentStatus: payload.fulfillmentStatus ? String(payload.fulfillmentStatus) : null,
+            total: payload.fullAmount === undefined ? (payload.amount === undefined ? null : String(payload.amount)) : String(payload.fullAmount),
+            currency: payload.currency ? String(payload.currency) : null,
+            items: payload.items || [],
+            preorderStatus: isPreorderDeposit ? "DEPOSIT_PAID" : null,
+            depositPaidAmount: isPreorderDeposit && payload.amount !== undefined ? String(payload.amount) : null,
+            totalOrderAmount: isPreorderDeposit
+              ? String(payload.fullAmount ?? payload.amount ?? "")
+              : null,
+            paymentCreatedAt: payload.createdAt ? new Date(payload.createdAt) : null,
+            customerId: customer?.id,
+          },
+          update: {
+            orderNumber: payload.orderNumber ? String(payload.orderNumber) : null,
+            name: payload.name ? String(payload.name) : null,
+            email,
+            financialStatus: payload.status ? String(payload.status) : null,
+            fulfillmentStatus: payload.fulfillmentStatus ? String(payload.fulfillmentStatus) : null,
+            total: isPreorderDeposit
+              ? String(payload.fullAmount ?? payload.amount ?? "")
+              : (payload.amount === undefined ? undefined : String(payload.amount)),
+            currency: payload.currency ? String(payload.currency) : null,
+            items: payload.items || [],
+            ...(isPreorderDeposit ? {
+              preorderStatus: "DEPOSIT_PAID",
+              depositPaidAmount: payload.amount === undefined ? null : String(payload.amount),
+              totalOrderAmount: String(payload.fullAmount ?? payload.amount ?? ""),
+            } : {}),
+            customerId: customer?.id,
+          },
+        });
+
+      if (!order) {
+        throw new Error("PREORDER_ORDER_NOT_FOUND");
+      }
+
+      if (isPreorderFinalPayment) {
+        await transaction.order.update({
+          where: { id: order.id },
+          data: {
+            finalPaymentReference: externalPaymentId,
+            preorderStatus: "COMPLETE",
+            financialStatus: payload.status ? String(payload.status) : "paid",
+            fulfillmentStatus: payload.fulfillmentStatus ? String(payload.fulfillmentStatus) : "unfulfilled",
+            total: order.totalOrderAmount || order.total,
+          },
+        });
+      }
 
       if (topic === "payment.paid") {
         await transaction.delivery.updateMany({
@@ -1207,6 +1270,10 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
       }
 
       if (!inventoryLines) {
+        return;
+      }
+
+      if (isPreorderDeposit) {
         return;
       }
 
@@ -1974,6 +2041,10 @@ async function handleCustomerOrders(request) {
       total: true,
       currency: true,
       items: true,
+      preorderStatus: true,
+      depositPaidAmount: true,
+      totalOrderAmount: true,
+      finalPaymentReference: true,
       paymentCreatedAt: true,
       updatedAt: true,
       delivery: {
@@ -2309,6 +2380,7 @@ async function handleUpdateCatalogProduct(request, productId) {
     if (!product) {
       return jsonResponse({ error: "Not found" }, 404);
     }
+    await refreshPreorderAvailability(product.id);
     await appendAudit("catalog.product.updated", { productId, handle: product.handle }, "catalog-admin");
     return jsonResponse({ product: serializeCatalogProduct(product) });
   } catch (error) {

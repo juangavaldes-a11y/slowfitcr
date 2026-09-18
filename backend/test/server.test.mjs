@@ -818,6 +818,65 @@ test("paid preorders preserve zero inventory", async () => {
   assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 0);
 });
 
+test("preorders keep the deposit order open until the final payment", async () => {
+  const product = await prisma.product.create({
+    data: {
+      title: "Two Phase Top",
+      handle: "two-phase-top",
+      status: "ACTIVE",
+      published: true,
+      preorderEnabled: true,
+      variants: { create: { title: "M", price: 100, inventoryQuantity: 0 } },
+    },
+    include: { variants: true },
+  });
+  const variantId = product.variants[0].id;
+  const depositBody = JSON.stringify({
+    reference: "pay-two-phase-deposit",
+    email: "two-phase@example.com",
+    status: "paid",
+    amount: "50.00",
+    fullAmount: "100.00",
+    orderType: "PREORDER_DEPOSIT",
+    items: [{ variantId, name: "Two Phase Top", quantity: 1, preorder: true }],
+  });
+  const sign = (body) => createHmac("sha256", process.env.PAYMENT_WEBHOOK_SECRET).update(body, "utf8").digest("base64");
+  const deposit = await route(request("/api/webhooks/payments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-slowfit-signature": sign(depositBody), "x-payment-topic": "payment.paid", "x-payment-provider": "test-bank" },
+    body: depositBody,
+  }));
+  assert.equal(deposit.status, 200);
+
+  await prisma.productVariant.update({ where: { id: variantId }, data: { inventoryQuantity: 1 } });
+  await prisma.product.update({ where: { id: product.id }, data: { inventoryTotal: 1 } });
+  const depositOrder = await prisma.order.findUnique({ where: { externalPaymentId: "pay-two-phase-deposit" } });
+  await prisma.order.update({ where: { id: depositOrder.id }, data: { preorderStatus: "FINAL_PAYMENT_PENDING" } });
+
+  const finalBody = JSON.stringify({
+    reference: "pay-two-phase-final",
+    linkedPreorderId: "pay-two-phase-deposit",
+    email: "two-phase@example.com",
+    status: "paid",
+    amount: "50.00",
+    items: [{ variantId, name: "Two Phase Top", quantity: 1 }],
+  });
+  const finalPayment = await route(request("/api/webhooks/payments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-slowfit-signature": sign(finalBody), "x-payment-topic": "payment.paid", "x-payment-provider": "test-bank" },
+    body: finalBody,
+  }));
+  assert.equal(finalPayment.status, 200);
+
+  const completedOrder = await prisma.order.findUnique({ where: { externalPaymentId: "pay-two-phase-deposit" } });
+  assert.equal(await prisma.order.count({ where: { email: "two-phase@example.com" } }), 1);
+  assert.equal(completedOrder.preorderStatus, "COMPLETE");
+  assert.equal(completedOrder.depositPaidAmount, "50.00");
+  assert.equal(completedOrder.finalPaymentReference, "pay-two-phase-final");
+  assert.equal(completedOrder.total, "100.00");
+  assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 0);
+});
+
 test("authenticated moderators can replay a stored webhook event", async () => {
   const event = await prisma.paymentWebhookEvent.create({
     data: {

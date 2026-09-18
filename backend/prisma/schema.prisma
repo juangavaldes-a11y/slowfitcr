@@ -48,6 +48,13 @@ enum DeliveryStatus {
   FAILED
 }
 
+enum PreorderStatus {
+  DEPOSIT_PAID
+  STOCK_AVAILABLE
+  FINAL_PAYMENT_PENDING
+  COMPLETE
+}
+
 model Product {
   id          String          @id @default(uuid())
   handle      String          @unique
@@ -172,6 +179,7 @@ model PasswordResetToken {
 model Order {
   id                String    @id @default(uuid())
   externalPaymentId String    @unique
+  finalPaymentReference String? @unique
   orderNumber    String?
   name           String?
   email          String
@@ -180,6 +188,9 @@ model Order {
   total          String?
   currency       String?
   items          Json
+  preorderStatus PreorderStatus?
+  depositPaidAmount String?
+  totalOrderAmount String?
   paymentCreatedAt DateTime?
   inventoryAdjustedAt DateTime?
   updatedAt      DateTime   @updatedAt

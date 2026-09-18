@@ -27,6 +27,10 @@ type Order = {
   total: string | null;
   currency: string | null;
   items: Array<{ title?: string; quantity?: number }>;
+  preorderStatus: "DEPOSIT_PAID" | "STOCK_AVAILABLE" | "FINAL_PAYMENT_PENDING" | "COMPLETE" | null;
+  depositPaidAmount: string | null;
+  totalOrderAmount: string | null;
+  finalPaymentReference: string | null;
   paymentCreatedAt: string | null;
   updatedAt: string;
   delivery: {
@@ -98,6 +102,9 @@ export default function AccountPanel({ locale, resetToken, paymentStatus, refere
         orders: "Tus pedidos",
         noOrders: "Tus pedidos aparecerán aqui cuando el banco confirme una compra con este correo.",
         paid: "Pago",
+        preorderWaiting: "Preventa: esperando inventario",
+        preorderReady: "Preventa: lista para pago final",
+        preorderComplete: "Preventa: pago completo",
         fulfillment: "Entrega",
         deliveryProvider: "Proveedor",
         deliveryFee: "Costo de entrega",
@@ -151,6 +158,9 @@ export default function AccountPanel({ locale, resetToken, paymentStatus, refere
         orders: "Your orders",
         noOrders: "Orders will appear here when the payment provider confirms a purchase using this email.",
         paid: "Payment",
+        preorderWaiting: "Pre-order: awaiting stock",
+        preorderReady: "Pre-order: ready for final payment",
+        preorderComplete: "Pre-order: fully paid",
         fulfillment: "Delivery",
         deliveryProvider: "Provider",
         deliveryFee: "Delivery cost",
@@ -366,6 +376,11 @@ export default function AccountPanel({ locale, resetToken, paymentStatus, refere
                     </div>
                     <div className="slowfit-order-status">
                       <span>{labels.paid}: <Tag color={order.financialStatus === "paid" ? "success" : "warning"}>{order.financialStatus || "pending"}</Tag></span>
+                      {order.preorderStatus ? (
+                        <Tag color={order.preorderStatus === "COMPLETE" ? "success" : order.preorderStatus === "STOCK_AVAILABLE" || order.preorderStatus === "FINAL_PAYMENT_PENDING" ? "processing" : "warning"}>
+                          {order.preorderStatus === "COMPLETE" ? labels.preorderComplete : order.preorderStatus === "STOCK_AVAILABLE" || order.preorderStatus === "FINAL_PAYMENT_PENDING" ? labels.preorderReady : labels.preorderWaiting}
+                        </Tag>
+                      ) : null}
                       <span>{labels.fulfillment}: <Tag color={order.delivery?.status === "COMPLETED" || order.fulfillmentStatus === "fulfilled" ? "success" : "warning"}>{order.delivery?.status || order.fulfillmentStatus || "unfulfilled"}</Tag></span>
                     </div>
                     <Typography.Text strong>{order.total ? `${order.total} ${order.currency || ""}` : ""}</Typography.Text>
