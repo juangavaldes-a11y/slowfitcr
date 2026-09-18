@@ -37,9 +37,26 @@ const RATE_LIMIT_MAX = Number.parseInt(process.env.RATE_LIMIT_MAX || "120", 10);
 const RATE_LIMIT_AUTH_MAX = Number.parseInt(process.env.RATE_LIMIT_AUTH_MAX || "20", 10);
 const WEBHOOK_TIMEOUT_MS = Number.parseInt(process.env.WEBHOOK_TIMEOUT_MS || "2000", 10);
 const WEBHOOK_MAX_ATTEMPTS = Math.min(3, Math.max(1, Number.parseInt(process.env.WEBHOOK_MAX_ATTEMPTS || "2", 10)));
+const OUTBOX_MAX_ATTEMPTS = Math.min(12, Math.max(3, Number.parseInt(process.env.OUTBOX_MAX_ATTEMPTS || "8", 10)));
+const INVENTORY_RESERVATION_MAX_AGE_MS = Number.parseInt(process.env.INVENTORY_RESERVATION_MAX_AGE_MS || "900000", 10);
+const PRESIGNED_URL_EXPIRY_SECONDS = Math.min(3600, Math.max(60, Number.parseInt(process.env.PRESIGNED_URL_EXPIRY_SECONDS || "300", 10)));
+const PASSWORD_RESET_RATE_LIMIT_MAX = Number.parseInt(process.env.PASSWORD_RESET_RATE_LIMIT_MAX || "3", 10);
+const PASSWORD_RESET_RATE_LIMIT_WINDOW_MS = Number.parseInt(process.env.PASSWORD_RESET_RATE_LIMIT_WINDOW_MS || "3600000", 10);
 const MAX_REQUEST_BODY_BYTES = Number.parseInt(process.env.MAX_REQUEST_BODY_BYTES || "1048576", 10);
-
-const rateLimitStore = new Map();
+const BACKEND_MODULE_DEFAULTS = {
+  catalog: true,
+  cart: true,
+  checkout: true,
+  customerAccount: true,
+  reviews: true,
+  delivery: true,
+  admin: true,
+  analytics: true,
+  crm: true,
+  email: true,
+  subscriptions: false,
+  marketplace: false,
+};
 
 const FALLBACK_APPROVED_REVIEWS = [
   {
@@ -148,7 +165,7 @@ function getCustomerSessionSecret() {
 }
 
 export function validateProductionConfiguration() {
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV === "test") {
     return;
   }
 
@@ -191,6 +208,23 @@ export function validateProductionConfiguration() {
   if (uberValues.every(Boolean) || didiValues.every(Boolean)) {
     configuredPickup();
   }
+}
+
+function isBackendModuleEnabled(moduleKey) {
+  const configured = process.env[`MODULE_${moduleKey.toUpperCase()}_ENABLED`];
+  if (configured === undefined) return BACKEND_MODULE_DEFAULTS[moduleKey] !== false;
+  return configured !== "false";
+}
+
+function isBackendFeatureEnabled(featureKey) {
+  const configured = process.env[`FEATURE_${featureKey.toUpperCase()}_ENABLED`];
+  return configured === undefined ? true : configured !== "false";
+}
+
+function maskedEmail(email) {
+  const [local, domain] = String(email || "").split("@");
+  if (!local || !domain) return "unknown";
+  return `${local.slice(0, 1)}***@${domain}`;
 }
 
 function toBase64Url(value) {
@@ -446,7 +480,7 @@ function shouldRateLimit(pathname) {
   return pathname.startsWith("/api/");
 }
 
-function applyRateLimit(request) {
+async function applyRateLimit(request) {
   const url = parseUrl(request);
   if (!shouldRateLimit(url.pathname)) {
     return { limited: false };
@@ -459,20 +493,48 @@ function applyRateLimit(request) {
   const max = isAuthPath ? RATE_LIMIT_AUTH_MAX : RATE_LIMIT_MAX;
   const key = `${ip}:${url.pathname}`;
   const now = Date.now();
+  const resetAt = new Date(now + RATE_LIMIT_WINDOW_MS);
 
-  const entry = rateLimitStore.get(key);
-  if (!entry || entry.resetAt <= now) {
-    rateLimitStore.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+  return prisma.$transaction(async (transaction) => {
+    const entry = await transaction.rateLimitBucket.findUnique({ where: { id: key } });
+    if (!entry || entry.resetAt.getTime() <= now) {
+      await transaction.rateLimitBucket.upsert({
+        where: { id: key },
+        create: { id: key, count: 1, resetAt },
+        update: { count: 1, resetAt },
+      });
+      return { limited: false };
+    }
+
+    if (entry.count >= max) {
+      return { limited: true, retryAfterSeconds: Math.ceil((entry.resetAt.getTime() - now) / 1000) };
+    }
+
+    await transaction.rateLimitBucket.update({ where: { id: key }, data: { count: { increment: 1 } } });
     return { limited: false };
-  }
+  }, { isolationLevel: "Serializable" });
+}
 
-  if (entry.count >= max) {
-    return { limited: true, retryAfterSeconds: Math.ceil((entry.resetAt - now) / 1000) };
-  }
+function getBackendRouteRequirements(pathname) {
+  if (pathname === "/api/contact") return [{ feature: "contactForm" }];
+  if (pathname === "/api/events") return [{ module: "analytics" }, { feature: "analytics" }];
+  if (pathname.startsWith("/api/catalog/")) return [{ module: "catalog" }];
+  if (pathname === "/api/cart/checkout") return [{ module: "checkout" }];
+  if (pathname.startsWith("/api/cart/")) return [{ module: "cart" }];
+  if (pathname.startsWith("/api/auth/") || pathname.startsWith("/api/account/")) return [{ module: "customerAccount" }];
+  if (pathname.startsWith("/api/reviews/")) return [{ module: "reviews" }];
+  if (pathname === "/api/reviews" || pathname.startsWith("/api/reviews?")) return [{ module: "reviews" }];
+  if (pathname.startsWith("/api/delivery/")) return [{ module: "delivery" }];
+  if (pathname.startsWith("/api/admin/")) return [{ module: "admin" }];
+  if (pathname === "/api/webhooks/payments") return [{ module: "checkout" }];
+  if (pathname.startsWith("/api/webhooks/deliveries/")) return [{ module: "delivery" }];
+  return [];
+}
 
-  entry.count += 1;
-  rateLimitStore.set(key, entry);
-  return { limited: false };
+function isBackendRouteEnabled(pathname) {
+  return getBackendRouteRequirements(pathname).every((requirement) =>
+    requirement.module ? isBackendModuleEnabled(requirement.module) : isBackendFeatureEnabled(requirement.feature),
+  );
 }
 
 async function appendAudit(action, details, actor = "system") {
@@ -522,6 +584,62 @@ async function resolveCartItems(lines) {
   });
 }
 
+async function reserveInventory(reference, items) {
+  const reservableItems = items.filter((item) => !item.preorder);
+  if (!reservableItems.length) return null;
+
+  const reservationLines = reservableItems.map(({ variantId, quantity }) => ({ variantId, quantity }));
+  await prisma.$transaction(async (transaction) => {
+    for (const line of reservationLines) {
+      const updated = await transaction.productVariant.updateMany({
+        where: { id: line.variantId, inventoryQuantity: { gte: line.quantity } },
+        data: { inventoryQuantity: { decrement: line.quantity } },
+      });
+      if (updated.count !== 1) throw new Error("INSUFFICIENT_STOCK");
+      const variant = await transaction.productVariant.findUnique({ where: { id: line.variantId }, select: { productId: true } });
+      await transaction.product.update({ where: { id: variant.productId }, data: { inventoryTotal: { decrement: line.quantity } } });
+    }
+    await transaction.inventoryReservation.create({
+      data: {
+        reference,
+        lines: reservationLines,
+        expiresAt: new Date(Date.now() + INVENTORY_RESERVATION_MAX_AGE_MS),
+      },
+    });
+  }, { isolationLevel: "Serializable" });
+  return reference;
+}
+
+async function releaseInventoryReservation(reference, status = "RELEASED") {
+  if (!reference) return;
+  await prisma.$transaction(async (transaction) => {
+    const reservation = await transaction.inventoryReservation.findFirst({
+      where: { reference, status: "ACTIVE" },
+    });
+    if (!reservation) return;
+    for (const line of Array.isArray(reservation.lines) ? reservation.lines : []) {
+      const variant = await transaction.productVariant.findUnique({ where: { id: line.variantId }, select: { productId: true } });
+      if (!variant) continue;
+      await transaction.productVariant.update({ where: { id: line.variantId }, data: { inventoryQuantity: { increment: line.quantity } } });
+      await transaction.product.update({ where: { id: variant.productId }, data: { inventoryTotal: { increment: line.quantity } } });
+    }
+    await transaction.inventoryReservation.update({
+      where: { id: reservation.id },
+      data: { status, releasedAt: new Date() },
+    });
+  }, { isolationLevel: "Serializable" });
+}
+
+async function releaseExpiredReservations() {
+  const expired = await prisma.inventoryReservation.findMany({
+    where: { status: "ACTIVE", expiresAt: { lte: new Date() } },
+    take: 25,
+  });
+  for (const reservation of expired) {
+    await releaseInventoryReservation(reservation.reference);
+  }
+}
+
 async function createPaymentSession(lines, locale, deliveryId) {
   const items = await resolveCartItems(lines);
   const hasPreorderItems = items.some((item) => item.preorder);
@@ -539,6 +657,7 @@ async function createPaymentSession(lines, locale, deliveryId) {
   const reference = randomUUID();
   const origin = process.env.APP_ORIGIN || "https://slowfitcr.com";
   let delivery = null;
+  let reservationReference = null;
   if (!hasPreorderItems && deliveryId) {
     delivery = await prisma.delivery.findFirst({
       where: { id: deliveryId, status: "QUOTED", paymentReference: null, quoteExpiresAt: { gt: new Date() } },
@@ -554,10 +673,12 @@ async function createPaymentSession(lines, locale, deliveryId) {
     if (claimed.count !== 1) throw new Error("INVALID_DELIVERY_QUOTE");
   }
 
-  const subtotal = items.reduce((total, item) => total + item.lineTotal, 0);
-  const shippingAmount = delivery ? delivery.feeMinor / 100 : 0;
-  const preorderDepositAmount = hasPreorderItems ? subtotal / 2 : 0;
-  const paymentPayload = {
+  try {
+    reservationReference = await reserveInventory(reference, items);
+    const subtotal = items.reduce((total, item) => total + item.lineTotal, 0);
+    const shippingAmount = delivery ? delivery.feeMinor / 100 : 0;
+    const preorderDepositAmount = hasPreorderItems ? subtotal / 2 : 0;
+    const paymentPayload = {
     reference,
     currency: process.env.STORE_CURRENCY || "CRC",
     amount: hasPreorderItems ? preorderDepositAmount : subtotal + shippingAmount,
@@ -572,8 +693,7 @@ async function createPaymentSession(lines, locale, deliveryId) {
     } : {}),
     returnUrl: `${origin}/${locale}/account?payment=success&reference=${reference}`,
     cancelUrl: `${origin}/${locale}/shop?payment=cancelled`,
-  };
-  try {
+    };
     const response = await fetch(providerUrl, {
       method: "POST",
       headers: { "Authorization": `Bearer ${providerToken}`, "Content-Type": "application/json" },
@@ -585,6 +705,9 @@ async function createPaymentSession(lines, locale, deliveryId) {
     }
     return { cartId: reference, checkoutUrl: result.checkoutUrl };
   } catch (error) {
+    await releaseInventoryReservation(reservationReference).catch((releaseError) => {
+      log("error", "inventory.reservation.release_failed", { reference, error: String(releaseError?.message || "unknown_error") });
+    });
     if (delivery) {
       await prisma.delivery.updateMany({
         where: { id: delivery.id, paymentReference: reference, status: "PAYMENT_PENDING" },
@@ -720,6 +843,99 @@ async function forwardJsonWebhook(url, payload) {
   throw lastError || new Error("Outbound webhook delivery failed");
 }
 
+async function enqueueOutbox(kind, destination, payload) {
+  if (!destination) return null;
+  const event = await prisma.outboxEvent.create({
+    data: { kind, destination, payload, availableAt: new Date() },
+  });
+  return event.id;
+}
+
+async function deliverOutboxEvent(event) {
+  if (event.kind === "webhook") {
+    await forwardJsonWebhook(event.destination, event.payload);
+    return;
+  }
+  if (event.kind === "email") {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(event.payload),
+      signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`Transactional email rejected with status ${response.status}`);
+    return;
+  }
+  throw new Error(`Unknown outbox event kind: ${event.kind}`);
+}
+
+export async function drainOutbox(limit = 10) {
+  const now = new Date();
+  const candidates = await prisma.outboxEvent.findMany({
+    where: {
+      status: { in: ["PENDING", "PROCESSING"] },
+      availableAt: { lte: now },
+      OR: [{ status: "PENDING" }, { status: "PROCESSING", lockedAt: { lt: new Date(Date.now() - 60000) } }],
+    },
+    orderBy: { createdAt: "asc" },
+    take: limit,
+  });
+
+  for (const candidate of candidates) {
+    const claimed = await prisma.outboxEvent.updateMany({
+      where: {
+        id: candidate.id,
+        OR: [{ status: "PENDING" }, { status: "PROCESSING", lockedAt: { lt: new Date(Date.now() - 60000) } }],
+      },
+      data: { status: "PROCESSING", lockedAt: now, attempts: { increment: 1 } },
+    });
+    if (claimed.count !== 1) continue;
+
+    const event = await prisma.outboxEvent.findUnique({ where: { id: candidate.id } });
+    try {
+      await deliverOutboxEvent(event);
+      await prisma.outboxEvent.update({
+        where: { id: candidate.id },
+        data: { status: "DELIVERED", deliveredAt: new Date(), lockedAt: null, lastError: null },
+      });
+    } catch (error) {
+      const attempts = (event?.attempts || 0);
+      const exhausted = attempts >= OUTBOX_MAX_ATTEMPTS;
+      await prisma.outboxEvent.update({
+        where: { id: candidate.id },
+        data: {
+          status: exhausted ? "FAILED" : "PENDING",
+          availableAt: new Date(Date.now() + Math.min(3600000, (2 ** attempts) * 1000 + Math.floor(Math.random() * 500))),
+          lockedAt: null,
+          lastError: String(error?.message || "outbox delivery failed"),
+        },
+      });
+      log(exhausted ? "error" : "warn", "outbox.delivery.failed", {
+        eventId: candidate.id,
+        kind: candidate.kind,
+        destination: candidate.destination,
+        attempts,
+        error: String(error?.message || "unknown_error"),
+      });
+    }
+  }
+}
+
+async function queueWebhook(url, payload) {
+  if (!url) return;
+  await enqueueOutbox("webhook", url, payload);
+  await drainOutbox(1);
+}
+
+async function queueTransactionalEmail(payload) {
+  if (!process.env.RESEND_API_KEY) return;
+  await enqueueOutbox("email", "resend", payload);
+  await drainOutbox(1);
+}
+
 function verifyPaymentHmac(rawBody, signature, secret) {
   const digest = createHmac("sha256", secret).update(rawBody, "utf8").digest("base64");
   const expected = Buffer.from(digest);
@@ -732,7 +948,7 @@ function verifyPaymentHmac(rawBody, signature, secret) {
 }
 
 function buildOrderIdempotencyKey(topic, payload) {
-  const id = payload.reference || payload.id || payload.orderNumber || payload.name || "unknown";
+  const id = payload.eventId || payload.deliveryId || payload.webhookId || payload.reference || payload.id || payload.orderNumber || payload.name || "unknown";
   const updated = payload.updatedAt || payload.processedAt || payload.createdAt || payload.updated_at || "none";
   return `${topic}:${id}:${updated}`;
 }
@@ -947,7 +1163,30 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
         });
       }
 
+      if (topic === "payment.failed") {
+        return;
+      }
+
       if (!inventoryLines) {
+        return;
+      }
+
+      const reservation = await transaction.inventoryReservation.findUnique({ where: { reference: externalPaymentId } });
+      if (reservation?.status === "ACTIVE") {
+        await transaction.inventoryReservation.update({
+          where: { id: reservation.id },
+          data: { status: "COMMITTED", committedAt: new Date() },
+        });
+        await transaction.order.update({ where: { id: order.id }, data: { inventoryAdjustedAt: new Date() } });
+        for (const [variantId, quantity] of inventoryLines) {
+          const variant = await transaction.productVariant.findUnique({ where: { id: variantId }, select: { productId: true, price: true } });
+          if (!variant) continue;
+          await transaction.productMetric.upsert({
+            where: { productId: variant.productId },
+            create: { productId: variant.productId, unitsSold: quantity, revenue: Number(variant.price) * quantity },
+            update: { unitsSold: { increment: quantity }, revenue: { increment: Number(variant.price) * quantity } },
+          });
+        }
         return;
       }
 
@@ -1000,10 +1239,13 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
         });
       }
     }, { isolationLevel: "Serializable" });
+    if (topic === "payment.failed") {
+      await releaseInventoryReservation(externalPaymentId);
+    }
   }
 
-  await forwardJsonWebhook(process.env.ORDER_EVENTS_WEBHOOK_URL, event);
-  await forwardJsonWebhook(process.env.CRM_ORDER_WEBHOOK_URL, {
+  await queueWebhook(process.env.ORDER_EVENTS_WEBHOOK_URL, event);
+  await queueWebhook(process.env.CRM_ORDER_WEBHOOK_URL, {
     source: options.replay ? "slowfit-webhook-replay" : "slowfit-payment-webhook",
     event,
   });
@@ -1020,18 +1262,11 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
         .map((item) => `${item.quantity || 1}x ${item.name || "Item"}`)
         .slice(0, 8)
         .join(", ");
-      await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from,
-          to: [email],
-          subject: `Order confirmation ${orderLabel}`,
-          html: `<div style=\"font-family:Arial,sans-serif;color:#2f2a28\"><h2>Thanks for your order, ${name}.</h2><p>Order: ${orderLabel}</p><p>Total: ${total}</p><p>Items: ${items}</p></div>`,
-        }),
+      await queueTransactionalEmail({
+        from,
+        to: [email],
+        subject: `Order confirmation ${orderLabel}`,
+        html: `<div style=\"font-family:Arial,sans-serif;color:#2f2a28\"><h2>Thanks for your order, ${name}.</h2><p>Order: ${orderLabel}</p><p>Total: ${total}</p><p>Items: ${items}</p></div>`,
       });
     }
   }
@@ -1061,7 +1296,7 @@ async function handleContact(request) {
     return jsonResponse({ error: "Invalid contact payload" }, 400);
   }
 
-  await forwardJsonWebhook(process.env.CONTACT_WEBHOOK_URL, {
+  await queueWebhook(process.env.CONTACT_WEBHOOK_URL, {
     source: "slowfit-backend",
     name,
     email,
@@ -1070,7 +1305,7 @@ async function handleContact(request) {
     createdAt: new Date().toISOString(),
   });
 
-  await appendAudit("contact.received", { email, locale }, "customer");
+  await appendAudit("contact.received", { email: maskedEmail(email), locale }, "customer");
   return jsonResponse({ ok: true });
 }
 
@@ -1105,7 +1340,7 @@ async function handleEvent(request) {
     })));
   }
 
-  await forwardJsonWebhook(process.env.ANALYTICS_WEBHOOK_URL, event);
+  await queueWebhook(process.env.ANALYTICS_WEBHOOK_URL, event);
   await appendAudit("event.ingested", { eventName, page: event.page, locale: event.locale, params: event.params });
   return jsonResponse({ ok: true });
 }
@@ -1213,7 +1448,7 @@ async function handleSubmitReview(request) {
     },
   });
 
-  await forwardJsonWebhook(process.env.REVIEWS_MODERATION_WEBHOOK_URL, {
+  await queueWebhook(process.env.REVIEWS_MODERATION_WEBHOOK_URL, {
     type: "review.submitted",
     review,
   });
@@ -1327,7 +1562,7 @@ async function handleBulkModerateReviews(request) {
       }),
     ]);
 
-    await Promise.all(pendingReviews.map((review) => forwardJsonWebhook(process.env.REVIEWS_MODERATION_WEBHOOK_URL, {
+    await Promise.all(pendingReviews.map((review) => queueWebhook(process.env.REVIEWS_MODERATION_WEBHOOK_URL, {
       type: "review.moderated",
       action,
       review,
@@ -1367,7 +1602,7 @@ async function handleModerateReview(request) {
     },
   });
 
-  await forwardJsonWebhook(process.env.REVIEWS_MODERATION_WEBHOOK_URL, {
+  await queueWebhook(process.env.REVIEWS_MODERATION_WEBHOOK_URL, {
     type: "review.moderated",
     action,
     review,
@@ -1434,7 +1669,7 @@ async function handleCustomerRegister(request) {
       data: { email, passwordHash: await hashPassword(password), firstName, lastName, locale },
     });
     await prisma.order.updateMany({ where: { email, customerId: null }, data: { customerId: customer.id } });
-    await appendAudit("customer.registered", { customerId: customer.id }, email);
+    await appendAudit("customer.registered", { customerId: customer.id }, `customer:${maskedEmail(email)}`);
     return jsonResponse({ ok: true, customer: customerResponse(customer) }, 201, {
       "Set-Cookie": buildCustomerSessionCookie(createCustomerSessionToken(customer)),
     });
@@ -1472,7 +1707,7 @@ async function handleCustomerLogin(request) {
         });
       }
     }
-    await appendAudit("customer.login.failed", { email }, "unknown");
+    await appendAudit("customer.login.failed", { email: maskedEmail(email) }, "unknown");
     return jsonResponse({ error: "Invalid email or password" }, 401);
   }
 
@@ -1480,7 +1715,7 @@ async function handleCustomerLogin(request) {
     where: { id: customer.id },
     data: { failedLoginAttempts: 0, lockedUntil: null },
   });
-  await appendAudit("customer.login", { customerId: customer.id }, email);
+  await appendAudit("customer.login", { customerId: customer.id }, `customer:${maskedEmail(email)}`);
   return jsonResponse({ ok: true, customer: customerResponse(customer) }, 200, {
     "Set-Cookie": buildCustomerSessionCookie(createCustomerSessionToken(customer)),
   });
@@ -1504,6 +1739,24 @@ async function handlePasswordResetRequest(request) {
     return jsonResponse(accepted, 202);
   }
 
+  const resetBucketId = `password-reset:${email}`;
+  const resetNow = Date.now();
+  const resetLimit = await prisma.$transaction(async (transaction) => {
+    const bucket = await transaction.rateLimitBucket.findUnique({ where: { id: resetBucketId } });
+    if (!bucket || bucket.resetAt.getTime() <= resetNow) {
+      await transaction.rateLimitBucket.upsert({
+        where: { id: resetBucketId },
+        create: { id: resetBucketId, count: 1, resetAt: new Date(resetNow + PASSWORD_RESET_RATE_LIMIT_WINDOW_MS) },
+        update: { count: 1, resetAt: new Date(resetNow + PASSWORD_RESET_RATE_LIMIT_WINDOW_MS) },
+      });
+      return false;
+    }
+    if (bucket.count >= PASSWORD_RESET_RATE_LIMIT_MAX) return true;
+    await transaction.rateLimitBucket.update({ where: { id: resetBucketId }, data: { count: { increment: 1 } } });
+    return false;
+  }, { isolationLevel: "Serializable" });
+  if (resetLimit) return jsonResponse(accepted, 202);
+
   const token = randomBytes(32).toString("base64url");
   const resetRecord = await prisma.$transaction(async (transaction) => {
     await transaction.passwordResetToken.deleteMany({ where: { customerId: customer.id } });
@@ -1518,7 +1771,7 @@ async function handlePasswordResetRequest(request) {
 
   try {
     await sendPasswordResetEmail({ email: customer.email, locale, token });
-    await appendAudit("customer.password_reset.requested", { customerId: customer.id }, "customer");
+    await appendAudit("customer.password_reset.requested", { customerId: customer.id, email: maskedEmail(customer.email) }, "customer");
   } catch (error) {
     await prisma.passwordResetToken.delete({ where: { id: resetRecord.id } }).catch(() => undefined);
     log("error", "customer.password_reset.delivery_failed", {
@@ -2015,7 +2268,7 @@ async function handleCatalogImageUpload(request) {
     credentials: { accessKeyId, secretAccessKey },
   });
   const uploadUrl = await getSignedUrl(client, new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }), {
-    expiresIn: 300,
+    expiresIn: PRESIGNED_URL_EXPIRY_SECONDS,
   });
 
   return jsonResponse({ uploadUrl, publicUrl: `${publicUrl}/${key}` });
@@ -2364,11 +2617,15 @@ export async function route(request) {
   const pathname = url.pathname;
   const method = request.method.toUpperCase();
 
+  if (!isBackendRouteEnabled(pathname)) {
+    return jsonResponse({ error: "This feature is not enabled" }, 404);
+  }
+
   if (!["GET", "HEAD", "OPTIONS"].includes(method) && !isTrustedBrowserMutation(request)) {
     return jsonResponse({ error: "Forbidden origin" }, 403);
   }
 
-  const rate = applyRateLimit(request);
+  const rate = await applyRateLimit(request);
   if (rate.limited) {
     return jsonResponse(
       { error: "Too many requests", retryAfterSeconds: rate.retryAfterSeconds },
@@ -2601,6 +2858,7 @@ export function createRequestListener() {
     }
 
     res.statusCode = response.status;
+    res.setHeader("X-Request-ID", requestId);
     response.headers.forEach((value, key) => {
       res.setHeader(key, value);
     });
@@ -2624,6 +2882,11 @@ export function createRequestListener() {
 
 export function startServer() {
   validateProductionConfiguration();
+  const outboxInterval = setInterval(() => {
+    void releaseExpiredReservations().catch((error) => log("error", "inventory.reservation.cleanup_failed", { error: String(error?.message || "unknown_error") }));
+    void drainOutbox().catch((error) => log("error", "outbox.drain_failed", { error: String(error?.message || "unknown_error") }));
+  }, 5000);
+  outboxInterval.unref?.();
   return createServer(createRequestListener()).listen(PORT, HOST, () => {
     log("info", "server.started", { host: HOST, port: PORT });
   });

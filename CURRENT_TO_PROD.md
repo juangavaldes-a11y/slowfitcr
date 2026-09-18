@@ -77,6 +77,11 @@ Backend delivery and request limits:
 
 - `WEBHOOK_TIMEOUT_MS` (default `2000`)
 - `WEBHOOK_MAX_ATTEMPTS` (default `2`, maximum `3`)
+- `OUTBOX_MAX_ATTEMPTS` (default `8`, maximum `12`)
+- `INVENTORY_RESERVATION_MAX_AGE_MS` (default `900000`)
+- `PRESIGNED_URL_EXPIRY_SECONDS` (default `300`, range `60-3600`)
+- `PASSWORD_RESET_RATE_LIMIT_MAX` (default `3` per email)
+- `PASSWORD_RESET_RATE_LIMIT_WINDOW_MS` (default `3600000`)
 - `MAX_REQUEST_BODY_BYTES` (default `1048576`)
 - `PASSWORD_RESET_MAX_AGE_MS` (default `1800000`)
 

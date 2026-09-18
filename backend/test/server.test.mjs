@@ -3,6 +3,7 @@ import { createHmac } from "node:crypto";
 import { after, before, beforeEach, test } from "node:test";
 import { PrismaClient } from "@prisma/client";
 
+process.env.NODE_ENV = "test";
 if (!process.env.TEST_DATABASE_URL) {
   process.env.TEST_DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://slowfit:slowfit@localhost:5433/slowfit_migration_test?schema=public";
 }
@@ -21,6 +22,7 @@ let route;
 let disconnectDatabase;
 let startServer;
 let validateProductionConfiguration;
+let drainOutbox;
 let requestSequence = 1;
 
 function request(path, init = {}) {
@@ -47,10 +49,13 @@ async function loginCookie() {
 }
 
 before(async () => {
-  ({ route, disconnectDatabase, startServer, validateProductionConfiguration } = await import("../server.mjs"));
+  ({ route, disconnectDatabase, startServer, validateProductionConfiguration, drainOutbox } = await import("../server.mjs"));
 });
 
 beforeEach(async () => {
+  await prisma.rateLimitBucket.deleteMany();
+  await prisma.outboxEvent.deleteMany();
+  await prisma.inventoryReservation.deleteMany();
   await prisma.product.deleteMany();
   await prisma.paymentWebhookEvent.deleteMany();
   await prisma.order.deleteMany();
@@ -791,6 +796,20 @@ test("health and unknown routes return their documented responses", async () => 
   assert.deepEqual(await json(missing), { error: "Not found" });
 });
 
+test("backend runtime module flags disable matching API routes", async () => {
+  const previousCatalog = process.env.MODULE_CATALOG_ENABLED;
+  const previousContact = process.env.FEATURE_CONTACTFORM_ENABLED;
+  try {
+    process.env.MODULE_CATALOG_ENABLED = "false";
+    process.env.FEATURE_CONTACTFORM_ENABLED = "false";
+    assert.equal((await route(request("/api/catalog/products"))).status, 404);
+    assert.equal((await route(request("/api/contact", { method: "POST", body: "{}" }))).status, 404);
+  } finally {
+    if (previousCatalog === undefined) delete process.env.MODULE_CATALOG_ENABLED; else process.env.MODULE_CATALOG_ENABLED = previousCatalog;
+    if (previousContact === undefined) delete process.env.FEATURE_CONTACTFORM_ENABLED; else process.env.FEATURE_CONTACTFORM_ENABLED = previousContact;
+  }
+});
+
 test("contact and analytics endpoints validate and persist accepted payloads", async () => {
   const invalidContact = await route(request("/api/contact", {
     method: "POST",
@@ -863,11 +882,24 @@ test("outbound webhooks retry transient failures and include HMAC headers", asyn
       .update(`${timestamp}.${deliveries[1].init.body}`)
       .digest("base64");
     assert.equal(deliveries[1].init.headers["X-Slowfit-Signature"], expectedSignature);
+    const outbox = await prisma.outboxEvent.findFirst({ where: { destination: process.env.CONTACT_WEBHOOK_URL } });
+    assert.equal(outbox.status, "DELIVERED");
   } finally {
     globalThis.fetch = originalFetch;
     delete process.env.CONTACT_WEBHOOK_URL;
     delete process.env.OUTBOUND_WEBHOOK_SECRET;
   }
+});
+
+test("outbox records delivery failures for later retry", async () => {
+  const event = await prisma.outboxEvent.create({
+    data: { kind: "unsupported", destination: "internal", payload: {}, availableAt: new Date() },
+  });
+  await drainOutbox();
+  const updated = await prisma.outboxEvent.findUnique({ where: { id: event.id } });
+  assert.equal(updated.status, "PENDING");
+  assert.equal(updated.attempts, 1);
+  assert.match(updated.lastError, /Unknown outbox event kind/);
 });
 
 test("checkout validates internal inventory and sends server-calculated totals to the payment adapter", async () => {
@@ -940,6 +972,31 @@ test("checkout validates internal inventory and sends server-calculated totals t
     assert.equal(payload.checkout.checkoutUrl, "https://payments.example.com/pay/123");
     assert.equal(paymentPayload.amount, 84);
     assert.equal(paymentPayload.items[0].unitPrice, 42);
+    assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 0);
+    const reservation = await prisma.inventoryReservation.findUnique({ where: { reference: payload.checkout.cartId } });
+    assert.equal(reservation.status, "ACTIVE");
+
+    const paidBody = JSON.stringify({
+      reference: payload.checkout.cartId,
+      email: "customer@example.com",
+      amount: 84,
+      currency: "CRC",
+      items: paymentPayload.items,
+      status: "paid",
+    });
+    const paidSignature = createHmac("sha256", process.env.PAYMENT_WEBHOOK_SECRET).update(paidBody, "utf8").digest("base64");
+    const paid = await route(request("/api/webhooks/payments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Slowfit-Signature": paidSignature,
+        "X-Payment-Topic": "payment.paid",
+      },
+      body: paidBody,
+    }));
+    assert.equal(paid.status, 200);
+    assert.equal((await prisma.inventoryReservation.findUnique({ where: { reference: payload.checkout.cartId } })).status, "COMMITTED");
+    assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 0);
 
     const preorderCheckout = await route(request("/api/cart/checkout", {
       method: "POST",
@@ -1134,6 +1191,7 @@ test("HTTP server adapter translates requests and contains route errors", async 
   try {
     const live = await fetch(`${origin}/health/live`);
     assert.equal(live.status, 200);
+    assert.match(live.headers.get("x-request-id"), /^[0-9a-f-]{36}$/);
     assert.deepEqual(await live.json(), { ok: true, service: "slowfit-backend" });
 
     const malformed = await fetch(`${origin}/api/contact`, {

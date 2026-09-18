@@ -18,6 +18,19 @@ enum WebhookStatus {
   FAILED
 }
 
+enum InventoryReservationStatus {
+  ACTIVE
+  COMMITTED
+  RELEASED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+}
+
 enum ProductStatus {
   DRAFT
   ACTIVE
@@ -253,4 +266,43 @@ model PaymentWebhookEvent {
   @@index([createdAt])
   @@index([topic])
   @@index([status])
+}
+
+model InventoryReservation {
+  id             String                     @id @default(uuid())
+  reference      String                     @unique
+  status         InventoryReservationStatus @default(ACTIVE)
+  lines          Json
+  expiresAt      DateTime
+  committedAt    DateTime?
+  releasedAt     DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@index([status, expiresAt])
+}
+
+model OutboxEvent {
+  id             String      @id @default(uuid())
+  kind           String
+  destination    String
+  payload        Json
+  status         OutboxStatus @default(PENDING)
+  attempts       Int         @default(0)
+  availableAt    DateTime    @default(now())
+  lockedAt       DateTime?
+  deliveredAt    DateTime?
+  lastError      String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([status, availableAt])
+  @@index([kind, createdAt])
+}
+
+model RateLimitBucket {
+  id        String   @id
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
 }
