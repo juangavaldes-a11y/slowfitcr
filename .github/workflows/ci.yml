@@ -21,7 +21,13 @@ jobs:
         run: npm ci
 
       - name: Audit dependencies
-        run: npm audit --audit-level=high
+        run: |
+          for attempt in 1 2 3; do
+            npm audit --audit-level=high && exit 0
+            echo "npm audit attempt $attempt failed, retrying..." >&2
+            sleep 15
+          done
+          exit 1
 
       - name: Lint
         run: npm run lint
@@ -67,7 +73,13 @@ jobs:
         run: npm ci
 
       - name: Audit dependencies
-        run: npm audit --audit-level=high
+        run: |
+          for attempt in 1 2 3; do
+            npm audit --audit-level=high && exit 0
+            echo "npm audit attempt $attempt failed, retrying..." >&2
+            sleep 15
+          done
+          exit 1
 
       - name: Generate Prisma client
         run: npx prisma generate
