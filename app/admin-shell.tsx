@@ -1,7 +1,7 @@
 "use client";
 
 import { LogoutOutlined } from "@ant-design/icons";
-import { Button, Form, Input, Space, Typography } from "antd";
+import { Button, Collapse, Form, Input, Space, Typography } from "antd";
 import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
 
@@ -36,6 +36,7 @@ export default function AdminShell({
         authTitle: "Acceso de moderacion",
         authCopy: "La sesion permanece activa hasta que expire o cierres sesion.",
         token: "Token de moderacion",
+        tokenHint: "Es la forma mas rapida de entrar: pega el token y presiona Entrar.",
         email: "Email del administrador",
         password: "Contrasena",
         otp: "Codigo MFA (si esta habilitado)",
@@ -43,6 +44,7 @@ export default function AdminShell({
         signOut: "Salir",
         checking: "Verificando sesion...",
         required: "Ingresa el token de moderacion.",
+        accountToggle: "Prefiero entrar con email y contrasena",
       }
     : {
         catalog: "Catalog",
@@ -51,6 +53,7 @@ export default function AdminShell({
         authTitle: "Moderation access",
         authCopy: "Your session remains active until it expires or you sign out.",
         token: "Moderation token",
+        tokenHint: "Fastest way in: paste the token and press Sign in.",
         email: "Admin email",
         password: "Password",
         otp: "MFA code (if enabled)",
@@ -58,6 +61,7 @@ export default function AdminShell({
         signOut: "Sign out",
         checking: "Checking session...",
         required: "Enter the moderation token.",
+        accountToggle: "I'd rather sign in with email and password",
       };
 
   useEffect(() => {
@@ -99,21 +103,46 @@ export default function AdminShell({
             <Typography.Title level={4}>{labels.authTitle}</Typography.Title>
             <Typography.Paragraph className="slowfit-policy-lead">{labels.authCopy}</Typography.Paragraph>
             <Form layout="vertical" onFinish={onLogin}>
-              <Form.Item name="email" label={labels.email}>
-                <Input autoComplete="username" />
-              </Form.Item>
-              <Form.Item name="password" label={labels.password}>
-                <Input.Password autoComplete="current-password" />
-              </Form.Item>
-              <Form.Item name="otp" label={labels.otp}>
-                <Input inputMode="numeric" autoComplete="one-time-code" />
-              </Form.Item>
-              <Form.Item name="token" label={labels.token}>
-                <Input.Password autoComplete="off" />
+              <Form.Item
+                name="token"
+                label={labels.token}
+                extra={labels.tokenHint}
+                dependencies={["email", "password"]}
+                rules={[
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (value || (getFieldValue("email") && getFieldValue("password"))) return Promise.resolve();
+                      return Promise.reject(new Error(labels.required));
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password autoComplete="off" autoFocus />
               </Form.Item>
               <Button type="primary" htmlType="submit" loading={loginLoading}>
                 {labels.signIn}
               </Button>
+              <Collapse
+                ghost
+                className="slowfit-admin-auth-collapse"
+                items={[{
+                  key: "account",
+                  label: labels.accountToggle,
+                  children: (
+                    <>
+                      <Form.Item name="email" label={labels.email}>
+                        <Input autoComplete="username" />
+                      </Form.Item>
+                      <Form.Item name="password" label={labels.password}>
+                        <Input.Password autoComplete="current-password" />
+                      </Form.Item>
+                      <Form.Item name="otp" label={labels.otp}>
+                        <Input inputMode="numeric" autoComplete="one-time-code" />
+                      </Form.Item>
+                    </>
+                  ),
+                }]}
+              />
             </Form>
           </article>
         ) : children}

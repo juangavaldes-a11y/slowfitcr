@@ -5,7 +5,11 @@ import { PrismaClient } from "@prisma/client";
 
 process.env.NODE_ENV = "test";
 if (!process.env.TEST_DATABASE_URL) {
-  process.env.TEST_DATABASE_URL = process.env.DATABASE_URL ?? "postgresql://slowfit:slowfit@localhost:5433/slowfit_migration_test?schema=public";
+  throw new Error(
+    "TEST_DATABASE_URL must be set explicitly before running backend integration tests. " +
+      "This suite truncates every table on each test; refusing to fall back to DATABASE_URL " +
+      "to avoid wiping a development or production database.",
+  );
 }
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 
