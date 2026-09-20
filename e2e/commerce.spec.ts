@@ -120,12 +120,14 @@ test("shop card opens product details and supports quick add", async ({ page }) 
   await page.getByText("Women", { exact: true }).click();
   await page.getByRole("button", { name: "Add: Quick Add Leggings", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/shop$/);
-  await expect(page.getByRole("dialog", { name: /Add to cart: Quick Add Leggings/ })).toBeVisible();
+  const quickAddDialog = page.getByRole("dialog", { name: /Add to cart: Quick Add Leggings/ });
+  await expect(quickAddDialog).toBeVisible();
   await page.getByRole("button", { name: "Blue", exact: true }).click();
   await expect(page.getByText("M - CRC 44.00", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Add to cart", exact: true }).click();
   await expect(page.getByRole("button", { name: "Cart (1)" })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
+  await expect(quickAddDialog).toBeHidden();
 
   await page.getByRole("button", { name: "Add: Single Color Shorts", exact: true }).click();
   const singleColorDialog = page.getByRole("dialog", { name: /Add to cart: Single Color Shorts/ });
