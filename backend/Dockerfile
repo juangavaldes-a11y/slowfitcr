@@ -7,6 +7,7 @@ COPY backend/prisma ./prisma
 COPY backend/data ./data
 COPY backend/scripts ./scripts
 COPY backend/server.mjs ./server.mjs
+COPY backend/delivery-providers.mjs ./delivery-providers.mjs
 COPY backend/package-lock.json ./package-lock.json
 
 RUN npm ci
