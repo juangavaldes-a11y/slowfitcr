@@ -531,27 +531,46 @@ async function applyRateLimit(request) {
     || url.pathname.includes("/reviews/moderate");
   const max = isAuthPath ? RATE_LIMIT_AUTH_MAX : RATE_LIMIT_MAX;
   const key = `${ip}:${url.pathname}`;
-  const now = Date.now();
-  const resetAt = new Date(now + RATE_LIMIT_WINDOW_MS);
 
-  return prisma.$transaction(async (transaction) => {
-    const entry = await transaction.rateLimitBucket.findUnique({ where: { id: key } });
-    if (!entry || entry.resetAt.getTime() <= now) {
-      await transaction.rateLimitBucket.upsert({
-        where: { id: key },
-        create: { id: key, count: 1, resetAt },
-        update: { count: 1, resetAt },
-      });
+  const runAttempt = () => {
+    const now = Date.now();
+    const resetAt = new Date(now + RATE_LIMIT_WINDOW_MS);
+
+    return prisma.$transaction(async (transaction) => {
+      const entry = await transaction.rateLimitBucket.findUnique({ where: { id: key } });
+      if (!entry || entry.resetAt.getTime() <= now) {
+        await transaction.rateLimitBucket.upsert({
+          where: { id: key },
+          create: { id: key, count: 1, resetAt },
+          update: { count: 1, resetAt },
+        });
+        return { limited: false };
+      }
+
+      if (entry.count >= max) {
+        return { limited: true, retryAfterSeconds: Math.ceil((entry.resetAt.getTime() - now) / 1000) };
+      }
+
+      await transaction.rateLimitBucket.update({ where: { id: key }, data: { count: { increment: 1 } } });
       return { limited: false };
-    }
+    }, { isolationLevel: "Serializable" });
+  };
 
-    if (entry.count >= max) {
-      return { limited: true, retryAfterSeconds: Math.ceil((entry.resetAt.getTime() - now) / 1000) };
+  // Serializable transactions on the same bucket row can raise write-conflict errors (Prisma P2034)
+  // under concurrent requests; Prisma's own docs recommend retrying rather than failing the request.
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await runAttempt();
+    } catch (error) {
+      const isWriteConflict = error?.code === "P2034";
+      if (!isWriteConflict || attempt === maxAttempts) {
+        throw error;
+      }
     }
+  }
 
-    await transaction.rateLimitBucket.update({ where: { id: key }, data: { count: { increment: 1 } } });
-    return { limited: false };
-  }, { isolationLevel: "Serializable" });
+  return { limited: false };
 }
 
 function getBackendRouteRequirements(pathname) {

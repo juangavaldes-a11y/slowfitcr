@@ -138,6 +138,7 @@ test("operator inspects and replays a failed webhook", async ({ page }) => {
     await route.fulfill({ json: { ok: true } });
   });
   await page.route("**/api/admin/outbox**", (route) => route.fulfill({ json: { events: [] } }));
+  await page.route("**/api/admin/deliveries**", (route) => route.fulfill({ json: { deliveries: [], total: 0 } }));
 
   await page.goto("/en/admin/ops");
   await expect(page.getByText("payment.paid", { exact: true })).toBeVisible();

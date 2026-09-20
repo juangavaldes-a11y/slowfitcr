@@ -197,6 +197,7 @@ test("operator filters and inspects audit details on mobile", async ({ page }) =
     route.fulfill({ json: { events: [], total: 0 } }),
   );
   await page.route("**/api/admin/outbox**", (route) => route.fulfill({ json: { events: [] } }));
+  await page.route("**/api/admin/deliveries**", (route) => route.fulfill({ json: { deliveries: [], total: 0 } }));
 
   await page.goto("/en/admin/ops");
   const auditRow = page.getByRole("article").filter({ hasText: "customer.registered" });
@@ -270,6 +271,7 @@ test("failed webhook replay preserves event details and reports the error", asyn
     route.fulfill({ status: 502, json: { error: "Downstream unavailable" } }),
   );
   await page.route("**/api/admin/outbox**", (route) => route.fulfill({ json: { events: [] } }));
+  await page.route("**/api/admin/deliveries**", (route) => route.fulfill({ json: { deliveries: [], total: 0 } }));
 
   await page.goto("/en/admin/ops");
   await expectNoHorizontalOverflow(page);
