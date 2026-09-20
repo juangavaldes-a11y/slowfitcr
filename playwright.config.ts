@@ -25,10 +25,12 @@ export default defineConfig({
       command: "npm run db:migrate && node server.mjs",
       cwd: "./backend",
       env: {
+        NODE_ENV: "test",
         DATABASE_URL: databaseUrl,
         PORT: "8181",
         REVIEW_MODERATION_TOKEN: "e2e-token",
         REVIEW_MODERATION_SESSION_SECRET: "e2e-session-secret",
+        CUSTOMER_SESSION_SECRET: "e2e-customer-session-secret",
       },
       url: "http://localhost:8181/health/ready",
       reuseExistingServer: !process.env.CI,
