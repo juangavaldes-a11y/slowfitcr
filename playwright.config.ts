@@ -34,7 +34,9 @@ export default defineConfig({
         CUSTOMER_SESSION_SECRET: "e2e-customer-session-secret",
       },
       url: "http://localhost:8181/health/ready",
-      reuseExistingServer: !process.env.CI,
+      // Never reuse an already-running backend here: a stray dev server on this port could be
+      // pointed at a real (staging/prod) DATABASE_URL, and e2e flows would then mutate/wipe it.
+      reuseExistingServer: false,
       timeout: 120_000,
     },
     {
