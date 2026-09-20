@@ -43,6 +43,7 @@ export default defineConfig({
       env: {
         BACKEND_INTERNAL_URL: "http://localhost:8181",
         NEXT_PUBLIC_BACKEND_URL: "http://localhost:8181",
+        TEST_IMAGE_HOST: "images.example.com",
       },
       url: "http://localhost:3100/en",
       reuseExistingServer: !process.env.CI,

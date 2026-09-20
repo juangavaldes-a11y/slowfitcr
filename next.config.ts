@@ -16,8 +16,31 @@ const contentSecurityPolicy = [
   "upgrade-insecure-requests",
 ].join("; ");
 
+function hostnameOf(urlString?: string) {
+  if (!urlString) return undefined;
+  try {
+    return new URL(urlString).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+const r2Hostname = hostnameOf(process.env.R2_PUBLIC_URL);
+const testImageHost = process.env.TEST_IMAGE_HOST;
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  images: {
+    // In e2e tests, images point at a fake host; skip server-side optimization so a failed
+    // upstream fetch doesn't crash rendering (a broken <img> is fine, a thrown fetch is not).
+    unoptimized: Boolean(testImageHost),
+    remotePatterns: [
+      ...(r2Hostname ? [{ protocol: "https" as const, hostname: r2Hostname }] : []),
+      { protocol: "https" as const, hostname: "*.r2.cloudflarestorage.com" },
+      { protocol: "https" as const, hostname: "*.r2.dev" },
+      ...(testImageHost ? [{ protocol: "https" as const, hostname: testImageHost }] : []),
+    ],
+  },
   headers() {
     return [
       {

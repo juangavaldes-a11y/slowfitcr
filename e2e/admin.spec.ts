@@ -86,7 +86,7 @@ test("moderator session persists across review and operations pages", async ({ p
 
   await page.goto("/en/admin/reviews");
   await page.getByLabel("Moderation token").fill("e2e-token");
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
   await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
   await page.getByPlaceholder("Search product, customer, or content").fill(author);
@@ -137,6 +137,7 @@ test("operator inspects and replays a failed webhook", async ({ page }) => {
     replayCount += 1;
     await route.fulfill({ json: { ok: true } });
   });
+  await page.route("**/api/admin/outbox**", (route) => route.fulfill({ json: { events: [] } }));
 
   await page.goto("/en/admin/ops");
   await expect(page.getByText("payment.paid", { exact: true })).toBeVisible();

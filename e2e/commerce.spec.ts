@@ -132,6 +132,7 @@ test("shop card opens product details and supports quick add", async ({ page }) 
   await expect(singleColorDialog.getByText(/^Color:/)).toHaveCount(0);
   await expect(singleColorDialog.getByText("Size", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Close" }).click();
+  await expect(singleColorDialog).toBeHidden();
 
   await page.getByRole("link", { name: "View: Quick Add Leggings", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/product\/quick-add-leggings$/);

@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCopy, isLocale, locales, type Locale } from "../../i18n";
-import { getCollections } from "../../lib/shopify";
+import { getProductPage } from "../../lib/catalog";
 import { isModuleEnabled } from "../../../packages/core/config";
+import ShopCatalog from "../../shop-catalog";
 
 type ShopPageProps = {
   params: Promise<{
     locale: string;
   }>;
+  searchParams: Promise<{ tag?: string }>;
 };
 
 export function generateStaticParams() {
@@ -51,8 +51,9 @@ export async function generateMetadata({ params }: ShopPageProps): Promise<Metad
   };
 }
 
-export default async function ShopPage({ params }: ShopPageProps) {
+export default async function ShopPage({ params, searchParams }: ShopPageProps) {
   const { locale } = await params;
+  const { tag } = await searchParams;
 
   if (!isLocale(locale)) {
     notFound();
@@ -63,7 +64,7 @@ export default async function ShopPage({ params }: ShopPageProps) {
   }
 
   const copy = getCopy(locale as Locale);
-  const collections = await getCollections(locale as Locale);
+  const catalog = await getProductPage({ tag: tag || "" });
 
   return (
     <main className="slowfit-shop-page">
@@ -73,33 +74,14 @@ export default async function ShopPage({ params }: ShopPageProps) {
         <p className="slowfit-shop-lead">{copy.shop.description}</p>
       </section>
 
-      <section id="collections" className="slowfit-shell">
-        <div className="slowfit-shop-grid">
-          {collections.map((collection, index) => (
-            <article key={collection.id} className="slowfit-shop-card">
-              <div className="slowfit-shop-card-media">
-                <Image
-                  src={collection.image}
-                  alt={collection.title}
-                  fill
-                  sizes="(max-width: 767px) 100vw, (max-width: 991px) 50vw, 33vw"
-                  className="slowfit-cover"
-                />
-              </div>
-              <div className="slowfit-shop-card-body">
-                <span className="slowfit-shop-card-label">
-                  {index === 0 ? copy.shop.featuredLabel : copy.collections.kicker}
-                </span>
-                <h2 className="slowfit-display slowfit-shop-card-title">{collection.title}</h2>
-                <p className="slowfit-shop-card-copy">{collection.description}</p>
-                <Link className="ant-btn slowfit-block-cta" href={`/${locale}/shop/${collection.handle}`}>
-                  {copy.shop.ctaLabel}
-                </Link>
-              </div>
-            </article>
-          ))}
-        </div>
-        <p className="slowfit-shop-helper">{copy.shop.helper}</p>
+      <section id="catalog" className="slowfit-shell slowfit-policy-section">
+        <ShopCatalog
+          locale={locale as Locale}
+          products={catalog.products}
+          total={catalog.total}
+          pageSize={catalog.pageSize}
+          initialTag={tag || "all"}
+        />
       </section>
 
       <section className="slowfit-shell slowfit-policy-section">
