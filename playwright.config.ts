@@ -7,6 +7,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
+  timeout: process.env.CI ? 60_000 : 30_000,
   workers: 1,
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
@@ -37,14 +38,15 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: "npm run dev -- --port 3100",
+      // Dev mode compiles routes on demand, which is too slow on CI runners and causes test timeouts.
+      command: process.env.CI ? "npm run build && npm run start -- --port 3100" : "npm run dev -- --port 3100",
       env: {
         BACKEND_INTERNAL_URL: "http://localhost:8181",
         NEXT_PUBLIC_BACKEND_URL: "http://localhost:8181",
       },
       url: "http://localhost:3100/en",
       reuseExistingServer: !process.env.CI,
-      timeout: 120_000,
+      timeout: 300_000,
     },
   ],
 });
