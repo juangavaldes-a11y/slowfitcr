@@ -1,0 +1,11 @@
+title = "gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore generated Next.js/OpenNext build output (not user secrets, regenerated on every build)"
+paths = [
+  '''\.open-next/''',
+  '''\.next/''',
+]
