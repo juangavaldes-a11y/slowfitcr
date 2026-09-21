@@ -20,6 +20,9 @@
 /.next/
 /out/
 
+# open-next / cloudflare build output (contains generated preview-mode keys)
+/.open-next/
+
 # production
 /build
 
