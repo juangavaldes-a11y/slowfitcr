@@ -35,6 +35,9 @@ export default function HomePage({ copy, locale }: HomePageProps) {
           />
           <div className="slowfit-hero-overlay">
             <div className="slowfit-hero-copy">
+              <Typography.Title level={1} className="slowfit-display slowfit-hero-title">
+                {copy.hero.seoTitle}
+              </Typography.Title>
               <Typography.Paragraph className="slowfit-hero-line">{copy.brandTagline}</Typography.Paragraph>
               <Typography.Paragraph className="slowfit-hero-line">{copy.hero.eyebrow}</Typography.Paragraph>
               <Typography.Paragraph className="slowfit-hero-line">{copy.hero.description}</Typography.Paragraph>
@@ -90,7 +93,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
               />
             </div>
             <div className="slowfit-collection-content">
-              <Typography.Title className="slowfit-display slowfit-collection-title">
+              <Typography.Title level={2} className="slowfit-display slowfit-collection-title">
                 {collection.title}
               </Typography.Title>
               <Typography.Paragraph className="slowfit-collection-copy">
@@ -107,7 +110,7 @@ export default function HomePage({ copy, locale }: HomePageProps) {
       <section id="why-slow" className="slowfit-values">
         <div className="slowfit-shell">
           <div className="slowfit-section-heading centered">
-            <Typography.Title className="slowfit-display slowfit-section-title light">
+              <Typography.Title level={2} className="slowfit-display slowfit-section-title light">
               {copy.values.kicker}
             </Typography.Title>
           </div>

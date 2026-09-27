@@ -355,6 +355,14 @@ a {
   gap: 8px;
 }
 
+.slowfit-hero-title.ant-typography {
+  max-width: 14ch;
+  margin: 0 0 8px !important;
+  color: #453f3c;
+  font-size: clamp(2.2rem, 5vw, 4.8rem);
+  line-height: 0.95;
+}
+
 .slowfit-hero-mark {
   width: clamp(220px, 28vw, 360px);
   height: auto;

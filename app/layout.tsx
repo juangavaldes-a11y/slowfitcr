@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import "antd/dist/reset.css";
 import "./globals.css";
 import Analytics from "./analytics";
-import { getPreferredLocale } from "./i18n";
+import { getPreferredLocale, isLocale } from "./i18n";
 import Providers from "./providers";
 import { projectConfig } from "../packages/core/config";
 
@@ -38,7 +38,11 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const locale = getPreferredLocale((await headers()).get("accept-language"));
+  const requestHeaders = await headers();
+  const routeLocale = requestHeaders.get("x-slowfit-locale");
+  const locale = routeLocale && isLocale(routeLocale)
+    ? routeLocale
+    : getPreferredLocale(requestHeaders.get("accept-language"));
 
   return (
     <html lang={locale} className={`${displayFont.variable} ${bodyFont.variable}`}>

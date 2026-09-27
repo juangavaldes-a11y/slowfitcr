@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: LocalePageProps): Promise<Met
   };
 
   return {
-    title: locale === "es" ? "Ropa deportiva en Costa Rica" : "Activewear in Costa Rica",
+    title: locale === "es" ? "Ropa deportiva en Costa Rica | Slow Fit" : "Activewear in Costa Rica | Slow Fit",
     description: copy.hero.description,
     alternates: {
       canonical: `/${locale}`,

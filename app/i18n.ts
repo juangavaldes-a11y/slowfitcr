@@ -35,6 +35,7 @@ export type Copy = {
   };
   hero: {
     eyebrow: string;
+    seoTitle: string;
     titleLineOne: string;
     titleLineTwo: string;
     description: string;
@@ -159,10 +160,11 @@ const copyByLocale: Record<Locale, Copy> = {
     },
     hero: {
       eyebrow: "No creemos en los resultados rápidos",
+      seoTitle: "Ropa deportiva en Costa Rica para entrenar con propósito",
       titleLineOne: "Slow is Smooth.",
       titleLineTwo: "Smooth is Fast.",
       description:
-        "Ropa deportiva y accesorios para entrenar con comodidad, estilo y propósito en Costa Rica. El progreso se construye avanzando cada día.",
+        "Descubre ropa deportiva, ropa para entrenar y accesorios en Costa Rica. Compra en línea prendas cómodas y funcionales para un estilo de vida activo.",
       primaryCta: "VER COLECCIÓN",
       secondaryCta: "CONTACTO",
       imageAlt: "Colección Slow Fit",
@@ -329,6 +331,7 @@ const copyByLocale: Record<Locale, Copy> = {
     },
     hero: {
       eyebrow: "We do not believe in quick results",
+      seoTitle: "Activewear in Costa Rica for purposeful training",
       titleLineOne: "Slow is Smooth.",
       titleLineTwo: "Smooth is Fast.",
       description:
