@@ -117,6 +117,8 @@ export default function ShopCatalog({
     return () => window.clearTimeout(timeout);
   }, [filterKey, loadPage]);
 
+  const addTag = (value: string) => setSelectedTags((current) => current.includes(value) ? current : [...current, value]);
+
   const toggleFavorite = async (productId: string) => {
     const isFavorite = favoriteIds.has(productId);
     setFavoriteLoadingId(productId);
@@ -149,10 +151,9 @@ export default function ShopCatalog({
           { value: "men", label: labels.men },
           { value: "women", label: labels.women },
         ]} />
-        <Select className="slowfit-shop-tags-filter" mode="tags" allowClear showSearch value={selectedTags.filter((tag) => tag !== "men" && tag !== "women")} onChange={(values) => setSelectedTags([
-          ...(selectedGender === "all" ? [] : [selectedGender]),
-          ...values.filter((tag) => tag !== "men" && tag !== "women"),
-        ])} tokenSeparators={[","]} placeholder={labels.all} options={[
+        <Select className="slowfit-shop-tags-filter" mode="tags" allowClear showSearch value={selectedTags} onChange={(values: string[]) => setSelectedTags(
+          Array.from(new Set(values.map((tag) => tag.trim().toLowerCase()).filter(Boolean))),
+        )} tokenSeparators={[","]} placeholder={labels.all} options={[
           ...tags.map((value) => ({ value, label: value })),
         ]} />
         <Checkbox checked={preorderOnly} onChange={(event) => setPreorderOnly(event.target.checked)}>{labels.preorderOnly}</Checkbox>
@@ -183,7 +184,11 @@ export default function ShopCatalog({
                   {!available || preorder ? <span className="slowfit-stock-badge">{preorder ? labels.preorder : labels.soldOut}</span> : null}
                 </div>
                 <div className="slowfit-product-card-body">
-                  <Space wrap>{product.tags.map((value) => <Tag key={value}>{value}</Tag>)}</Space>
+                  <Space wrap className="slowfit-product-card-tags">{product.tags.map((value) => (
+                    <Tag key={value} role="button" tabIndex={0} color={selectedTags.includes(value) ? "green" : undefined} style={{ cursor: "pointer" }}
+                      onClick={() => addTag(value)}
+                      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); addTag(value); } }}>{value}</Tag>
+                  ))}</Space>
                   <h2>{product.title}</h2>
                   <p className="slowfit-shop-card-copy">{product.description}</p>
                   <div className="slowfit-product-price-row">

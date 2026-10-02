@@ -999,6 +999,11 @@ a {
   min-height: 320px;
 }
 
+.slowfit-product-card-tags {
+  position: relative;
+  z-index: 2;
+}
+
 .slowfit-product-card-body {
   display: flex;
   flex: 1;
