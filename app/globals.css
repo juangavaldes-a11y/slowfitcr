@@ -40,6 +40,10 @@
   width: 100%;
 }
 
+.slowfit-shop-tags-filter {
+  width: clamp(240px, 28vw, 320px);
+}
+
 .slowfit-stock-badge {
   position: absolute;
   top: 12px;
@@ -73,6 +77,10 @@
 
   .slowfit-shop-filters {
     grid-template-columns: 1fr;
+  }
+
+  .slowfit-shop-tags-filter {
+    width: min(420px, calc(100vw - 48px));
   }
 }
 @import "tailwindcss";

@@ -149,7 +149,7 @@ export default function ShopCatalog({
           { value: "men", label: labels.men },
           { value: "women", label: labels.women },
         ]} />
-        <Select mode="tags" allowClear showSearch value={selectedTags.filter((tag) => tag !== "men" && tag !== "women")} onChange={(values) => setSelectedTags([
+        <Select className="slowfit-shop-tags-filter" mode="tags" allowClear showSearch value={selectedTags.filter((tag) => tag !== "men" && tag !== "women")} onChange={(values) => setSelectedTags([
           ...(selectedGender === "all" ? [] : [selectedGender]),
           ...values.filter((tag) => tag !== "men" && tag !== "women"),
         ])} tokenSeparators={[","]} placeholder={labels.all} options={[

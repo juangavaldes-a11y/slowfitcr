@@ -1,0 +1,287 @@
+{
+  "invoiceFile": "Sammy-2026-9-2.pdf",
+  "invoiceDate": "2026-09-18",
+  "priceMultiplier": 2,
+  "products": [
+    {
+      "handle": "mige-fgbcx6116-jackets-colors-updated-c60c87a8",
+      "supplierReference": "FGBCX6116",
+      "unitCost": 9.8,
+      "stock": {
+        "Cherry": { "S": 1, "M": 1, "L": 1 },
+        "Sky blue": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "M": 1, "L": 1 },
+        "White": { "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbtz4549-bra-pants-4681974c",
+      "supplierReference": "FGBTZ4549",
+      "unitCost": 22.5,
+      "stock": {
+        "Dark blue & Stripe": { "S": 1, "M": 1, "L": 1 },
+        "Black & Stripe": { "S": 1, "M": 1, "L": 1 },
+        "Dark blue & Polka dot": { "S": 1, "M": 1, "L": 1 },
+        "Black & Polka dot": { "S": 1, "M": 1, "L": 1 },
+        "Cream & Polka dot": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbcdk8519-shorts-colors-updated-3e1f3314",
+      "supplierReference": "FGBCDK8519",
+      "unitCost": 6.6,
+      "stock": {
+        "Raspberry": { "S": 1, "M": 1, "L": 1 },
+        "Navy": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "S": 1, "M": 1, "L": 1 },
+        "Army green": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbcck8519-leggings-colors-updated-ff57b17d",
+      "supplierReference": "FGBCCK8519",
+      "unitCost": 9.4,
+      "stock": {
+        "Raspberry": { "S": 1, "M": 1, "L": 1 },
+        "Navy": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "S": 1, "M": 1, "L": 1 },
+        "Army green": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbck1524-pants-free-size-0e14c8df",
+      "supplierReference": "FGBCK1524",
+      "unitCost": 11.3,
+      "stock": {
+        "Black": { "One Size": 5 },
+        "Navy": { "One Size": 5 }
+      }
+    },
+    {
+      "handle": "mige-fgbtz8232-long-sleeves-tops-bell-bottom-pants-8470fb12",
+      "supplierReference": "FGBTZ8232",
+      "unitCost": 19.7,
+      "stock": {
+        "Cobalt blue": { "S": 1, "M": 1, "L": 1 },
+        "Khaki": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "S": 1, "M": 1, "L": 1 },
+        "Green": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbb6505-k6510-bra-skirts-8412f7f2",
+      "supplierReference": "FGBB6505+K6510",
+      "unitCost": 18.5,
+      "stock": {
+        "Off white": { "S": 1, "M": 1, "L": 1 },
+        "Pink": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbdk067-shorts-colors-updated-f8516623",
+      "supplierReference": "FGBDK067",
+      "unitCost": 7.5,
+      "stock": {
+        "31.SHL": { "S": 1, "M": 1, "L": 1 },
+        "35.HS": { "S": 1, "M": 1, "L": 1 },
+        "12.XNTLL": { "S": 1, "M": 1, "L": 1 },
+        "16.SMZ": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbwx22-bra-colors-updated-25-colors-totally-2c717b23",
+      "supplierReference": "FGBWX22",
+      "unitCost": 7.8,
+      "stock": {
+        "White": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "S": 1, "M": 1, "L": 1 },
+        "Red": { "S": 1, "M": 1, "L": 1 },
+        "Navy": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbet002-leggings-lycra-0f87223e",
+      "supplierReference": "FGBET002",
+      "unitCost": 13.8,
+      "stock": {
+        "Black": { "S": 1, "M": 2, "L": 2 },
+        "Olive": { "S": 1, "M": 2, "L": 2 }
+      }
+    },
+    {
+      "handle": "mige-fgb52762-bra-32c47af9",
+      "supplierReference": "FGB52762",
+      "unitCost": 8.4,
+      "stock": {
+        "Black": { "S": 1, "M": 2, "L": 1 },
+        "Violet": { "S": 1, "M": 1, "L": 1 },
+        "White": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbd26061-leggings-pockets-f5571ec2",
+      "supplierReference": "FGBD26061",
+      "unitCost": 11.7,
+      "stock": {
+        "Dark purple": { "S": 1, "M": 2, "L": 1 },
+        "Black": { "S": 1, "M": 1, "L": 1 },
+        "Grey": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgb02337-leggings-77201f8a",
+      "supplierReference": "FGB02337",
+      "unitCost": 9.4,
+      "stock": {
+        "Dark red": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "S": 1, "M": 1, "L": 1 },
+        "Light purple": { "S": 1, "M": 1, "L": 1 },
+        "Dark blue": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbd26011-shorts-093ab809",
+      "supplierReference": "FGBD26011",
+      "unitCost": 10.5,
+      "stock": {
+        "Purple": { "S": 1, "M": 1, "L": 1 },
+        "Pink": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgb2590-91229-short-sleeves-tops-without-padding-pants-fa06ff09",
+      "supplierReference": "FGB2590+91229",
+      "unitCost": 18.8,
+      "stock": {
+        "Dark blue": { "S": 2, "M": 2, "L": 2 },
+        "Black": { "S": 1, "M": 1, "L": 1 },
+        "Grape": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbwx2493-dk3492-bra-shorts-pockets-43f1a46c",
+      "supplierReference": "FGBWX2493+DK3492",
+      "unitCost": 14,
+      "stock": {
+        "Red": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "S": 1, "M": 1, "L": 1 },
+        "Cherry": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgb7126-pants-5bd2a222",
+      "supplierReference": "FGB7126",
+      "unitCost": 10.3,
+      "stock": {
+        "Burgundy": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "S": 1, "M": 2, "L": 1 },
+        "Navy": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgba2-023-bra-f1b59259",
+      "supplierReference": "FGBA2-023",
+      "unitCost": 11.3,
+      "stock": {
+        "Purple": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "S": 1, "M": 2, "L": 1 },
+        "Angolan red": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbdk3231-shorts-free-size-6480b942",
+      "supplierReference": "FGBDK3231",
+      "unitCost": 6.3,
+      "stock": {
+        "Midnight": { "One Size": 3 },
+        "Black": { "One Size": 3 },
+        "Blue": { "One Size": 3 },
+        "Pink": { "One Size": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbf233-230-one-shoulder-bra-shorts-pockets-ec03fc99",
+      "supplierReference": "FGBF233-230",
+      "unitCost": 18.3,
+      "stock": {
+        "Wine": { "S": 1, "M": 1, "L": 1 },
+        "Navy": { "S": 1, "M": 2, "L": 1 },
+        "Black": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbctz8232-long-sleeves-tops-bell-bottom-pants-d95c301a",
+      "supplierReference": "FGBCTZ8232",
+      "unitCost": 21,
+      "stock": {
+        "Black": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbyw211-crop-top-sammy-20260918",
+      "supplierReference": "FGBYW211",
+      "unitCost": 8.2,
+      "title": "Crop Top",
+      "description": "Top corto deportivo para entrenamiento y uso diario. Disponible en rojo, azul marino y negro, en tallas S, M y L. Referencia del proveedor: FGBYW211.",
+      "create": true,
+      "tags": ["pdf-import", "mige-sports", "crop-top", "women"],
+      "images": [
+        {
+          "url": "/slowfit/catalog-products/sammy-fgbyw211.png",
+          "altText": "Crop top FGBYW211 en rojo"
+        }
+      ],
+      "stock": {
+        "Red": { "S": 1, "M": 2, "L": 1 },
+        "Navy": { "S": 1, "M": 1, "L": 1 },
+        "Black": { "S": 1, "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-fgbwx2495-ck5495-bra-bell-bottoms-pants-pockets-5c99218c",
+      "supplierReference": "FGBWX2495+CK5495",
+      "unitCost": 18,
+      "stock": {
+        "Red": { "M": 1 }
+      }
+    },
+    {
+      "handle": "mige-efgbyel-51140-069be00f",
+      "supplierReference": "EFGBYEL-51140",
+      "unitCost": 8.8,
+      "stock": {
+        "Black": { "L": 1, "XL": 1 },
+        "Grey": { "L": 1, "XL": 1 }
+      }
+    },
+    {
+      "handle": "mige-efgbyel-41116-5f027615",
+      "supplierReference": "EFGBYEL-41116",
+      "unitCost": 7.1,
+      "stock": {
+        "Green": { "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-afgbyel-1002-51223c19",
+      "supplierReference": "AFGBYEL-1002",
+      "unitCost": 6,
+      "stock": {
+        "Black": { "M": 1, "L": 1 },
+        "Grey": { "M": 1, "L": 1 },
+        "Blue": { "M": 1, "L": 1 }
+      }
+    },
+    {
+      "handle": "mige-ffgbzc-edk5085-shorts-1dd7e5fb",
+      "supplierReference": "EFFGBZC-EDK5085",
+      "replaceSupplierReference": "FFGBZC-EDK5085",
+      "unitCost": 15,
+      "stock": {
+        "Black": { "L": 1, "XL": 1 },
+        "Grey": { "L": 1, "XL": 1 },
+        "Blue": { "L": 1, "XL": 1 }
+      }
+    }
+  ]
+}
