@@ -97,3 +97,23 @@ test("fetchBccrRate validates the provider payload", async () => {
   await assert.rejects(fetchBccrRate(async () => ({ ok: true, json: async () => ({}) })), /FX_INVALID_PAYLOAD/);
   await assert.rejects(fetchBccrRate(async () => ({ ok: false, status: 500 })), /FX_HTTP_500/);
 });
+
+test("planWebsiteSales groups items per order, line and size and counts unmatched items", async () => {
+  const { planWebsiteSales } = await import("../inventory-admin.mjs");
+  const variants = new Map([
+    ["v1", { size: "M", color: "Black", price: "20000", productHandle: "jacket" }],
+    ["v2", { size: "One Size", color: "Black", price: "9000", productHandle: "jacket" }],
+    ["v3", { size: "M", color: "Pink", price: "1", productHandle: "other" }],
+  ]);
+  const lines = [{ id: "L1", productHandle: "jacket", color: "Black" }, { id: "L2", productHandle: null, color: "Pink" }];
+  const when = new Date("2026-10-01T00:00:00Z");
+  const orders = [{ id: "o1", name: "#1", paymentCreatedAt: when, updatedAt: when, items: [
+    { variantId: "v1", quantity: 1, unitPrice: 19000 }, { variantId: "v1", quantity: 2, unitPrice: 19000 },
+    { variantId: "v2", quantity: 1 }, { variantId: "v3", quantity: 1 }, { variantId: "gone", quantity: 1 },
+  ] }];
+  const { sales, unmatched } = planWebsiteSales(orders, variants, lines);
+  assert.equal(unmatched, 2);
+  assert.equal(sales.length, 2);
+  assert.deepEqual(sales.map((sale) => [sale.size, sale.quantity, sale.unitPriceCrc]).sort(), [["M", 3, 19000], ["OS", 1, 9000]]);
+  assert.equal(sales[0].source, "WEBSITE");
+});

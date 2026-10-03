@@ -187,6 +187,41 @@ export function diffImport(existingLines, incomingLines, soldByLine = new Map())
   return result;
 }
 
+const WEBSITE_METHOD = "Website checkout";
+
+function sizeKeyOf(variantSize) {
+  if (variantSize === "One Size") return "OS";
+  return SIZE_KEYS.includes(variantSize) ? variantSize : null;
+}
+
+// Groups paid website order items into ledger sales per order, line and size.
+export function planWebsiteSales(orders, variantsById, lines) {
+  const lineByKey = new Map(lines.filter((line) => line.productHandle).map((line) => [`${line.productHandle}\u0000${line.color}`, line]));
+  const grouped = new Map();
+  let unmatched = 0;
+  for (const order of orders) {
+    for (const item of Array.isArray(order.items) ? order.items : []) {
+      const variant = variantsById.get(String(item?.variantId || ""));
+      const quantity = Number(item?.quantity);
+      const size = variant ? sizeKeyOf(variant.size) : null;
+      const line = variant && size ? lineByKey.get(`${variant.productHandle}\u0000${variant.color}`) : null;
+      if (!line || !Number.isInteger(quantity) || quantity < 1) {
+        unmatched += 1;
+        continue;
+      }
+      const key = `${order.id}\u0000${line.id}\u0000${size}`;
+      const entry = grouped.get(key) ?? {
+        lineId: line.id, size, quantity: 0, unitPriceCrc: Number(item.unitPrice) || Number(variant.price) || 0,
+        discountCrc: 0, soldAt: order.paymentCreatedAt ?? order.updatedAt, paymentMethod: WEBSITE_METHOD,
+        source: "WEBSITE", orderId: order.id, note: order.name ?? "",
+      };
+      entry.quantity += quantity;
+      grouped.set(key, entry);
+    }
+  }
+  return { sales: [...grouped.values()], unmatched };
+}
+
 export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuthorized, appendAudit, fetchRate = fetchBccrRate }) {
   const guard = (handler) => async (request, ...args) => {
     if (!(await isAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
@@ -202,14 +237,34 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     }
   };
 
+  const syncWebsiteOrders = async () => {
+    const synced = await prisma.inventorySale.findMany({ where: { orderId: { not: null } }, select: { orderId: true }, distinct: ["orderId"] });
+    const orders = await prisma.order.findMany({
+      where: { inventoryAdjustedAt: { not: null }, id: { notIn: synced.map((row) => row.orderId) } },
+      orderBy: { updatedAt: "desc" },
+      take: 500,
+    });
+    if (!orders.length) return { imported: 0, unmatched: 0 };
+    const variantIds = [...new Set(orders.flatMap((order) => (Array.isArray(order.items) ? order.items : []).map((item) => String(item?.variantId || ""))))].filter(Boolean);
+    const [variants, lines] = await Promise.all([
+      prisma.productVariant.findMany({ where: { id: { in: variantIds } }, select: { id: true, size: true, color: true, price: true, product: { select: { handle: true } } } }),
+      prisma.inventoryLine.findMany(),
+    ]);
+    const variantsById = new Map(variants.map((variant) => [variant.id, { size: variant.size, color: variant.color, price: variant.price, productHandle: variant.product.handle }]));
+    const { sales, unmatched } = planWebsiteSales(orders, variantsById, lines);
+    if (sales.length) await prisma.inventorySale.createMany({ data: sales, skipDuplicates: true });
+    return { imported: sales.length, unmatched };
+  };
+
   const loadView = async () => {
+    const websiteSync = await syncWebsiteOrders().catch(() => ({ imported: 0, unmatched: 0, failed: true }));
     const [settings, lines, sales, paymentMethods] = await Promise.all([
       prisma.inventorySettings.findUnique({ where: { id: "default" } }),
       prisma.inventoryLine.findMany({ orderBy: [{ position: "asc" }, { code: "asc" }, { color: "asc" }] }),
       prisma.inventorySale.findMany({ where: { voidedAt: null }, select: { lineId: true, size: true, quantity: true, voidedAt: true } }),
       prisma.paymentMethod.findMany({ orderBy: { position: "asc" } }),
     ]);
-    return { ...buildInventoryView(settings, lines, sales), paymentMethods };
+    return { ...buildInventoryView(settings, lines, sales), paymentMethods, websiteSync };
   };
 
   const getInventory = guard(async () => jsonResponse(await loadView()));
@@ -278,7 +333,7 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
       if (!sale) throw new Error("NOT_FOUND");
       if (sale.voidedAt) throw new Error("ALREADY_VOIDED");
       await transaction.inventorySale.update({ where: { id: saleId }, data: { voidedAt: new Date() } });
-      await syncStorefrontStock(transaction, sale.line, sale.size, sale.quantity);
+      if (sale.source !== "WEBSITE") await syncStorefrontStock(transaction, sale.line, sale.size, sale.quantity);
     });
     await appendAudit("inventory.sale.voided", { saleId }, "admin");
     return jsonResponse(await loadView());

@@ -2,7 +2,7 @@
 
 import { DollarOutlined, DownloadOutlined, HistoryOutlined, LineChartOutlined, SettingOutlined, ShoppingCartOutlined, UploadOutlined } from "@ant-design/icons";
 import {
-  Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select,
+  Alert, Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select,
   Space, Statistic, Table, Tag, Typography, Upload, message,
 } from "antd";
 import Link from "next/link";
@@ -52,6 +52,7 @@ type View = {
     contributionMargin: number | null;
   };
   paymentMethods: Array<{ id: string; name: string; active: boolean }>;
+  websiteSync?: { imported: number; unmatched: number };
 };
 type SaleRow = {
   id: string;
@@ -382,7 +383,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     { title: labels.product, render: (_, row) => `${row.line.code} ${row.line.color} (${row.size})` },
     { title: labels.quantity, dataIndex: "quantity", align: "right" },
     { title: labels.total, align: "right", render: (_, row) => money(Number(row.unitPriceCrc) * row.quantity - Number(row.discountCrc)) },
-    { title: labels.method, dataIndex: "paymentMethod" },
+    { title: labels.method, dataIndex: "paymentMethod", render: (value: string, row) => <>{value}{row.source === "WEBSITE" ? " (web)" : ""}</> },
     { title: labels.status, render: (_, row) => <Tag color={row.voidedAt ? "red" : "green"}>{row.voidedAt ? labels.voidedTag : labels.active}</Tag> },
     {
       title: labels.actions,
@@ -400,6 +401,11 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       <AdminShell locale={locale} title={labels.title} subtitle={labels.subtitle}
         sessionReady={sessionReady} authorized={authorized} loginLoading={loginLoading}
         onLogin={onLogin} onLogout={onLogout}>
+        {view?.websiteSync?.unmatched ? (
+          <Alert type="warning" showIcon style={{ marginBottom: 16 }}
+            title={es ? `${view.websiteSync.unmatched} articulos de pedidos web no coinciden con una linea del inventario (producto/color/talla).`
+              : `${view.websiteSync.unmatched} website order items do not match an inventory line (product/color/size).`} />
+        ) : null}
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
           <Col xs={12} md={6}><Card><Statistic title={labels.units} value={totals?.quantity ?? 0} /></Card></Col>
           <Col xs={12} md={6}><Card><Statistic title={labels.investment} value={totals?.totalInventoryCostCrc == null ? labels.pending : money(totals.totalInventoryCostCrc)} /></Card></Col>

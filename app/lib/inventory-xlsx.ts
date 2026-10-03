@@ -60,8 +60,8 @@ const numberOf = (value: CellValue) => {
 const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 async function loadWorkbook() {
-  const module = await import("exceljs");
-  return module.Workbook ?? (module as unknown as { default: typeof module }).default.Workbook;
+  const exceljs = await import("exceljs");
+  return exceljs.Workbook ?? (exceljs as unknown as { default: typeof exceljs }).default.Workbook;
 }
 
 export async function exportInventoryWorkbook(view: ExportView) {

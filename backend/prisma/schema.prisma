@@ -385,6 +385,7 @@ model InventorySale {
   createdAt     DateTime      @default(now())
   line          InventoryLine @relation(fields: [lineId], references: [id], onDelete: Restrict)
 
+  @@unique([orderId, lineId, size])
   @@index([soldAt])
   @@index([lineId, voidedAt])
   @@index([paymentMethod])
