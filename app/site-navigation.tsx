@@ -48,6 +48,7 @@ export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
     { href: `/${locale}/admin/catalog`, label: copy.nav.catalog },
     { href: `/${locale}/admin/reviews`, label: copy.nav.reviews },
     { href: `/${locale}/admin/ops`, label: copy.nav.operations },
+    { href: `/${locale}/admin/inventory`, label: copy.nav.inventory },
   ];
   const sectionHashes = new Set(["#collections", "#why-slow", "#contacto"]);
   const active = {

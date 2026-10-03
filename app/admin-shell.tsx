@@ -33,6 +33,7 @@ export default function AdminShell({
         catalog: "Catalogo",
         reviews: "Resenas",
         operations: "Operaciones",
+        inventory: "Inventario y costos",
         authTitle: "Acceso de moderacion",
         authCopy: "La sesion permanece activa hasta que expire o cierres sesion.",
         token: "Token de moderacion",
@@ -50,6 +51,7 @@ export default function AdminShell({
         catalog: "Catalog",
         reviews: "Reviews",
         operations: "Operations",
+        inventory: "Inventory & costs",
         authTitle: "Moderation access",
         authCopy: "Your session remains active until it expires or you sign out.",
         token: "Moderation token",
@@ -90,6 +92,9 @@ export default function AdminShell({
             </Link>
             <Link href={`/${locale}/admin/ops`}>
               <Button>{labels.operations}</Button>
+            </Link>
+            <Link href={`/${locale}/admin/inventory`}>
+              <Button>{labels.inventory}</Button>
             </Link>
           </Space>
         </Space> : null}

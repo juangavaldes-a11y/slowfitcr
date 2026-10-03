@@ -5,6 +5,7 @@
   "scripts": {
     "catalog:import": "node scripts/import-catalog.mjs",
     "catalog:upload-images": "node --env-file-if-exists=../.env.docker scripts/upload-catalog-images.mjs",
+    "inventory:seed": "node scripts/seed-inventory.mjs",
     "catalog:tag-gender": "node scripts/tag-catalog-gender.mjs",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",

@@ -334,3 +334,74 @@ model RateLimitBucket {
   resetAt   DateTime
   updatedAt DateTime @updatedAt
 }
+
+model InventorySettings {
+  id                       String   @id @default("default")
+  hkShippingUsd            Decimal  @default(0) @db.Decimal(14, 2)
+  invoiceAdjustmentUsd     Decimal  @default(0) @db.Decimal(14, 2)
+  fxRate                   Decimal? @db.Decimal(12, 4)
+  crShippingUsd            Decimal? @db.Decimal(14, 2)
+  nationalizationCrc       Decimal? @db.Decimal(14, 2)
+  otherImportCrc           Decimal? @db.Decimal(14, 2)
+  extraUnitCrc             Decimal  @default(0) @db.Decimal(14, 2)
+  cardCommissionRate       Decimal  @default(0) @db.Decimal(6, 4)
+  customizationPerPieceUsd Decimal  @default(0) @db.Decimal(10, 2)
+  updatedAt                DateTime @updatedAt
+}
+
+model InventoryLine {
+  id                String          @id @default(uuid())
+  code              String
+  productName       String
+  color             String
+  productHandle     String?
+  sizes             Json
+  piecesPerGarment  Int             @default(1)
+  unitPriceUsd      Decimal         @db.Decimal(12, 2)
+  salePriceCrc      Decimal?        @db.Decimal(14, 2)
+  supplierEquivalence String?
+  position          Int             @default(0)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  sales             InventorySale[]
+
+  @@unique([code, color])
+  @@index([productHandle])
+}
+
+model InventorySale {
+  id            String        @id @default(uuid())
+  lineId        String
+  size          String
+  quantity      Int
+  unitPriceCrc  Decimal       @db.Decimal(14, 2)
+  discountCrc   Decimal       @default(0) @db.Decimal(14, 2)
+  soldAt        DateTime
+  paymentMethod String
+  source        String        @default("MANUAL")
+  orderId       String?
+  note          String        @default("")
+  voidedAt      DateTime?
+  createdAt     DateTime      @default(now())
+  line          InventoryLine @relation(fields: [lineId], references: [id], onDelete: Restrict)
+
+  @@index([soldAt])
+  @@index([lineId, voidedAt])
+  @@index([paymentMethod])
+}
+
+model PaymentMethod {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model ExchangeRate {
+  date      DateTime @id @db.Date
+  buyRate   Decimal  @db.Decimal(12, 4)
+  sellRate  Decimal  @db.Decimal(12, 4)
+  source    String   @default("BCCR")
+  fetchedAt DateTime @default(now())
+}

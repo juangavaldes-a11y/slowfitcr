@@ -1,0 +1,1771 @@
+{
+ "rows": [
+  {
+   "no": 1,
+   "code": "FGBCX6116",
+   "product": "Jackets",
+   "color": "Cherry",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.8,
+   "salePriceCrc": 18950,
+   "expected": {
+    "S": 36.55898794094445,
+    "X": 23276.245722979835,
+    "Y": 7758.748574326612,
+    "AC": 10821.726425673389
+   }
+  },
+  {
+   "no": 1,
+   "code": "FGBCX6116",
+   "product": "Jackets",
+   "color": "Sky blue",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.8,
+   "salePriceCrc": 18950,
+   "expected": {
+    "S": 36.55898794094445,
+    "X": 23276.245722979835,
+    "Y": 7758.748574326612,
+    "AC": 10821.726425673389
+   }
+  },
+  {
+   "no": 1,
+   "code": "FGBCX6116",
+   "product": "Jackets",
+   "color": "Black",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.8,
+   "salePriceCrc": 18950,
+   "expected": {
+    "S": 24.372658627296296,
+    "X": 15517.497148653218,
+    "Y": 7758.748574326609,
+    "AC": 10821.72642567339
+   }
+  },
+  {
+   "no": 1,
+   "code": "FGBCX6116",
+   "product": "Jackets",
+   "color": "White",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.8,
+   "salePriceCrc": 18950,
+   "expected": {
+    "S": 24.372658627296296,
+    "X": 15517.497148653218,
+    "Y": 7758.748574326609,
+    "AC": 10821.72642567339
+   }
+  },
+  {
+   "no": 2,
+   "code": "FGBTZ4549",
+   "product": "Bra & Pants",
+   "color": "Dark blue & Stripe",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "expected": {
+    "S": 82.10281190127354,
+    "X": 40490.32319959428,
+    "Y": 13496.774399864758,
+    "AC": 12927.700600135242
+   }
+  },
+  {
+   "no": 2,
+   "code": "FGBTZ4549",
+   "product": "Bra & Pants",
+   "color": "Black & Stripe",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "expected": {
+    "S": 82.10281190127354,
+    "X": 51899.195903302156,
+    "Y": 17299.731967767384,
+    "AC": 9124.743032232614
+   }
+  },
+  {
+   "no": 2,
+   "code": "FGBTZ4549",
+   "product": "Bra & Pants",
+   "color": "Dark blue & Polka dot",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "expected": {
+    "S": 82.10281190127354,
+    "X": 51899.195903302156,
+    "Y": 17299.731967767384,
+    "AC": 9124.743032232614
+   }
+  },
+  {
+   "no": 2,
+   "code": "FGBTZ4549",
+   "product": "Bra & Pants",
+   "color": "Black & Polka dot",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "expected": {
+    "S": 82.10281190127354,
+    "X": 51899.195903302156,
+    "Y": 17299.731967767384,
+    "AC": 9124.743032232614
+   }
+  },
+  {
+   "no": 2,
+   "code": "FGBTZ4549",
+   "product": "Bra & Pants",
+   "color": "Cream & Polka dot",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "expected": {
+    "S": 82.10281190127354,
+    "X": 51899.195903302156,
+    "Y": 17299.731967767384,
+    "AC": 9124.743032232614
+   }
+  },
+  {
+   "no": 3,
+   "code": "FGBCDK8519",
+   "product": "Shorts",
+   "color": "Raspberry",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.6,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 26.64468612645103,
+    "X": 17045.399425222582,
+    "Y": 5681.799808407527,
+    "AC": 8976.675191592472
+   }
+  },
+  {
+   "no": 3,
+   "code": "FGBCDK8519",
+   "product": "Shorts",
+   "color": "Navy",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.6,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 26.64468612645103,
+    "X": 17045.399425222582,
+    "Y": 5681.799808407527,
+    "AC": 8976.675191592472
+   }
+  },
+  {
+   "no": 3,
+   "code": "FGBCDK8519",
+   "product": "Shorts",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.6,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 26.64468612645103,
+    "X": 17045.399425222582,
+    "Y": 5681.799808407527,
+    "AC": 8976.675191592472
+   }
+  },
+  {
+   "no": 3,
+   "code": "FGBCDK8519",
+   "product": "Shorts",
+   "color": "Army green",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.6,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 26.64468612645103,
+    "X": 17045.399425222582,
+    "Y": 5681.799808407527,
+    "AC": 8976.675191592472
+   }
+  },
+  {
+   "no": 4,
+   "code": "FGBCCK8519",
+   "product": "Leggings",
+   "color": "Raspberry",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 35.31970021413277,
+    "X": 22497.389935760177,
+    "Y": 7499.129978586726,
+    "AC": 9120.345021413275
+   }
+  },
+  {
+   "no": 4,
+   "code": "FGBCCK8519",
+   "product": "Leggings",
+   "color": "Navy",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 35.31970021413277,
+    "X": 22497.389935760177,
+    "Y": 7499.129978586726,
+    "AC": 9120.345021413275
+   }
+  },
+  {
+   "no": 4,
+   "code": "FGBCCK8519",
+   "product": "Leggings",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 35.31970021413277,
+    "X": 22497.389935760177,
+    "Y": 7499.129978586726,
+    "AC": 9120.345021413275
+   }
+  },
+  {
+   "no": 4,
+   "code": "FGBCCK8519",
+   "product": "Leggings",
+   "color": "Army green",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 35.31970021413277,
+    "X": 22497.389935760177,
+    "Y": 7499.129978586726,
+    "AC": 9120.345021413275
+   }
+  },
+  {
+   "no": 5,
+   "code": "FGBCK1524",
+   "product": "Pants - Free size",
+   "color": "Black",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 5
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 68.67719486081371,
+    "X": 43661.5915417559,
+    "Y": 8732.31830835118,
+    "AC": 7887.156691648821
+   }
+  },
+  {
+   "no": 5,
+   "code": "FGBCK1524",
+   "product": "Pants - Free size",
+   "color": "Navy",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 5
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 68.67719486081371,
+    "X": 43661.5915417559,
+    "Y": 8732.31830835118,
+    "AC": 7887.156691648821
+   }
+  },
+  {
+   "no": 6,
+   "code": "FGBTZ8232",
+   "product": "Long sleeves tops & Bell-bottom pants",
+   "color": "Cobalt blue",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 19.7,
+   "salePriceCrc": 24950,
+   "expected": {
+    "S": 73.4277978135918,
+    "X": 46447.20539276457,
+    "Y": 15482.401797588189,
+    "AC": 8981.073202411812
+   }
+  },
+  {
+   "no": 6,
+   "code": "FGBTZ8232",
+   "product": "Long sleeves tops & Bell-bottom pants",
+   "color": "Khaki",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 19.7,
+   "salePriceCrc": 24950,
+   "expected": {
+    "S": 73.4277978135918,
+    "X": 46447.20539276457,
+    "Y": 15482.401797588189,
+    "AC": 8981.073202411812
+   }
+  },
+  {
+   "no": 6,
+   "code": "FGBTZ8232",
+   "product": "Long sleeves tops & Bell-bottom pants",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 19.7,
+   "salePriceCrc": 24950,
+   "expected": {
+    "S": 73.4277978135918,
+    "X": 46447.20539276457,
+    "Y": 15482.401797588189,
+    "AC": 8981.073202411812
+   }
+  },
+  {
+   "no": 6,
+   "code": "FGBTZ8232",
+   "product": "Long sleeves tops & Bell-bottom pants",
+   "color": "Green",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 19.7,
+   "salePriceCrc": 24950,
+   "expected": {
+    "S": 73.4277978135918,
+    "X": 46447.20539276457,
+    "Y": 15482.401797588189,
+    "AC": 8981.073202411812
+   }
+  },
+  {
+   "no": 7,
+   "code": "FGBB6505+K6510",
+   "product": "Bra & Skirts",
+   "color": "Off white",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.5,
+   "salePriceCrc": 22950,
+   "expected": {
+    "S": 69.70993463315678,
+    "X": 44110.638031105605,
+    "Y": 14703.546010368535,
+    "AC": 7798.928989631466
+   }
+  },
+  {
+   "no": 7,
+   "code": "FGBB6505+K6510",
+   "product": "Bra & Skirts",
+   "color": "Pink",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.5,
+   "salePriceCrc": 22950,
+   "expected": {
+    "S": 69.70993463315678,
+    "X": 44110.638031105605,
+    "Y": 14703.546010368535,
+    "AC": 7798.928989631466
+   }
+  },
+  {
+   "no": 8,
+   "code": "FGBDK067",
+   "product": "Shorts",
+   "color": "31.SHL",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.5,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 29.433083511777305,
+    "X": 18797.82494646681,
+    "Y": 6265.9416488222705,
+    "AC": 8392.53335117773
+   }
+  },
+  {
+   "no": 8,
+   "code": "FGBDK067",
+   "product": "Shorts",
+   "color": "35.HS",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.5,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 29.433083511777305,
+    "X": 18797.82494646681,
+    "Y": 6265.9416488222705,
+    "AC": 8392.53335117773
+   }
+  },
+  {
+   "no": 8,
+   "code": "FGBDK067",
+   "product": "Shorts",
+   "color": "12.XNTLL",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.5,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 29.433083511777305,
+    "X": 18797.82494646681,
+    "Y": 6265.9416488222705,
+    "AC": 8392.53335117773
+   }
+  },
+  {
+   "no": 8,
+   "code": "FGBDK067",
+   "product": "Shorts",
+   "color": "16.SMZ",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.5,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 29.433083511777305,
+    "X": 18797.82494646681,
+    "Y": 6265.9416488222705,
+    "AC": 8392.53335117773
+   }
+  },
+  {
+   "no": 9,
+   "code": "FGBWX22",
+   "product": "Bra",
+   "color": "White",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.8,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 30.36254930688606,
+    "X": 19381.966786881552,
+    "Y": 6460.655595627184,
+    "AC": 8197.819404372816
+   }
+  },
+  {
+   "no": 9,
+   "code": "FGBWX22",
+   "product": "Bra",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.8,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 30.36254930688606,
+    "X": 19381.966786881552,
+    "Y": 6460.655595627184,
+    "AC": 8197.819404372816
+   }
+  },
+  {
+   "no": 9,
+   "code": "FGBWX22",
+   "product": "Bra",
+   "color": "Red",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.8,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 30.36254930688606,
+    "X": 19381.966786881552,
+    "Y": 6460.655595627184,
+    "AC": 8197.819404372816
+   }
+  },
+  {
+   "no": 9,
+   "code": "FGBWX22",
+   "product": "Bra",
+   "color": "Navy",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.8,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 30.36254930688606,
+    "X": 19381.966786881552,
+    "Y": 6460.655595627184,
+    "AC": 8197.819404372816
+   }
+  },
+  {
+   "no": 10,
+   "code": "FGBET002",
+   "product": "Leggings",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 2,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 13.8,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 81.586442015102,
+    "X": 51774.6726586273,
+    "Y": 10354.93453172546,
+    "AC": 6264.540468274541
+   }
+  },
+  {
+   "no": 10,
+   "code": "FGBET002",
+   "product": "Leggings",
+   "color": "Olive",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 2,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 13.8,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 81.586442015102,
+    "X": 51774.6726586273,
+    "Y": 10354.93453172546,
+    "AC": 6264.540468274541
+   }
+  },
+  {
+   "no": 11,
+   "code": "FGB52762",
+   "product": "Bra",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.4,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 42.96197452947143,
+    "X": 27400.33395694804,
+    "Y": 6850.08348923701,
+    "AC": 7808.39151076299
+   }
+  },
+  {
+   "no": 11,
+   "code": "FGB52762",
+   "product": "Bra",
+   "color": "Violet",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.4,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 32.221480897103575,
+    "X": 20550.25046771103,
+    "Y": 6850.08348923701,
+    "AC": 7808.39151076299
+   }
+  },
+  {
+   "no": 11,
+   "code": "FGB52762",
+   "product": "Bra",
+   "color": "White",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.4,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 32.221480897103575,
+    "X": 20550.25046771103,
+    "Y": 6850.08348923701,
+    "AC": 7808.39151076299
+   }
+  },
+  {
+   "no": 12,
+   "code": "FGBD26061",
+   "product": "Leggings - Pockets",
+   "color": "Dark purple",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.7,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 56.594139524399864,
+    "X": 35967.74761636425,
+    "Y": 8991.936904091062,
+    "AC": 7627.538095908938
+   }
+  },
+  {
+   "no": 12,
+   "code": "FGBD26061",
+   "product": "Leggings - Pockets",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.7,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 42.445604643299895,
+    "X": 26975.81071227319,
+    "Y": 8991.936904091062,
+    "AC": 7627.538095908938
+   }
+  },
+  {
+   "no": 12,
+   "code": "FGBD26061",
+   "product": "Leggings - Pockets",
+   "color": "Grey",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.7,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 42.445604643299895,
+    "X": 26975.81071227319,
+    "Y": 8991.936904091062,
+    "AC": 7627.538095908938
+   }
+  },
+  {
+   "no": 13,
+   "code": "FGB02337",
+   "product": "Leggings",
+   "color": "Dark red",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 35.31970021413277,
+    "X": 22497.389935760177,
+    "Y": 7499.129978586726,
+    "AC": 9120.345021413275
+   }
+  },
+  {
+   "no": 13,
+   "code": "FGB02337",
+   "product": "Leggings",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 35.31970021413277,
+    "X": 22497.389935760177,
+    "Y": 7499.129978586726,
+    "AC": 9120.345021413275
+   }
+  },
+  {
+   "no": 13,
+   "code": "FGB02337",
+   "product": "Leggings",
+   "color": "Light purple",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 35.31970021413277,
+    "X": 22497.389935760177,
+    "Y": 7499.129978586726,
+    "AC": 9120.345021413275
+   }
+  },
+  {
+   "no": 13,
+   "code": "FGB02337",
+   "product": "Leggings",
+   "color": "Dark blue",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 35.31970021413277,
+    "X": 22497.389935760177,
+    "Y": 7499.129978586726,
+    "AC": 9120.345021413275
+   }
+  },
+  {
+   "no": 14,
+   "code": "FGBD26011",
+   "product": "Shorts",
+   "color": "Purple",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.5,
+   "salePriceCrc": 15950,
+   "expected": {
+    "S": 38.72774146286487,
+    "X": 24639.243350614222,
+    "Y": 8213.081116871408,
+    "AC": 7425.893883128592
+   }
+  },
+  {
+   "no": 14,
+   "code": "FGBD26011",
+   "product": "Shorts",
+   "color": "Pink",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.5,
+   "salePriceCrc": 15950,
+   "expected": {
+    "S": 38.72774146286487,
+    "X": 24639.243350614222,
+    "Y": 8213.081116871408,
+    "AC": 7425.893883128592
+   }
+  },
+  {
+   "no": 15,
+   "code": "FGB2590+91229",
+   "product": "Short sleeves tops (Without padding) & Pants",
+   "color": "Dark blue",
+   "sizes": {
+    "S": 2,
+    "M": 2,
+    "L": 2,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.8,
+   "salePriceCrc": 23950,
+   "expected": {
+    "S": 141.2788008565311,
+    "X": 89389.5597430407,
+    "Y": 14898.259957173452,
+    "AC": 8584.715042826549
+   }
+  },
+  {
+   "no": 15,
+   "code": "FGB2590+91229",
+   "product": "Short sleeves tops (Without padding) & Pants",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.8,
+   "salePriceCrc": 23950,
+   "expected": {
+    "S": 70.63940042826555,
+    "X": 44694.77987152035,
+    "Y": 14898.259957173452,
+    "AC": 8584.715042826549
+   }
+  },
+  {
+   "no": 15,
+   "code": "FGB2590+91229",
+   "product": "Short sleeves tops (Without padding) & Pants",
+   "color": "Grape",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.8,
+   "salePriceCrc": 23950,
+   "expected": {
+    "S": 70.63940042826555,
+    "X": 44694.77987152035,
+    "Y": 14898.259957173452,
+    "AC": 8584.715042826549
+   }
+  },
+  {
+   "no": 16,
+   "code": "FGBWX2493+DK3492",
+   "product": "Bra & Shorts (Pocket)",
+   "color": "Red",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 14,
+   "salePriceCrc": 22950,
+   "expected": {
+    "S": 55.76794770652541,
+    "X": 35348.51042488448,
+    "Y": 11782.836808294827,
+    "AC": 10719.638191705173
+   }
+  },
+  {
+   "no": 16,
+   "code": "FGBWX2493+DK3492",
+   "product": "Bra & Shorts (Pocket)",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 14,
+   "salePriceCrc": 22950,
+   "expected": {
+    "S": 55.76794770652541,
+    "X": 35348.51042488448,
+    "Y": 11782.836808294827,
+    "AC": 10719.638191705173
+   }
+  },
+  {
+   "no": 16,
+   "code": "FGBWX2493+DK3492",
+   "product": "Bra & Shorts (Pocket)",
+   "color": "Cherry",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 14,
+   "salePriceCrc": 22950,
+   "expected": {
+    "S": 55.76794770652541,
+    "X": 35348.51042488448,
+    "Y": 11782.836808294827,
+    "AC": 10719.638191705173
+   }
+  },
+  {
+   "no": 17,
+   "code": "FGB7126",
+   "product": "Pants",
+   "color": "Burgundy",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.3,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 38.10809759945904,
+    "X": 24249.8154570044,
+    "Y": 8083.271819001467,
+    "AC": 8536.203180998533
+   }
+  },
+  {
+   "no": 17,
+   "code": "FGB7126",
+   "product": "Pants",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.3,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 50.81079679927872,
+    "X": 32333.087276005866,
+    "Y": 8083.271819001467,
+    "AC": 8536.203180998533
+   }
+  },
+  {
+   "no": 17,
+   "code": "FGB7126",
+   "product": "Pants",
+   "color": "Navy",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.3,
+   "salePriceCrc": 16950,
+   "expected": {
+    "S": 38.10809759945904,
+    "X": 24249.8154570044,
+    "Y": 8083.271819001467,
+    "AC": 8536.203180998533
+   }
+  },
+  {
+   "no": 18,
+   "code": "FGBA2-023",
+   "product": "Bra",
+   "color": "Purple",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 41.206316916488234,
+    "X": 26196.95492505354,
+    "Y": 8732.31830835118,
+    "AC": 5926.156691648821
+   }
+  },
+  {
+   "no": 18,
+   "code": "FGBA2-023",
+   "product": "Bra",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 54.941755888650974,
+    "X": 34929.27323340471,
+    "Y": 8732.318308351178,
+    "AC": 5926.156691648823
+   }
+  },
+  {
+   "no": 18,
+   "code": "FGBA2-023",
+   "product": "Bra",
+   "color": "Angolan red",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 41.206316916488234,
+    "X": 26196.95492505354,
+    "Y": 8732.31830835118,
+    "AC": 5926.156691648821
+   }
+  },
+  {
+   "no": 19,
+   "code": "FGBDK3231",
+   "product": "Shorts - Free size",
+   "color": "Midnight",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 3
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.3,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 25.715220331342277,
+    "X": 16461.25758480784,
+    "Y": 5487.0858616026135,
+    "AC": 9171.389138397386
+   }
+  },
+  {
+   "no": 19,
+   "code": "FGBDK3231",
+   "product": "Shorts - Free size",
+   "color": "Black",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 3
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.3,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 25.715220331342277,
+    "X": 16461.25758480784,
+    "Y": 5487.0858616026135,
+    "AC": 9171.389138397386
+   }
+  },
+  {
+   "no": 19,
+   "code": "FGBDK3231",
+   "product": "Shorts - Free size",
+   "color": "Blue",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 3
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.3,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 25.715220331342277,
+    "X": 16461.25758480784,
+    "Y": 5487.0858616026135,
+    "AC": 9171.389138397386
+   }
+  },
+  {
+   "no": 19,
+   "code": "FGBDK3231",
+   "product": "Shorts - Free size",
+   "color": "Pink",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 1
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.3,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 8.571740110447426,
+    "X": 5487.085861602615,
+    "Y": 5487.085861602615,
+    "AC": 9171.389138397386
+   }
+  },
+  {
+   "no": 20,
+   "code": "FGBF233-230",
+   "product": "One shoulder bra & Shorts (Pockets)",
+   "color": "Wine",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.3,
+   "salePriceCrc": 22950,
+   "expected": {
+    "S": 69.09029076975095,
+    "X": 43721.210137495786,
+    "Y": 14573.736712498596,
+    "AC": 7928.738287501405
+   }
+  },
+  {
+   "no": 20,
+   "code": "FGBF233-230",
+   "product": "One shoulder bra & Shorts (Pockets)",
+   "color": "Navy",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.3,
+   "salePriceCrc": 22950,
+   "expected": {
+    "S": 92.12038769300125,
+    "X": 58294.94684999436,
+    "Y": 14573.73671249859,
+    "AC": 7928.73828750141
+   }
+  },
+  {
+   "no": 20,
+   "code": "FGBF233-230",
+   "product": "One shoulder bra & Shorts (Pockets)",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.3,
+   "salePriceCrc": 22950,
+   "expected": {
+    "S": 69.09029076975095,
+    "X": 43721.210137495786,
+    "Y": 14573.736712498596,
+    "AC": 7928.738287501405
+   }
+  },
+  {
+   "no": 21,
+   "code": "FGBCTZ8232",
+   "product": "Long sleeves tops & Bell-bottom pants",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 21,
+   "salePriceCrc": 25950,
+   "expected": {
+    "S": 77.45548292572974,
+    "X": 48978.486701228445,
+    "Y": 16326.162233742814,
+    "AC": 9117.812766257186
+   }
+  },
+  {
+   "no": 22,
+   "code": "FGBYW211",
+   "product": "Crop Tops",
+   "color": "Red",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.2,
+   "salePriceCrc": 15950,
+   "expected": {
+    "S": 42.13578271159698,
+    "X": 26881.096765468275,
+    "Y": 6720.274191367069,
+    "AC": 8918.700808632932
+   }
+  },
+  {
+   "no": 22,
+   "code": "FGBYW211",
+   "product": "Crop Tops",
+   "color": "Navy",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.2,
+   "salePriceCrc": 15950,
+   "expected": {
+    "S": 31.601837033697734,
+    "X": 20160.8225741012,
+    "Y": 6720.274191367066,
+    "AC": 8918.700808632933
+   }
+  },
+  {
+   "no": 22,
+   "code": "FGBYW211",
+   "product": "Crop Tops",
+   "color": "Black",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.2,
+   "salePriceCrc": 15950,
+   "expected": {
+    "S": 31.601837033697734,
+    "X": 20160.8225741012,
+    "Y": 6720.274191367066,
+    "AC": 8918.700808632933
+   }
+  },
+  {
+   "no": 23,
+   "code": "FGBWX2495+CK5495",
+   "product": "Bra & Bell-bottoms pants (Pockets)",
+   "color": "Red",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 0,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18,
+   "salePriceCrc": 25950,
+   "expected": {
+    "S": 22.72027499154739,
+    "X": 14379.022765693677,
+    "Y": 14379.022765693677,
+    "AC": 11064.952234306324
+   }
+  },
+  {
+   "no": 24,
+   "code": "EFGBYEL-51140",
+   "product": "Top",
+   "color": "Black",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.8,
+   "salePriceCrc": 15950,
+   "expected": {
+    "S": 22.307179082610165,
+    "X": 14219.404169953792,
+    "Y": 7109.702084976896,
+    "AC": 8529.272915023104
+   }
+  },
+  {
+   "no": 24,
+   "code": "EFGBYEL-51140",
+   "product": "Top",
+   "color": "Grey",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.8,
+   "salePriceCrc": 15950,
+   "expected": {
+    "S": 22.307179082610165,
+    "X": 14219.404169953792,
+    "Y": 7109.702084976896,
+    "AC": 8529.272915023104
+   }
+  },
+  {
+   "no": 25,
+   "code": "EFGBYEL-41116",
+   "product": "Top",
+   "color": "Green",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.1,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 9.397931928321874,
+    "X": 6006.323053082384,
+    "Y": 6006.323053082384,
+    "AC": 8652.151946917616
+   }
+  },
+  {
+   "no": 26,
+   "code": "AFGBYEL-1002",
+   "product": "Top",
+   "color": "Black",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 16.523836357489014,
+    "X": 10584.743829595403,
+    "Y": 5292.371914797702,
+    "AC": 9366.1030852023
+   }
+  },
+  {
+   "no": 26,
+   "code": "AFGBYEL-1002",
+   "product": "Top",
+   "color": "Grey",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 16.523836357489014,
+    "X": 10584.743829595403,
+    "Y": 5292.371914797702,
+    "AC": 9366.1030852023
+   }
+  },
+  {
+   "no": 26,
+   "code": "AFGBYEL-1002",
+   "product": "Top",
+   "color": "Blue",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6,
+   "salePriceCrc": 14950,
+   "expected": {
+    "S": 16.523836357489014,
+    "X": 10584.743829595403,
+    "Y": 5292.371914797702,
+    "AC": 9366.1030852023
+   }
+  },
+  {
+   "no": 27,
+   "code": "EFFGBZC-EDK5085",
+   "product": "Shorts",
+   "color": "Black",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 15,
+   "salePriceCrc": 19550,
+   "expected": {
+    "S": 35.113152259664155,
+    "X": 22267.58063789023,
+    "Y": 11133.790318945115,
+    "AC": 8034.984681054884
+   }
+  },
+  {
+   "no": 27,
+   "code": "EFFGBZC-EDK5085",
+   "product": "Shorts",
+   "color": "Grey",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 15,
+   "salePriceCrc": 19550,
+   "expected": {
+    "S": 35.113152259664155,
+    "X": 22267.58063789023,
+    "Y": 11133.790318945115,
+    "AC": 8034.984681054884
+   }
+  },
+  {
+   "no": 27,
+   "code": "EFFGBZC-EDK5085",
+   "product": "Shorts",
+   "color": "Blue",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 15,
+   "salePriceCrc": 19550,
+   "expected": {
+    "S": 35.113152259664155,
+    "X": 22267.58063789023,
+    "Y": 11133.790318945115,
+    "AC": 8034.984681054884
+   }
+  }
+ ],
+ "totals": {
+  "K": 241,
+  "S": 3665.4000000000005,
+  "X": 2316286.9272962944,
+  "AF": 4470550,
+  "AG": 2067087.3477037076
+ }
+}

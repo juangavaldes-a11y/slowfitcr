@@ -15,6 +15,7 @@ import {
   quoteProvider,
   verifyProviderWebhook,
 } from "./delivery-providers.mjs";
+import { createInventoryHandlers } from "./inventory-admin.mjs";
 
 const prisma = new PrismaClient();
 
@@ -604,6 +605,14 @@ async function appendAudit(action, details, actor = "system") {
     },
   });
 }
+
+const inventory = createInventoryHandlers({
+  prisma,
+  jsonResponse,
+  readJson,
+  isAuthorized: (request) => isModeratorAuthorized(request),
+  appendAudit,
+});
 
 async function resolveCartItems(lines) {
   const quantities = new Map();
@@ -3025,6 +3034,16 @@ export async function route(request) {
   if (pathname === "/api/admin/deliveries" && method === "GET") {
     return handleAdminDeliveries(request);
   }
+
+  if (pathname === "/api/admin/inventory" && method === "GET") return inventory.getInventory(request);
+  if (pathname === "/api/admin/inventory/settings" && method === "PUT") return inventory.updateSettings(request);
+  if (pathname === "/api/admin/inventory/lines" && method === "POST") return inventory.createLine(request);
+  const inventoryLineMatch = pathname.match(/^\/api\/admin\/inventory\/lines\/([^/]+)$/);
+  if (inventoryLineMatch && method === "PATCH") return inventory.updateLine(request, decodeURIComponent(inventoryLineMatch[1]));
+  if (pathname === "/api/admin/inventory/sales" && method === "GET") return inventory.listSales(request);
+  if (pathname === "/api/admin/inventory/sales" && method === "POST") return inventory.createSale(request);
+  const inventorySaleMatch = pathname.match(/^\/api\/admin\/inventory\/sales\/([^/]+)\/void$/);
+  if (inventorySaleMatch && method === "POST") return inventory.voidSale(request, decodeURIComponent(inventorySaleMatch[1]));
 
   const adminDeliveryMatch = pathname.match(/^\/api\/admin\/deliveries\/([^/]+)\/(dispatch|cancel)$/);
   if (adminDeliveryMatch && method === "POST") {

@@ -1,0 +1,1455 @@
+{
+ "settings": {
+  "hkShippingUsd": 80,
+  "invoiceAdjustmentUsd": 36.2,
+  "fxRate": 466,
+  "crShippingUsd": 1093,
+  "nationalizationCrc": 48631.75,
+  "otherImportCrc": 37549.65,
+  "extraUnitCrc": 100,
+  "cardCommissionRate": 0.0195,
+  "customizationPerPieceUsd": 2
+ },
+ "lines": [
+  {
+   "code": "FGBCX6116",
+   "productName": "Jackets",
+   "color": "Cherry",
+   "productHandle": "mige-fgbcx6116-jackets-colors-updated-c60c87a8",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.8,
+   "salePriceCrc": 18950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 0
+  },
+  {
+   "code": "FGBCX6116",
+   "productName": "Jackets",
+   "color": "Sky blue",
+   "productHandle": "mige-fgbcx6116-jackets-colors-updated-c60c87a8",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.8,
+   "salePriceCrc": 18950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 1
+  },
+  {
+   "code": "FGBCX6116",
+   "productName": "Jackets",
+   "color": "Black",
+   "productHandle": "mige-fgbcx6116-jackets-colors-updated-c60c87a8",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.8,
+   "salePriceCrc": 18950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 2
+  },
+  {
+   "code": "FGBCX6116",
+   "productName": "Jackets",
+   "color": "White",
+   "productHandle": "mige-fgbcx6116-jackets-colors-updated-c60c87a8",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.8,
+   "salePriceCrc": 18950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 3
+  },
+  {
+   "code": "FGBTZ4549",
+   "productName": "Bra & Pants",
+   "color": "Dark blue & Stripe",
+   "productHandle": "mige-fgbtz4549-bra-pants-4681974c",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 4
+  },
+  {
+   "code": "FGBTZ4549",
+   "productName": "Bra & Pants",
+   "color": "Black & Stripe",
+   "productHandle": "mige-fgbtz4549-bra-pants-4681974c",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 5
+  },
+  {
+   "code": "FGBTZ4549",
+   "productName": "Bra & Pants",
+   "color": "Dark blue & Polka dot",
+   "productHandle": "mige-fgbtz4549-bra-pants-4681974c",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 6
+  },
+  {
+   "code": "FGBTZ4549",
+   "productName": "Bra & Pants",
+   "color": "Black & Polka dot",
+   "productHandle": "mige-fgbtz4549-bra-pants-4681974c",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 7
+  },
+  {
+   "code": "FGBTZ4549",
+   "productName": "Bra & Pants",
+   "color": "Cream & Polka dot",
+   "productHandle": "mige-fgbtz4549-bra-pants-4681974c",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 22.5,
+   "salePriceCrc": 26950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 8
+  },
+  {
+   "code": "FGBCDK8519",
+   "productName": "Shorts",
+   "color": "Raspberry",
+   "productHandle": "mige-fgbcdk8519-shorts-colors-updated-3e1f3314",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.6,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 9
+  },
+  {
+   "code": "FGBCDK8519",
+   "productName": "Shorts",
+   "color": "Navy",
+   "productHandle": "mige-fgbcdk8519-shorts-colors-updated-3e1f3314",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.6,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 10
+  },
+  {
+   "code": "FGBCDK8519",
+   "productName": "Shorts",
+   "color": "Black",
+   "productHandle": "mige-fgbcdk8519-shorts-colors-updated-3e1f3314",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.6,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 11
+  },
+  {
+   "code": "FGBCDK8519",
+   "productName": "Shorts",
+   "color": "Army green",
+   "productHandle": "mige-fgbcdk8519-shorts-colors-updated-3e1f3314",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.6,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 12
+  },
+  {
+   "code": "FGBCCK8519",
+   "productName": "Leggings",
+   "color": "Raspberry",
+   "productHandle": "mige-fgbcck8519-leggings-colors-updated-ff57b17d",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 13
+  },
+  {
+   "code": "FGBCCK8519",
+   "productName": "Leggings",
+   "color": "Navy",
+   "productHandle": "mige-fgbcck8519-leggings-colors-updated-ff57b17d",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 14
+  },
+  {
+   "code": "FGBCCK8519",
+   "productName": "Leggings",
+   "color": "Black",
+   "productHandle": "mige-fgbcck8519-leggings-colors-updated-ff57b17d",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 15
+  },
+  {
+   "code": "FGBCCK8519",
+   "productName": "Leggings",
+   "color": "Army green",
+   "productHandle": "mige-fgbcck8519-leggings-colors-updated-ff57b17d",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 16
+  },
+  {
+   "code": "FGBCK1524",
+   "productName": "Pants - Free size",
+   "color": "Black",
+   "productHandle": "mige-fgbck1524-pants-free-size-0e14c8df",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 5
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": null,
+   "position": 17
+  },
+  {
+   "code": "FGBCK1524",
+   "productName": "Pants - Free size",
+   "color": "Navy",
+   "productHandle": "mige-fgbck1524-pants-free-size-0e14c8df",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 5
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": null,
+   "position": 18
+  },
+  {
+   "code": "FGBTZ8232",
+   "productName": "Long sleeves tops & Bell-bottom pants",
+   "color": "Cobalt blue",
+   "productHandle": "mige-fgbtz8232-long-sleeves-tops-bell-bottom-pants-8470fb12",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 19.7,
+   "salePriceCrc": 24950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 19
+  },
+  {
+   "code": "FGBTZ8232",
+   "productName": "Long sleeves tops & Bell-bottom pants",
+   "color": "Khaki",
+   "productHandle": "mige-fgbtz8232-long-sleeves-tops-bell-bottom-pants-8470fb12",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 19.7,
+   "salePriceCrc": 24950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 20
+  },
+  {
+   "code": "FGBTZ8232",
+   "productName": "Long sleeves tops & Bell-bottom pants",
+   "color": "Black",
+   "productHandle": "mige-fgbtz8232-long-sleeves-tops-bell-bottom-pants-8470fb12",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 19.7,
+   "salePriceCrc": 24950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 21
+  },
+  {
+   "code": "FGBTZ8232",
+   "productName": "Long sleeves tops & Bell-bottom pants",
+   "color": "Green",
+   "productHandle": "mige-fgbtz8232-long-sleeves-tops-bell-bottom-pants-8470fb12",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 19.7,
+   "salePriceCrc": 24950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 22
+  },
+  {
+   "code": "FGBB6505+K6510",
+   "productName": "Bra & Skirts",
+   "color": "Off white",
+   "productHandle": "mige-fgbb6505-k6510-bra-skirts-8412f7f2",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.5,
+   "salePriceCrc": 22950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 23
+  },
+  {
+   "code": "FGBB6505+K6510",
+   "productName": "Bra & Skirts",
+   "color": "Pink",
+   "productHandle": "mige-fgbb6505-k6510-bra-skirts-8412f7f2",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.5,
+   "salePriceCrc": 22950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 24
+  },
+  {
+   "code": "FGBDK067",
+   "productName": "Shorts",
+   "color": "31.SHL",
+   "productHandle": "mige-fgbdk067-shorts-colors-updated-f8516623",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.5,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 25
+  },
+  {
+   "code": "FGBDK067",
+   "productName": "Shorts",
+   "color": "35.HS",
+   "productHandle": "mige-fgbdk067-shorts-colors-updated-f8516623",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.5,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 26
+  },
+  {
+   "code": "FGBDK067",
+   "productName": "Shorts",
+   "color": "12.XNTLL",
+   "productHandle": "mige-fgbdk067-shorts-colors-updated-f8516623",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.5,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 27
+  },
+  {
+   "code": "FGBDK067",
+   "productName": "Shorts",
+   "color": "16.SMZ",
+   "productHandle": "mige-fgbdk067-shorts-colors-updated-f8516623",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.5,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 28
+  },
+  {
+   "code": "FGBWX22",
+   "productName": "Bra",
+   "color": "White",
+   "productHandle": "mige-fgbwx22-bra-colors-updated-25-colors-totally-2c717b23",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.8,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 29
+  },
+  {
+   "code": "FGBWX22",
+   "productName": "Bra",
+   "color": "Black",
+   "productHandle": "mige-fgbwx22-bra-colors-updated-25-colors-totally-2c717b23",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.8,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 30
+  },
+  {
+   "code": "FGBWX22",
+   "productName": "Bra",
+   "color": "Red",
+   "productHandle": "mige-fgbwx22-bra-colors-updated-25-colors-totally-2c717b23",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.8,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 31
+  },
+  {
+   "code": "FGBWX22",
+   "productName": "Bra",
+   "color": "Navy",
+   "productHandle": "mige-fgbwx22-bra-colors-updated-25-colors-totally-2c717b23",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.8,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 32
+  },
+  {
+   "code": "FGBET002",
+   "productName": "Leggings",
+   "color": "Black",
+   "productHandle": "mige-fgbet002-leggings-lycra-0f87223e",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 2,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 13.8,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 33
+  },
+  {
+   "code": "FGBET002",
+   "productName": "Leggings",
+   "color": "Olive",
+   "productHandle": "mige-fgbet002-leggings-lycra-0f87223e",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 2,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 13.8,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 34
+  },
+  {
+   "code": "FGB52762",
+   "productName": "Bra",
+   "color": "Black",
+   "productHandle": "mige-fgb52762-bra-32c47af9",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.4,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 35
+  },
+  {
+   "code": "FGB52762",
+   "productName": "Bra",
+   "color": "Violet",
+   "productHandle": "mige-fgb52762-bra-32c47af9",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.4,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 36
+  },
+  {
+   "code": "FGB52762",
+   "productName": "Bra",
+   "color": "White",
+   "productHandle": "mige-fgb52762-bra-32c47af9",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.4,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 37
+  },
+  {
+   "code": "FGBD26061",
+   "productName": "Leggings - Pockets",
+   "color": "Dark purple",
+   "productHandle": "mige-fgbd26061-leggings-pockets-f5571ec2",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.7,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 38
+  },
+  {
+   "code": "FGBD26061",
+   "productName": "Leggings - Pockets",
+   "color": "Black",
+   "productHandle": "mige-fgbd26061-leggings-pockets-f5571ec2",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.7,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 39
+  },
+  {
+   "code": "FGBD26061",
+   "productName": "Leggings - Pockets",
+   "color": "Grey",
+   "productHandle": "mige-fgbd26061-leggings-pockets-f5571ec2",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.7,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 40
+  },
+  {
+   "code": "FGB02337",
+   "productName": "Leggings",
+   "color": "Dark red",
+   "productHandle": "mige-fgb02337-leggings-77201f8a",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 41
+  },
+  {
+   "code": "FGB02337",
+   "productName": "Leggings",
+   "color": "Black",
+   "productHandle": "mige-fgb02337-leggings-77201f8a",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 42
+  },
+  {
+   "code": "FGB02337",
+   "productName": "Leggings",
+   "color": "Light purple",
+   "productHandle": "mige-fgb02337-leggings-77201f8a",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 43
+  },
+  {
+   "code": "FGB02337",
+   "productName": "Leggings",
+   "color": "Dark blue",
+   "productHandle": "mige-fgb02337-leggings-77201f8a",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 9.4,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 44
+  },
+  {
+   "code": "FGBD26011",
+   "productName": "Shorts",
+   "color": "Purple",
+   "productHandle": "mige-fgbd26011-shorts-093ab809",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.5,
+   "salePriceCrc": 15950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 45
+  },
+  {
+   "code": "FGBD26011",
+   "productName": "Shorts",
+   "color": "Pink",
+   "productHandle": "mige-fgbd26011-shorts-093ab809",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.5,
+   "salePriceCrc": 15950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 46
+  },
+  {
+   "code": "FGB2590+91229",
+   "productName": "Short sleeves tops (Without padding) & Pants",
+   "color": "Dark blue",
+   "productHandle": "mige-fgb2590-91229-short-sleeves-tops-without-padding-pants-fa06ff09",
+   "sizes": {
+    "S": 2,
+    "M": 2,
+    "L": 2,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.8,
+   "salePriceCrc": 23950,
+   "supplierEquivalence": null,
+   "position": 47
+  },
+  {
+   "code": "FGB2590+91229",
+   "productName": "Short sleeves tops (Without padding) & Pants",
+   "color": "Black",
+   "productHandle": "mige-fgb2590-91229-short-sleeves-tops-without-padding-pants-fa06ff09",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.8,
+   "salePriceCrc": 23950,
+   "supplierEquivalence": null,
+   "position": 48
+  },
+  {
+   "code": "FGB2590+91229",
+   "productName": "Short sleeves tops (Without padding) & Pants",
+   "color": "Grape",
+   "productHandle": "mige-fgb2590-91229-short-sleeves-tops-without-padding-pants-fa06ff09",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.8,
+   "salePriceCrc": 23950,
+   "supplierEquivalence": null,
+   "position": 49
+  },
+  {
+   "code": "FGBWX2493+DK3492",
+   "productName": "Bra & Shorts (Pocket)",
+   "color": "Red",
+   "productHandle": "mige-fgbwx2493-dk3492-bra-shorts-pockets-43f1a46c",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 14,
+   "salePriceCrc": 22950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 50
+  },
+  {
+   "code": "FGBWX2493+DK3492",
+   "productName": "Bra & Shorts (Pocket)",
+   "color": "Black",
+   "productHandle": "mige-fgbwx2493-dk3492-bra-shorts-pockets-43f1a46c",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 14,
+   "salePriceCrc": 22950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 51
+  },
+  {
+   "code": "FGBWX2493+DK3492",
+   "productName": "Bra & Shorts (Pocket)",
+   "color": "Cherry",
+   "productHandle": "mige-fgbwx2493-dk3492-bra-shorts-pockets-43f1a46c",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 14,
+   "salePriceCrc": 22950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 52
+  },
+  {
+   "code": "FGB7126",
+   "productName": "Pants",
+   "color": "Burgundy",
+   "productHandle": "mige-fgb7126-pants-5bd2a222",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.3,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 53
+  },
+  {
+   "code": "FGB7126",
+   "productName": "Pants",
+   "color": "Black",
+   "productHandle": "mige-fgb7126-pants-5bd2a222",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.3,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 54
+  },
+  {
+   "code": "FGB7126",
+   "productName": "Pants",
+   "color": "Navy",
+   "productHandle": "mige-fgb7126-pants-5bd2a222",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 10.3,
+   "salePriceCrc": 16950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 55
+  },
+  {
+   "code": "FGBA2-023",
+   "productName": "Bra",
+   "color": "Purple",
+   "productHandle": "mige-fgba2-023-bra-f1b59259",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 56
+  },
+  {
+   "code": "FGBA2-023",
+   "productName": "Bra",
+   "color": "Black",
+   "productHandle": "mige-fgba2-023-bra-f1b59259",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 57
+  },
+  {
+   "code": "FGBA2-023",
+   "productName": "Bra",
+   "color": "Angolan red",
+   "productHandle": "mige-fgba2-023-bra-f1b59259",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 11.3,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 58
+  },
+  {
+   "code": "FGBDK3231",
+   "productName": "Shorts - Free size",
+   "color": "Midnight",
+   "productHandle": "mige-fgbdk3231-shorts-free-size-6480b942",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 3
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.3,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": null,
+   "position": 59
+  },
+  {
+   "code": "FGBDK3231",
+   "productName": "Shorts - Free size",
+   "color": "Black",
+   "productHandle": "mige-fgbdk3231-shorts-free-size-6480b942",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 3
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.3,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": null,
+   "position": 60
+  },
+  {
+   "code": "FGBDK3231",
+   "productName": "Shorts - Free size",
+   "color": "Blue",
+   "productHandle": "mige-fgbdk3231-shorts-free-size-6480b942",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 3
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.3,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": null,
+   "position": 61
+  },
+  {
+   "code": "FGBDK3231",
+   "productName": "Shorts - Free size",
+   "color": "Pink",
+   "productHandle": "mige-fgbdk3231-shorts-free-size-6480b942",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 0,
+    "XL": 0,
+    "OS": 1
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6.3,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": null,
+   "position": 62
+  },
+  {
+   "code": "FGBF233-230",
+   "productName": "One shoulder bra & Shorts (Pockets)",
+   "color": "Wine",
+   "productHandle": "mige-fgbf233-230-one-shoulder-bra-shorts-pockets-ec03fc99",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.3,
+   "salePriceCrc": 22950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 63
+  },
+  {
+   "code": "FGBF233-230",
+   "productName": "One shoulder bra & Shorts (Pockets)",
+   "color": "Navy",
+   "productHandle": "mige-fgbf233-230-one-shoulder-bra-shorts-pockets-ec03fc99",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.3,
+   "salePriceCrc": 22950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 64
+  },
+  {
+   "code": "FGBF233-230",
+   "productName": "One shoulder bra & Shorts (Pockets)",
+   "color": "Black",
+   "productHandle": "mige-fgbf233-230-one-shoulder-bra-shorts-pockets-ec03fc99",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18.3,
+   "salePriceCrc": 22950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 65
+  },
+  {
+   "code": "FGBCTZ8232",
+   "productName": "Long sleeves tops & Bell-bottom pants",
+   "color": "Black",
+   "productHandle": "mige-fgbctz8232-long-sleeves-tops-bell-bottom-pants-d95c301a",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 21,
+   "salePriceCrc": 25950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 66
+  },
+  {
+   "code": "FGBYW211",
+   "productName": "Crop Tops",
+   "color": "Red",
+   "productHandle": "mige-fgbyw211-crop-top-sammy-20260918",
+   "sizes": {
+    "S": 1,
+    "M": 2,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.2,
+   "salePriceCrc": 15950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 67
+  },
+  {
+   "code": "FGBYW211",
+   "productName": "Crop Tops",
+   "color": "Navy",
+   "productHandle": "mige-fgbyw211-crop-top-sammy-20260918",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.2,
+   "salePriceCrc": 15950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 68
+  },
+  {
+   "code": "FGBYW211",
+   "productName": "Crop Tops",
+   "color": "Black",
+   "productHandle": "mige-fgbyw211-crop-top-sammy-20260918",
+   "sizes": {
+    "S": 1,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.2,
+   "salePriceCrc": 15950,
+   "supplierEquivalence": "M-L-XL",
+   "position": 69
+  },
+  {
+   "code": "FGBWX2495+CK5495",
+   "productName": "Bra & Bell-bottoms pants (Pockets)",
+   "color": "Red",
+   "productHandle": "mige-fgbwx2495-ck5495-bra-bell-bottoms-pants-pockets-5c99218c",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 0,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 2,
+   "unitPriceUsd": 18,
+   "salePriceCrc": 25950,
+   "supplierEquivalence": null,
+   "position": 70
+  },
+  {
+   "code": "EFGBYEL-51140",
+   "productName": "Top",
+   "color": "Black",
+   "productHandle": "mige-efgbyel-51140-069be00f",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.8,
+   "salePriceCrc": 15950,
+   "supplierEquivalence": null,
+   "position": 71
+  },
+  {
+   "code": "EFGBYEL-51140",
+   "productName": "Top",
+   "color": "Grey",
+   "productHandle": "mige-efgbyel-51140-069be00f",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 8.8,
+   "salePriceCrc": 15950,
+   "supplierEquivalence": null,
+   "position": 72
+  },
+  {
+   "code": "EFGBYEL-41116",
+   "productName": "Top",
+   "color": "Green",
+   "productHandle": "mige-efgbyel-41116-5f027615",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 7.1,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": null,
+   "position": 73
+  },
+  {
+   "code": "AFGBYEL-1002",
+   "productName": "Top",
+   "color": "Black",
+   "productHandle": "mige-afgbyel-1002-51223c19",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": null,
+   "position": 74
+  },
+  {
+   "code": "AFGBYEL-1002",
+   "productName": "Top",
+   "color": "Grey",
+   "productHandle": "mige-afgbyel-1002-51223c19",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": null,
+   "position": 75
+  },
+  {
+   "code": "AFGBYEL-1002",
+   "productName": "Top",
+   "color": "Blue",
+   "productHandle": "mige-afgbyel-1002-51223c19",
+   "sizes": {
+    "S": 0,
+    "M": 1,
+    "L": 1,
+    "XL": 0,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 6,
+   "salePriceCrc": 14950,
+   "supplierEquivalence": null,
+   "position": 76
+  },
+  {
+   "code": "EFFGBZC-EDK5085",
+   "productName": "Shorts",
+   "color": "Black",
+   "productHandle": "mige-ffgbzc-edk5085-shorts-1dd7e5fb",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 15,
+   "salePriceCrc": 19550,
+   "supplierEquivalence": null,
+   "position": 77
+  },
+  {
+   "code": "EFFGBZC-EDK5085",
+   "productName": "Shorts",
+   "color": "Grey",
+   "productHandle": "mige-ffgbzc-edk5085-shorts-1dd7e5fb",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 15,
+   "salePriceCrc": 19550,
+   "supplierEquivalence": null,
+   "position": 78
+  },
+  {
+   "code": "EFFGBZC-EDK5085",
+   "productName": "Shorts",
+   "color": "Blue",
+   "productHandle": "mige-ffgbzc-edk5085-shorts-1dd7e5fb",
+   "sizes": {
+    "S": 0,
+    "M": 0,
+    "L": 1,
+    "XL": 1,
+    "OS": 0
+   },
+   "piecesPerGarment": 1,
+   "unitPriceUsd": 15,
+   "salePriceCrc": 19550,
+   "supplierEquivalence": null,
+   "position": 79
+  }
+ ]
+}
