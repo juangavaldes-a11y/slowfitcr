@@ -154,3 +154,35 @@ test("operator inspects and replays a failed webhook", async ({ page }) => {
   await expect(page.getByText("Webhook replayed")).toBeVisible();
   expect(replayCount).toBe(1);
 });
+
+test("inventory admin lists costs and records a sale", async ({ page }) => {
+  const emptySizes = { S: 0, M: 0, L: 0, XL: 0, OS: 0 };
+  const view = {
+    settings: { fxRate: 466, cardCommissionRate: 0.0195 },
+    crReady: true,
+    totals: { quantity: 3, paidInvestmentUsd: 100, totalInventoryCostCrc: 90000, expectedSalesCrc: 150000, totalContributionCrc: 50000, contributionMargin: 0.33 },
+    paymentMethods: [{ id: "pm1", name: "Cash", active: true }],
+    lines: [{
+      id: "line-1", code: "FGB001", productName: "Jackets", color: "Black",
+      sizes: { ...emptySizes, M: 3 }, remaining: { ...emptySizes, M: 3 }, soldQuantity: 0, remainingQuantity: 3,
+      unitPriceUsd: 9.8, piecesPerGarment: 1,
+      cost: { paidInvestmentUsd: 30, totalInventoryCostCrc: 30000, costPerUnitCrc: 10000, salePriceCrc: 50000, contributionPerUnitCrc: 39000, contributionMargin: 0.78 },
+    }],
+  };
+  let saleBody: Record<string, unknown> | null = null;
+  await page.route("**/api/admin/inventory/exchange-rate", (route) => route.fulfill({ json: { date: "2026-10-02", buyRate: 456, sellRate: 462.29, stale: false } }));
+  await page.route("**/api/admin/inventory/sales", (route) => {
+    saleBody = route.request().postDataJSON();
+    return route.fulfill({ status: 201, json: { ...view, lines: [{ ...view.lines[0], remainingQuantity: 2, soldQuantity: 1 }] } });
+  });
+  await page.route("**/api/admin/inventory", (route) => route.fulfill({ json: view }));
+
+  await page.goto("/en/admin/inventory");
+  await expect(page.getByText("FGB001")).toBeVisible();
+  await expect(page.getByText("BCCR sell rate: 462.29")).toBeVisible();
+
+  await page.getByRole("button", { name: /Sell/ }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Sale recorded.")).toBeVisible();
+  expect(saleBody).toMatchObject({ lineId: "line-1", size: "M", quantity: 1, paymentMethod: "Cash" });
+});

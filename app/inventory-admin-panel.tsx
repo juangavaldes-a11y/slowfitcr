@@ -1,15 +1,17 @@
 "use client";
 
-import { DollarOutlined, HistoryOutlined, SettingOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { DollarOutlined, DownloadOutlined, HistoryOutlined, LineChartOutlined, SettingOutlined, ShoppingCartOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select,
-  Space, Statistic, Table, Tag, Typography, message,
+  Space, Statistic, Table, Tag, Typography, Upload, message,
 } from "antd";
+import Link from "next/link";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
 import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
+import { exportInventoryWorkbook, parseInventoryWorkbook, type XlsxLine } from "./lib/inventory-xlsx";
 
 const SIZES = ["S", "M", "L", "XL", "OS"] as const;
 type Size = (typeof SIZES)[number];
@@ -64,6 +66,14 @@ type SaleRow = {
   voidedAt: string | null;
   line: { code: string; productName: string; color: string };
 };
+type ImportPreview = {
+  applied: boolean;
+  summary: { created: number; updated: number; unchanged: number; missing: number; errors: Array<{ row: number; code: string | null; error: string }> };
+  created?: Array<{ code: string; color: string }>;
+  updated?: Array<{ code: string; color: string; changes: Record<string, unknown> }>;
+  missing?: Array<{ code: string; color: string }>;
+};
+type FxRate = { date: string; buyRate: number; sellRate: number; stale: boolean };
 type SaleForm = { size: Size; quantity: number; unitPriceCrc: number; discountCrc: number; soldAt: dayjs.Dayjs; paymentMethod: string; note?: string };
 
 const SETTING_FIELDS: Array<{ key: string; es: string; en: string }> = [
@@ -92,6 +102,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [saleLine, setSaleLine] = useState<Line | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sales, setSales] = useState<SaleRow[]>([]);
+  const [fx, setFx] = useState<FxRate | null>(null);
+  const [importLines, setImportLines] = useState<XlsxLine[] | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const es = locale === "es";
   const labels = useMemo(() => es ? {
@@ -110,6 +124,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     required: "Obligatorio", saved: "Guardado.", saleSaved: "Venta registrada.", voided: "Venta anulada.",
     void: "Anular", voidConfirm: "Anular esta venta y devolver el inventario?", status: "Estado", active: "Activa", voidedTag: "Anulada",
     total: "Total", loadFail: "No pudimos cargar el inventario.", saveFail: "No pudimos guardar los cambios.",
+    exportXlsx: "Exportar Excel", importXlsx: "Importar Excel", charts: "Ventas y proyecciones",
+    importTitle: "Revisar importacion", importApply: "Aplicar cambios", created: "Nuevas", updated: "Actualizadas", unchanged: "Sin cambios",
+    missing: "No incluidas en el archivo (no se eliminan)", errors: "Errores", importDone: "Importacion aplicada.", importFail: "No pudimos leer el archivo.",
+    fxLabel: "BCCR venta", fxUse: "Usar tipo de cambio", fxStale: "(ultimo disponible)",
   } : {
     title: "Inventory & costs",
     subtitle: "Prices, import costs, stock and sales by garment, color and size.",
@@ -126,6 +144,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     required: "Required", saved: "Saved.", saleSaved: "Sale recorded.", voided: "Sale voided.",
     void: "Void", voidConfirm: "Void this sale and restore stock?", status: "Status", active: "Active", voidedTag: "Voided",
     total: "Total", loadFail: "We could not load the inventory.", saveFail: "We could not save the changes.",
+    exportXlsx: "Export Excel", importXlsx: "Import Excel", charts: "Sales & projections",
+    importTitle: "Review import", importApply: "Apply changes", created: "New", updated: "Updated", unchanged: "Unchanged",
+    missing: "Not in the file (not deleted)", errors: "Errors", importDone: "Import applied.", importFail: "We could not read the file.",
+    fxLabel: "BCCR sell rate", fxUse: "Use exchange rate", fxStale: "(latest available)",
   }, [es]);
 
   const crc = useMemo(() => new Intl.NumberFormat(es ? "es-CR" : "en-US", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }), [es]);
@@ -154,7 +176,18 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     }
   };
 
-  const loadInitial = useEffectEvent(() => load());
+  const loadFx = async () => {
+    try {
+      setFx(await apiRequest<FxRate>("/api/admin/inventory/exchange-rate", { cache: "no-store" }));
+    } catch {
+      setFx(null);
+    }
+  };
+
+  const loadInitial = useEffectEvent(async () => {
+    await load();
+    await loadFx();
+  });
   useEffect(() => {
     const timeout = window.setTimeout(() => void loadInitial(), 0);
     return () => window.clearTimeout(timeout);
@@ -194,6 +227,37 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const updatePrice = (line: Line, value: number | null) => {
     if (value === line.cost.salePriceCrc) return;
     void mutate(`/api/admin/inventory/lines/${line.id}`, "PATCH", { salePriceCrc: value }, labels.saved);
+  };
+
+  const previewImport = async (file: File) => {
+    try {
+      const parsed = await parseInventoryWorkbook(file);
+      const preview = await apiRequest<ImportPreview>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: parsed }) });
+      setImportLines(parsed);
+      setImportPreview(preview);
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) setAuthorized(false);
+      else api.error(error instanceof Error && !("status" in error) ? labels.importFail : formatApiError(error, locale, { fallback: labels.importFail }));
+    }
+  };
+
+  const applyImport = async () => {
+    if (!importLines) return;
+    setImporting(true);
+    try {
+      setView(await apiRequest<View>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: importLines, apply: true }) }));
+      api.success(labels.importDone);
+      setImportLines(null);
+      setImportPreview(null);
+    } catch (error) {
+      handleError(error, labels.saveFail);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const useFxRate = () => {
+    if (fx) void mutate("/api/admin/inventory/settings", "PUT", { fxRate: fx.sellRate }, labels.saved);
   };
 
   const openSettings = () => {
@@ -346,6 +410,17 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           <Input.Search allowClear placeholder={labels.search} value={search} onChange={(event) => setSearch(event.target.value)} style={{ minWidth: 300 }} />
           <Button icon={<SettingOutlined />} onClick={openSettings}>{labels.settings}</Button>
           <Button icon={<HistoryOutlined />} onClick={() => void openHistory()}>{labels.history}</Button>
+          <Button icon={<DownloadOutlined />} disabled={!view} onClick={() => view && void exportInventoryWorkbook(view as never)}>{labels.exportXlsx}</Button>
+          <Upload accept=".xlsx" showUploadList={false} beforeUpload={(file) => { void previewImport(file); return false; }}>
+            <Button icon={<UploadOutlined />}>{labels.importXlsx}</Button>
+          </Upload>
+          <Link href={`/${locale}/admin/inventory/analytics`}><Button icon={<LineChartOutlined />}>{labels.charts}</Button></Link>
+          {fx ? (
+            <Space size={4}>
+              <Tag color="blue">{labels.fxLabel}: {fx.sellRate} ({fx.date}){fx.stale ? ` ${labels.fxStale}` : ""}</Tag>
+              <Button size="small" onClick={useFxRate}>{labels.fxUse}</Button>
+            </Space>
+          ) : null}
         </Space>
         <Table<Line> rowKey="id" size="small" loading={loading} columns={columns} dataSource={lines}
           pagination={{ pageSize: 25, showSizeChanger: false }} scroll={{ x: 1200 }} />
@@ -386,6 +461,29 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
               <Input.TextArea rows={2} maxLength={500} />
             </Form.Item>
           </Form>
+        </Modal>
+
+        <Modal title={labels.importTitle} open={Boolean(importPreview)} onCancel={() => { setImportPreview(null); setImportLines(null); }}
+          okText={labels.importApply} cancelText={labels.cancel} confirmLoading={importing}
+          okButtonProps={{ disabled: !importPreview || importPreview.summary.errors.length > 0 || importPreview.summary.created + importPreview.summary.updated === 0 }}
+          onOk={() => void applyImport()} width={640}>
+          {importPreview ? (
+            <Space orientation="vertical" style={{ width: "100%" }}>
+              <Space wrap>
+                <Tag color="green">{labels.created}: {importPreview.summary.created}</Tag>
+                <Tag color="blue">{labels.updated}: {importPreview.summary.updated}</Tag>
+                <Tag>{labels.unchanged}: {importPreview.summary.unchanged}</Tag>
+                <Tag color="orange">{labels.missing}: {importPreview.summary.missing}</Tag>
+              </Space>
+              {importPreview.summary.errors.length ? (
+                <Table size="small" rowKey={(row) => `${row.row}-${row.error}`} pagination={false} dataSource={importPreview.summary.errors}
+                  columns={[{ title: "#", dataIndex: "row" }, { title: labels.code, dataIndex: "code" }, { title: labels.errors, dataIndex: "error" }]} />
+              ) : null}
+              <Table size="small" rowKey={(row) => `${row.code}-${row.color}`} pagination={{ pageSize: 6, showSizeChanger: false }} dataSource={importPreview.updated ?? []}
+                columns={[{ title: labels.code, dataIndex: "code" }, { title: labels.color, dataIndex: "color" },
+                  { title: labels.updated, render: (_, row) => Object.keys(row.changes).join(", ") }]} />
+            </Space>
+          ) : null}
         </Modal>
 
         <Drawer title={labels.history} open={historyOpen} onClose={() => setHistoryOpen(false)} size="min(96vw, 820px)">

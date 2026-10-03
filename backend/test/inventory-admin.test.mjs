@@ -47,3 +47,53 @@ test("handlers reject unauthorized requests", async () => {
   });
   assert.equal((await handlers.getInventory({})).status, 401);
 });
+
+test("diffImport classifies created, updated, unchanged, missing and invalid rows", async () => {
+  const { diffImport } = await import("../inventory-admin.mjs");
+  const existing = [
+    { id: "1", code: "A", color: "Black", productName: "Top", sizes: { S: 1, M: 1, L: 0, XL: 0, OS: 0 }, piecesPerGarment: 1, unitPriceUsd: "10", salePriceCrc: "15000", supplierEquivalence: null },
+    { id: "2", code: "B", color: "Red", productName: "Pants", sizes: { S: 2 }, piecesPerGarment: 1, unitPriceUsd: "5", salePriceCrc: null, supplierEquivalence: null },
+    { id: "3", code: "C", color: "Navy", productName: "Bra", sizes: { S: 1 }, piecesPerGarment: 1, unitPriceUsd: "5", salePriceCrc: null, supplierEquivalence: null },
+  ];
+  const row = (extra) => ({ code: "A", productName: "Top", color: "Black", sizes: { S: 1, M: 1 }, piecesPerGarment: 1, unitPriceUsd: 10, salePriceCrc: 15000, ...extra });
+  const diff = diffImport(existing, [
+    row({}),
+    row({ code: "B", color: "Red", productName: "Pants", salePriceCrc: 9000, sizes: { S: 2 }, unitPriceUsd: 5 }),
+    row({ code: "N", color: "New" }),
+    row({ code: "B", color: "Red", sizes: { S: 1 } }),
+    row({ code: "", color: "X" }),
+  ], new Map([["2", { S: 2 }]]));
+  assert.equal(diff.unchanged.length, 1);
+  assert.equal(diff.updated.length, 1);
+  assert.deepEqual(diff.updated[0].changes, { salePriceCrc: 9000 });
+  assert.equal(diff.created.length, 1);
+  assert.deepEqual(diff.missing, [{ code: "C", color: "Navy" }]);
+  assert.deepEqual(diff.errors.map((entry) => entry.error).sort(), ["INVALID_DUPLICATE_ROW", "INVALID_TEXT"]);
+});
+
+test("exchange rate falls back to the cached rate when the provider fails", async () => {
+  const cached = { date: new Date("2020-01-01"), buyRate: "450", sellRate: "460", source: "BCCR" };
+  const make = (fetchRate, rate) => createInventoryHandlers({
+    prisma: { exchangeRate: { findFirst: async () => rate, upsert: async ({ create }) => ({ ...create, source: "BCCR" }) } },
+    jsonResponse: (body, status = 200) => ({ body, status }),
+    readJson: async () => ({}),
+    isAuthorized: async () => true,
+    appendAudit: async () => undefined,
+    fetchRate,
+  });
+  const fallback = await make(async () => { throw new Error("down"); }, cached).getExchangeRate({});
+  assert.equal(fallback.body.stale, true);
+  assert.equal(fallback.body.sellRate, 460);
+  assert.equal((await make(async () => { throw new Error("down"); }, null).getExchangeRate({})).status, 502);
+  const fresh = await make(async () => ({ date: "2026-10-02", buyRate: 456.56, sellRate: 462.29 }), cached).getExchangeRate({});
+  assert.equal(fresh.body.sellRate, 462.29);
+  assert.equal(fresh.body.stale, false);
+});
+
+test("fetchBccrRate validates the provider payload", async () => {
+  const { fetchBccrRate } = await import("../inventory-fx.mjs");
+  const ok = await fetchBccrRate(async () => ({ ok: true, json: async () => ({ dolar: { venta: { fecha: "2026-10-02", valor: 462.29 }, compra: { valor: 456.56 } } }) }));
+  assert.deepEqual(ok, { date: "2026-10-02", buyRate: 456.56, sellRate: 462.29 });
+  await assert.rejects(fetchBccrRate(async () => ({ ok: true, json: async () => ({}) })), /FX_INVALID_PAYLOAD/);
+  await assert.rejects(fetchBccrRate(async () => ({ ok: false, status: 500 })), /FX_HTTP_500/);
+});

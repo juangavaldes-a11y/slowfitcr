@@ -1,3 +1,5 @@
+import { buildAnalytics } from "./inventory-analytics.mjs";
+import { fetchBccrRate } from "./inventory-fx.mjs";
 import { computeInventoryCosts, SIZE_KEYS, sumSizes } from "./inventory-costing.mjs";
 
 const VARIANT_SIZE = { OS: "One Size" };
@@ -138,7 +140,54 @@ export function buildInventoryView(settingsRow, lineRows, sales) {
   return { settings: costs.settings, crReady: costs.crReady, lines, totals: costs.totals };
 }
 
-export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuthorized, appendAudit }) {
+const IMPORT_FIELDS = ["productName", "sizes", "piecesPerGarment", "unitPriceUsd", "salePriceCrc", "supplierEquivalence"];
+const MAX_IMPORT_ROWS = 1000;
+
+export function diffImport(existingLines, incomingLines, soldByLine = new Map()) {
+  const existing = new Map(existingLines.map((line) => [`${line.code}\u0000${line.color}`, line]));
+  const seen = new Set();
+  const result = { created: [], updated: [], unchanged: [], errors: [], missing: [] };
+  incomingLines.forEach((incoming, index) => {
+    let data;
+    try {
+      data = parseLineInput(incoming);
+    } catch (error) {
+      result.errors.push({ row: index + 1, code: incoming?.code ?? null, error: error.message });
+      return;
+    }
+    const key = `${data.code}\u0000${data.color}`;
+    if (seen.has(key)) {
+      result.errors.push({ row: index + 1, code: data.code, error: "INVALID_DUPLICATE_ROW" });
+      return;
+    }
+    seen.add(key);
+    const current = existing.get(key);
+    if (!current) {
+      result.created.push(data);
+      return;
+    }
+    const sold = soldByLine.get(current.id) ?? {};
+    if (SIZE_KEYS.some((size) => data.sizes[size] < (sold[size] ?? 0))) {
+      result.errors.push({ row: index + 1, code: data.code, error: "SOLD_EXCEEDS_STOCK" });
+      return;
+    }
+    const changes = {};
+    for (const field of IMPORT_FIELDS) {
+      if (data[field] === undefined) continue;
+      const before = field === "sizes" ? JSON.stringify(SIZE_KEYS.map((size) => current.sizes[size] ?? 0))
+        : field === "unitPriceUsd" || field === "salePriceCrc" ? num(current[field]) : current[field] ?? null;
+      const after = field === "sizes" ? JSON.stringify(SIZE_KEYS.map((size) => data.sizes[size]))
+        : data[field] ?? null;
+      if (before !== after) changes[field] = data[field];
+    }
+    if (Object.keys(changes).length) result.updated.push({ id: current.id, code: data.code, color: data.color, changes });
+    else result.unchanged.push({ id: current.id });
+  });
+  result.missing = existingLines.filter((line) => !seen.has(`${line.code}\u0000${line.color}`)).map((line) => ({ code: line.code, color: line.color }));
+  return result;
+}
+
+export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuthorized, appendAudit, fetchRate = fetchBccrRate }) {
   const guard = (handler) => async (request, ...args) => {
     if (!(await isAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
     try {
@@ -247,5 +296,65 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     return jsonResponse({ sales });
   });
 
-  return { getInventory, updateSettings, createLine, updateLine, createSale, voidSale, listSales };
+  const importLines = guard(async (request) => {
+    const body = await readJson(request);
+    const incoming = Array.isArray(body.lines) ? body.lines : null;
+    if (!incoming || incoming.length === 0 || incoming.length > MAX_IMPORT_ROWS) throw new Error("INVALID_IMPORT");
+    const apply = body.apply === true;
+    const [existing, sales] = await Promise.all([
+      prisma.inventoryLine.findMany(),
+      prisma.inventorySale.findMany({ where: { voidedAt: null } }),
+    ]);
+    const diff = diffImport(existing, incoming, soldBySize(sales));
+    const summary = { created: diff.created.length, updated: diff.updated.length, unchanged: diff.unchanged.length, missing: diff.missing.length, errors: diff.errors };
+    if (!apply) return jsonResponse({ applied: false, summary, created: diff.created, updated: diff.updated, missing: diff.missing });
+    if (diff.errors.length) return jsonResponse({ applied: false, summary, error: "IMPORT_HAS_ERRORS" }, 422);
+    await prisma.$transaction(async (transaction) => {
+      for (const data of diff.created) await transaction.inventoryLine.create({ data });
+      for (const row of diff.updated) await transaction.inventoryLine.update({ where: { id: row.id }, data: row.changes });
+    }, { timeout: 30000 });
+    await appendAudit("inventory.import.applied", { created: summary.created, updated: summary.updated, unchanged: summary.unchanged }, "admin");
+    return jsonResponse({ applied: true, summary, ...(await loadView()) });
+  });
+
+  const getExchangeRate = guard(async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    let rate = await prisma.exchangeRate.findFirst({ orderBy: { date: "desc" } });
+    let stale = !rate || rate.date.toISOString().slice(0, 10) < today;
+    if (stale) {
+      try {
+        const fresh = await fetchRate();
+        rate = await prisma.exchangeRate.upsert({
+          where: { date: new Date(fresh.date) },
+          create: { date: new Date(fresh.date), buyRate: fresh.buyRate, sellRate: fresh.sellRate },
+          update: { buyRate: fresh.buyRate, sellRate: fresh.sellRate, fetchedAt: new Date() },
+        });
+        stale = false;
+      } catch {
+        if (!rate) return jsonResponse({ error: "FX_UNAVAILABLE" }, 502);
+      }
+    }
+    return jsonResponse({
+      date: rate.date.toISOString().slice(0, 10),
+      buyRate: num(rate.buyRate),
+      sellRate: num(rate.sellRate),
+      stale,
+      source: rate.source,
+    });
+  });
+
+  const getAnalytics = guard(async () => {
+    const [view, sales] = await Promise.all([loadView(), prisma.inventorySale.findMany({ orderBy: { soldAt: "asc" } })]);
+    return jsonResponse({
+      crReady: view.crReady,
+      ...buildAnalytics({
+        lines: view.lines,
+        sales,
+        commissionRate: view.settings.cardCommissionRate ?? 0,
+        invested: view.totals.totalInventoryCostCrc ?? 0,
+      }),
+    });
+  });
+
+  return { getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, voidSale, listSales };
 }

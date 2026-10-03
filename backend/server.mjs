@@ -3037,6 +3037,9 @@ export async function route(request) {
 
   if (pathname === "/api/admin/inventory" && method === "GET") return inventory.getInventory(request);
   if (pathname === "/api/admin/inventory/settings" && method === "PUT") return inventory.updateSettings(request);
+  if (pathname === "/api/admin/inventory/exchange-rate" && method === "GET") return inventory.getExchangeRate(request);
+  if (pathname === "/api/admin/inventory/analytics" && method === "GET") return inventory.getAnalytics(request);
+  if (pathname === "/api/admin/inventory/import" && method === "POST") return inventory.importLines(request);
   if (pathname === "/api/admin/inventory/lines" && method === "POST") return inventory.createLine(request);
   const inventoryLineMatch = pathname.match(/^\/api\/admin\/inventory\/lines\/([^/]+)$/);
   if (inventoryLineMatch && method === "PATCH") return inventory.updateLine(request, decodeURIComponent(inventoryLineMatch[1]));
