@@ -117,3 +117,70 @@ test("planWebsiteSales groups items per order, line and size and counts unmatche
   assert.deepEqual(sales.map((sale) => [sale.size, sale.quantity, sale.unitPriceCrc]).sort(), [["M", 3, 19000], ["OS", 1, 9000]]);
   assert.equal(sales[0].source, "WEBSITE");
 });
+
+function makeLedger() {
+  const state = {
+    line: { id: "L1", productHandle: "jacket", color: "Black", sizes: { S: 0, M: 3, L: 0, XL: 0, OS: 0 } },
+    sales: [], variant: { id: "v1", productId: "p1", inventoryQuantity: 5 }, audits: [],
+  };
+  const model = {
+    inventoryLine: { findUnique: async () => state.line, findMany: async () => [state.line] },
+    inventorySale: {
+      findMany: async () => state.sales.filter((row) => !row.voidedAt),
+      findUnique: async ({ where }) => { const row = state.sales.find((entry) => entry.id === where.id); return row && { ...row, line: state.line }; },
+      create: async ({ data }) => { const row = { id: `s${state.sales.length + 1}`, voidedAt: null, refundedQuantity: 0, restockedQuantity: 0, source: "MANUAL", ...data }; state.sales.push(row); return row; },
+      update: async ({ where, data }) => {
+        const row = state.sales.find((entry) => entry.id === where.id);
+        for (const [key, value] of Object.entries(data)) row[key] = value?.increment !== undefined ? row[key] + value.increment : value;
+        return row;
+      },
+    },
+    productVariant: {
+      findFirst: async () => state.variant,
+      update: async ({ data }) => { state.variant.inventoryQuantity = data.inventoryQuantity; },
+      aggregate: async () => ({ _sum: { inventoryQuantity: state.variant.inventoryQuantity } }),
+    },
+    product: { update: async () => undefined },
+    inventorySettings: { findUnique: async () => null },
+    paymentMethod: { findMany: async () => [] },
+    order: { findMany: async () => [] },
+  };
+  const prisma = { ...model, $transaction: async (fn) => fn(model) };
+  const handlers = createInventoryHandlers({
+    prisma,
+    jsonResponse: (body, status = 200) => ({ body, status }),
+    readJson: async (request) => request.body,
+    isAuthorized: async () => true,
+    appendAudit: async (action) => { state.audits.push(action); },
+  });
+  return { state, handlers };
+}
+
+test("sale, refund (with and without restock) and void keep stock and storefront in sync", async () => {
+  const { state, handlers } = makeLedger();
+  const sale = { lineId: "L1", size: "M", quantity: 2, unitPriceCrc: 10000, paymentMethod: "Cash" };
+  assert.equal((await handlers.createSale({ body: sale })).status, 201);
+  assert.equal(state.variant.inventoryQuantity, 3);
+  assert.equal((await handlers.createSale({ body: { ...sale, quantity: 5 } })).status, 400);
+
+  assert.equal((await handlers.refundSale({ body: { quantity: 1, restock: true } }, "s1")).status, 200);
+  assert.equal(state.variant.inventoryQuantity, 4);
+  assert.equal(state.sales[0].refundedQuantity, 1);
+  assert.equal((await handlers.refundSale({ body: { quantity: 1, restock: false, note: "damaged" } }, "s1")).status, 200);
+  assert.equal(state.variant.inventoryQuantity, 4);
+  assert.equal((await handlers.refundSale({ body: { quantity: 1 } }, "s1")).status, 400);
+  assert.equal((await handlers.refundSale({ body: { quantity: 1 } }, "missing")).status, 404);
+
+  assert.equal((await handlers.voidSale({}, "s1")).status, 200);
+  assert.equal(state.variant.inventoryQuantity, 5);
+  assert.equal((await handlers.voidSale({}, "s1")).status, 400);
+  assert.deepEqual(state.audits.filter((action) => action.includes("refunded")).length, 2);
+});
+
+test("voiding a website sale leaves storefront stock untouched", async () => {
+  const { state, handlers } = makeLedger();
+  state.sales.push({ id: "w1", lineId: "L1", size: "M", quantity: 1, source: "WEBSITE", refundedQuantity: 0, restockedQuantity: 0, voidedAt: null });
+  await handlers.voidSale({}, "w1");
+  assert.equal(state.variant.inventoryQuantity, 5);
+  await handlers.refundSale({ body: { quantity: 1, restock: true } }, "missing").catch(() => undefined);
+});

@@ -3045,6 +3045,8 @@ export async function route(request) {
   if (inventoryLineMatch && method === "PATCH") return inventory.updateLine(request, decodeURIComponent(inventoryLineMatch[1]));
   if (pathname === "/api/admin/inventory/sales" && method === "GET") return inventory.listSales(request);
   if (pathname === "/api/admin/inventory/sales" && method === "POST") return inventory.createSale(request);
+  const inventoryRefundMatch = pathname.match(/^\/api\/admin\/inventory\/sales\/([^/]+)\/refund$/);
+  if (inventoryRefundMatch && method === "POST") return inventory.refundSale(request, decodeURIComponent(inventoryRefundMatch[1]));
   const inventorySaleMatch = pathname.match(/^\/api\/admin\/inventory\/sales\/([^/]+)\/void$/);
   if (inventorySaleMatch && method === "POST") return inventory.voidSale(request, decodeURIComponent(inventorySaleMatch[1]));
 

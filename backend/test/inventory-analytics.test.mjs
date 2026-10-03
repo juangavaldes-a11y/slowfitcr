@@ -42,3 +42,15 @@ test("projectPayback gives ordered scenarios and handles no sales or enough stoc
   const done = projectPayback({ invested: 1000, recovered: 1000, remainingNetRevenue: 0, series, now });
   assert.equal(done.scenarios[1].weeksToPayback, 0);
 });
+
+test("refunds reduce revenue and units; restocked units also drop their cost", () => {
+  const base = sale("2026-10-01", 4, 10000, "Cash", { discountCrc: 4000 });
+  assert.equal(saleEconomics(base, 3000, 0).revenue, 36000);
+  const refunded = { ...base, refundedQuantity: 2, restockedQuantity: 0 };
+  assert.deepEqual([saleEconomics(refunded, 3000, 0).revenue, saleEconomics(refunded, 3000, 0).cost], [18000, 12000]);
+  const restocked = { ...refunded, restockedQuantity: 2 };
+  assert.equal(saleEconomics(restocked, 3000, 0).cost, 6000);
+  const result = buildAnalytics({ lines, commissionRate: 0, invested: 50000, now, sales: [restocked] });
+  assert.equal(result.totals.units, 2);
+  assert.equal(result.totals.revenue, 18000);
+});

@@ -1,0 +1,4 @@
+ALTER TABLE "InventorySale"
+ADD COLUMN "refundedQuantity" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "restockedQuantity" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "refundedAt" TIMESTAMP(3);

@@ -4,10 +4,14 @@ const COMMISSION_METHODS = new Set(["card", "website checkout"]);
 const dayKey = (date) => new Date(date).toISOString().slice(0, 10);
 const round = (value) => Math.round(value * 100) / 100;
 
+// Units still sold after refunds; restocked units go back to inventory and carry no cost.
+export const netQuantity = (sale) => sale.quantity - (sale.refundedQuantity ?? 0);
+
 export function saleEconomics(sale, costPerUnitCrc, commissionRate) {
-  const revenue = Number(sale.unitPriceCrc) * sale.quantity - Number(sale.discountCrc);
+  const net = netQuantity(sale);
+  const revenue = Number(sale.unitPriceCrc) * net - Number(sale.discountCrc) * (net / sale.quantity);
   const commission = COMMISSION_METHODS.has(String(sale.paymentMethod).toLowerCase()) ? revenue * commissionRate : 0;
-  const cost = (costPerUnitCrc ?? 0) * sale.quantity;
+  const cost = (costPerUnitCrc ?? 0) * (sale.quantity - (sale.restockedQuantity ?? 0));
   return { revenue, commission, cost, profit: revenue - commission - cost };
 }
 
@@ -87,25 +91,26 @@ export function buildAnalytics({ lines, sales, commissionRate, invested, now = n
     const economics = saleEconomics(sale, line?.cost?.costPerUnitCrc ?? 0, commissionRate);
     const key = dayKey(sale.soldAt);
     const day = byDay.get(key) ?? { date: key, units: 0, revenue: 0, netRevenue: 0, profit: 0 };
-    day.units += sale.quantity;
+    const units = netQuantity(sale);
+    day.units += units;
     day.revenue += economics.revenue;
     day.netRevenue += economics.revenue - economics.commission;
     day.profit += economics.profit;
     byDay.set(key, day);
 
     const method = byMethod.get(sale.paymentMethod) ?? { method: sale.paymentMethod, units: 0, revenue: 0 };
-    method.units += sale.quantity;
+    method.units += units;
     method.revenue += economics.revenue;
     byMethod.set(sale.paymentMethod, method);
 
     const productKey = line ? `${line.productName}` : "?";
     const product = byProduct.get(productKey) ?? { product: productKey, units: 0, revenue: 0, profit: 0 };
-    product.units += sale.quantity;
+    product.units += units;
     product.revenue += economics.revenue;
     product.profit += economics.profit;
     byProduct.set(productKey, product);
 
-    totals.units += sale.quantity;
+    totals.units += units;
     totals.revenue += economics.revenue;
     totals.commission += economics.commission;
     totals.cost += economics.cost;

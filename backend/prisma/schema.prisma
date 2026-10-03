@@ -382,6 +382,9 @@ model InventorySale {
   orderId       String?
   note          String        @default("")
   voidedAt      DateTime?
+  refundedQuantity  Int       @default(0)
+  restockedQuantity Int       @default(0)
+  refundedAt    DateTime?
   createdAt     DateTime      @default(now())
   line          InventoryLine @relation(fields: [lineId], references: [id], onDelete: Restrict)
 

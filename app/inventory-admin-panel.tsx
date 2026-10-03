@@ -3,7 +3,7 @@
 import { DollarOutlined, DownloadOutlined, HistoryOutlined, LineChartOutlined, SettingOutlined, ShoppingCartOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Alert, Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select,
-  Space, Statistic, Table, Tag, Typography, Upload, message,
+  Space, Statistic, Switch, Table, Tag, Typography, Upload, message,
 } from "antd";
 import Link from "next/link";
 import type { ColumnsType } from "antd/es/table";
@@ -65,6 +65,8 @@ type SaleRow = {
   source: string;
   note: string;
   voidedAt: string | null;
+  refundedQuantity: number;
+  restockedQuantity: number;
   line: { code: string; productName: string; color: string };
 };
 type ImportPreview = {
@@ -103,6 +105,8 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [saleLine, setSaleLine] = useState<Line | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sales, setSales] = useState<SaleRow[]>([]);
+  const [refundSale, setRefundSale] = useState<SaleRow | null>(null);
+  const [refundForm] = Form.useForm<{ quantity: number; restock: boolean; note?: string }>();
   const [fx, setFx] = useState<FxRate | null>(null);
   const [importLines, setImportLines] = useState<XlsxLine[] | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
@@ -124,6 +128,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     discount: "Descuento total CRC", date: "Fecha", method: "Metodo de pago", note: "Nota",
     required: "Obligatorio", saved: "Guardado.", saleSaved: "Venta registrada.", voided: "Venta anulada.",
     void: "Anular", voidConfirm: "Anular esta venta y devolver el inventario?", status: "Estado", active: "Activa", voidedTag: "Anulada",
+    refund: "Devolver", refundTitle: "Registrar devolucion", restock: "Regresar al inventario", refunded: "Devolucion registrada.", refundedUnits: "devueltas",
     total: "Total", loadFail: "No pudimos cargar el inventario.", saveFail: "No pudimos guardar los cambios.",
     exportXlsx: "Exportar Excel", importXlsx: "Importar Excel", charts: "Ventas y proyecciones",
     importTitle: "Revisar importacion", importApply: "Aplicar cambios", created: "Nuevas", updated: "Actualizadas", unchanged: "Sin cambios",
@@ -144,6 +149,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     discount: "Total discount CRC", date: "Date", method: "Payment method", note: "Note",
     required: "Required", saved: "Saved.", saleSaved: "Sale recorded.", voided: "Sale voided.",
     void: "Void", voidConfirm: "Void this sale and restore stock?", status: "Status", active: "Active", voidedTag: "Voided",
+    refund: "Refund", refundTitle: "Record refund", restock: "Return units to stock", refunded: "Refund recorded.", refundedUnits: "refunded",
     total: "Total", loadFail: "We could not load the inventory.", saveFail: "We could not save the changes.",
     exportXlsx: "Export Excel", importXlsx: "Import Excel", charts: "Sales & projections",
     importTitle: "Review import", importApply: "Apply changes", created: "New", updated: "Updated", unchanged: "Unchanged",
@@ -304,6 +310,23 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     }
   };
 
+  const refreshSales = async () => {
+    const payload = await apiRequest<{ sales: SaleRow[] }>("/api/admin/inventory/sales", { cache: "no-store" });
+    setSales(payload.sales);
+  };
+
+  const submitRefund = async (values: { quantity: number; restock: boolean; note?: string }) => {
+    if (!refundSale) return;
+    try {
+      setView(await apiRequest<View>(`/api/admin/inventory/sales/${refundSale.id}/refund`, { method: "POST", body: JSON.stringify(values) }));
+      api.success(labels.refunded);
+      setRefundSale(null);
+      await refreshSales();
+    } catch (error) {
+      handleError(error, labels.saveFail);
+    }
+  };
+
   const voidSale = async (saleId: string) => {
     try {
       setView(await apiRequest<View>(`/api/admin/inventory/sales/${saleId}/void`, { method: "POST" }));
@@ -381,16 +404,19 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const saleColumns: ColumnsType<SaleRow> = [
     { title: labels.date, dataIndex: "soldAt", render: (value: string) => dayjs(value).format("YYYY-MM-DD") },
     { title: labels.product, render: (_, row) => `${row.line.code} ${row.line.color} (${row.size})` },
-    { title: labels.quantity, dataIndex: "quantity", align: "right" },
-    { title: labels.total, align: "right", render: (_, row) => money(Number(row.unitPriceCrc) * row.quantity - Number(row.discountCrc)) },
+    { title: labels.quantity, align: "right", render: (_, row) => <>{row.quantity}{row.refundedQuantity ? <Tag color="orange" style={{ marginLeft: 4 }}>{row.refundedQuantity} {labels.refundedUnits}</Tag> : null}</> },
+    { title: labels.total, align: "right", render: (_, row) => money(Number(row.unitPriceCrc) * (row.quantity - row.refundedQuantity) - Number(row.discountCrc) * ((row.quantity - row.refundedQuantity) / row.quantity)) },
     { title: labels.method, dataIndex: "paymentMethod", render: (value: string, row) => <>{value}{row.source === "WEBSITE" ? " (web)" : ""}</> },
     { title: labels.status, render: (_, row) => <Tag color={row.voidedAt ? "red" : "green"}>{row.voidedAt ? labels.voidedTag : labels.active}</Tag> },
     {
       title: labels.actions,
       render: (_, row) => row.voidedAt ? null : (
-        <Popconfirm title={labels.voidConfirm} okText={labels.void} cancelText={labels.cancel} onConfirm={() => void voidSale(row.id)}>
+        <Space size={4}>
+          <Button size="small" disabled={row.refundedQuantity >= row.quantity} onClick={() => { setRefundSale(row); refundForm.setFieldsValue({ quantity: 1, restock: true, note: "" }); }}>{labels.refund}</Button>
+          <Popconfirm title={labels.voidConfirm} okText={labels.void} cancelText={labels.cancel} onConfirm={() => void voidSale(row.id)}>
           <Button size="small" danger>{labels.void}</Button>
-        </Popconfirm>
+          </Popconfirm>
+        </Space>
       ),
     },
   ];
@@ -490,6 +516,17 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
                   { title: labels.updated, render: (_, row) => Object.keys(row.changes).join(", ") }]} />
             </Space>
           ) : null}
+        </Modal>
+
+        <Modal title={labels.refundTitle} open={Boolean(refundSale)} onCancel={() => setRefundSale(null)} okText={labels.save} cancelText={labels.cancel}
+          onOk={() => refundForm.submit()} destroyOnHidden forceRender>
+          <Form form={refundForm} layout="vertical" onFinish={(values) => void submitRefund(values)}>
+            <Form.Item name="quantity" label={labels.quantity} rules={[{ required: true, message: labels.required }]}>
+              <InputNumber min={1} max={refundSale ? refundSale.quantity - refundSale.refundedQuantity : 1} precision={0} style={{ width: "100%" }} />
+            </Form.Item>
+            <Form.Item name="restock" label={labels.restock} valuePropName="checked"><Switch /></Form.Item>
+            <Form.Item name="note" label={labels.note}><Input.TextArea rows={2} maxLength={200} /></Form.Item>
+          </Form>
         </Modal>
 
         <Drawer title={labels.history} open={historyOpen} onClose={() => setHistoryOpen(false)} size="min(96vw, 820px)">

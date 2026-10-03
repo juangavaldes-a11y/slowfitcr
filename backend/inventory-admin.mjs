@@ -98,7 +98,7 @@ function soldBySize(sales) {
   for (const sale of sales) {
     if (sale.voidedAt) continue;
     const entry = map.get(sale.lineId) ?? {};
-    entry[sale.size] = (entry[sale.size] ?? 0) + sale.quantity;
+    entry[sale.size] = (entry[sale.size] ?? 0) + sale.quantity - (sale.restockedQuantity ?? 0);
     map.set(sale.lineId, entry);
   }
   return map;
@@ -261,7 +261,7 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     const [settings, lines, sales, paymentMethods] = await Promise.all([
       prisma.inventorySettings.findUnique({ where: { id: "default" } }),
       prisma.inventoryLine.findMany({ orderBy: [{ position: "asc" }, { code: "asc" }, { color: "asc" }] }),
-      prisma.inventorySale.findMany({ where: { voidedAt: null }, select: { lineId: true, size: true, quantity: true, voidedAt: true } }),
+      prisma.inventorySale.findMany({ where: { voidedAt: null }, select: { lineId: true, size: true, quantity: true, restockedQuantity: true, voidedAt: true } }),
       prisma.paymentMethod.findMany({ orderBy: { position: "asc" } }),
     ]);
     return { ...buildInventoryView(settings, lines, sales), paymentMethods, websiteSync };
@@ -317,7 +317,7 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
       const line = await transaction.inventoryLine.findUnique({ where: { id: input.lineId } });
       if (!line) throw new Error("NOT_FOUND");
       const active = await transaction.inventorySale.findMany({ where: { lineId: line.id, size: input.size, voidedAt: null } });
-      const available = (line.sizes[input.size] ?? 0) - active.reduce((total, row) => total + row.quantity, 0);
+      const available = (line.sizes[input.size] ?? 0) - active.reduce((total, row) => total + row.quantity - row.restockedQuantity, 0);
       if (input.quantity > available) throw new Error("INVALID_QUANTITY_EXCEEDS_STOCK");
       const created = await transaction.inventorySale.create({ data: input });
       await syncStorefrontStock(transaction, line, input.size, -input.quantity);
@@ -333,9 +333,34 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
       if (!sale) throw new Error("NOT_FOUND");
       if (sale.voidedAt) throw new Error("ALREADY_VOIDED");
       await transaction.inventorySale.update({ where: { id: saleId }, data: { voidedAt: new Date() } });
-      if (sale.source !== "WEBSITE") await syncStorefrontStock(transaction, sale.line, sale.size, sale.quantity);
+      if (sale.source !== "WEBSITE") await syncStorefrontStock(transaction, sale.line, sale.size, sale.quantity - sale.restockedQuantity);
     });
     await appendAudit("inventory.sale.voided", { saleId }, "admin");
+    return jsonResponse(await loadView());
+  });
+
+  const refundSale = guard(async (request, saleId) => {
+    const body = await readJson(request);
+    const quantity = Number(body.quantity);
+    const restock = body.restock === true;
+    await prisma.$transaction(async (transaction) => {
+      const sale = await transaction.inventorySale.findUnique({ where: { id: saleId }, include: { line: true } });
+      if (!sale) throw new Error("NOT_FOUND");
+      if (sale.voidedAt) throw new Error("ALREADY_VOIDED");
+      const refundable = sale.quantity - sale.refundedQuantity;
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > refundable) throw new Error("INVALID_REFUND_QUANTITY");
+      await transaction.inventorySale.update({
+        where: { id: saleId },
+        data: {
+          refundedQuantity: { increment: quantity },
+          restockedQuantity: { increment: restock ? quantity : 0 },
+          refundedAt: new Date(),
+          note: [sale.note, String(body.note || "").slice(0, 200)].filter(Boolean).join(" | "),
+        },
+      });
+      if (restock) await syncStorefrontStock(transaction, sale.line, sale.size, quantity);
+    });
+    await appendAudit("inventory.sale.refunded", { saleId, quantity, restock }, "admin");
     return jsonResponse(await loadView());
   });
 
@@ -411,5 +436,5 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     });
   });
 
-  return { getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, voidSale, listSales };
+  return { getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, voidSale, refundSale, listSales };
 }
