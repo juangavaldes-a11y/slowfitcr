@@ -96,8 +96,8 @@ See [CURRENT_TO_PROD.md](CURRENT_TO_PROD.md) for the remaining staging and produ
 Create a `.env.local` file and configure:
 
 ```bash
-# External bank payment adapter (BAC or another supported bank)
-PAYMENT_PROVIDER_URL=https://payments.example.com/session
+# Payment adapter endpoint (not a Banco Popular credential or URL)
+PAYMENT_PROVIDER_URL=https://your-payment-adapter.example.com/session
 PAYMENT_PROVIDER_TOKEN=set-a-provider-token
 PAYMENT_WEBHOOK_SECRET=set-a-long-random-secret
 STORE_CURRENCY=CRC
@@ -183,7 +183,7 @@ REVIEW_MODERATION_TOKEN=set-a-strong-shared-token
 REVIEW_MODERATION_SESSION_SECRET=set-a-long-random-secret
 CUSTOMER_SESSION_SECRET=set-a-different-long-random-secret
 OUTBOUND_WEBHOOK_SECRET=set-a-long-random-secret
-PAYMENT_PROVIDER_URL=https://payments.example.com/session
+PAYMENT_PROVIDER_URL=https://your-payment-adapter.example.com/session
 PAYMENT_PROVIDER_TOKEN=set-a-provider-token
 PAYMENT_WEBHOOK_SECRET=set-a-long-random-secret
 STORE_CURRENCY=CRC
@@ -193,6 +193,21 @@ R2_SECRET_ACCESS_KEY=your-r2-secret
 R2_BUCKET_NAME=slowfit-products
 R2_PUBLIC_URL=https://media.slowfitcr.com
 ```
+
+## Banco Popular Costa Rica payments
+
+The store is configured for CRC and already supports redirecting customers to hosted checkout and receiving signed payment webhooks. The current `PAYMENT_PROVIDER_URL` contract is an adapter contract; it is **not** a direct Banco Popular integration. Do not put bank credentials in these variables unless the bank's technical guide explicitly says they are for a compatible adapter.
+
+The Botón de Pagos requires merchant affiliation and the bank's technical guide. During onboarding, request the e-commerce integration details for the website button (not the separate Link de Pagos product), including:
+
+- Sandbox and production base URLs, merchant identifiers, and authentication/signature requirements.
+- Session-creation request/response fields, hosted checkout redirect behavior, and supported currency.
+- Payment status lookup and the authoritative success/failure notification mechanism, including signature verification, retries, and duplicate delivery behavior.
+- Test cards or test payment procedure, plus activation and certification steps for production.
+
+Once received, map the bank's session API and notifications to the existing adapter contract. The adapter must accept the store's checkout payload and return `{ "checkoutUrl": "https://..." }`; it must normalize verified bank payment notifications into the store's signed `POST /api/webhooks/payments` format. For `payment.paid`, include the checkout `reference`, customer `email`, `amount`, `currency`, and each item's `variantId` and `quantity`. The store verifies `x-slowfit-signature` as a Base64 HMAC-SHA256 of the raw request body using `PAYMENT_WEBHOOK_SECRET`. Only verified paid notifications update orders and inventory.
+
+Banco Popular onboarding information: [Conexión BP](https://www.bancopopular.fi.cr/conexion-bp/). Configure and certify the integration against the bank's sandbox before enabling production payments.
 
 ## Last-mile delivery
 

@@ -134,12 +134,13 @@ Before every production migration:
 - Test the migration against a staging copy of production-like data.
 - Define the rollback or forward-fix procedure.
 
-## 4. Configure payments and product media
+## 4. Configure Banco Popular payments and product media
 
-- Configure the BAC or bank session endpoint and provider token.
-- Register provider callbacks against `POST /api/webhooks/payments` on the backend origin.
-- Configure the same `PAYMENT_WEBHOOK_SECRET` in the provider and backend.
-- Confirm `payment.paid` callbacks preserve the checkout `reference` plus every item's `variantId` and `quantity`; inventory deduction rejects incomplete paid events.
+- Complete Banco Popular Costa Rica merchant affiliation for the website's Botón de Pagos; request the technical guide, sandbox access, credentials, and certification procedure. The public [Conexión BP](https://www.bancopopular.fi.cr/conexion-bp/) page describes onboarding but does not publish the button's integration protocol.
+- Implement or configure a server-side adapter from the bank's session API to the existing `PAYMENT_PROVIDER_URL` contract. This setting currently points to an adapter accepting the store's normalized checkout payload and returning `checkoutUrl`; it is not necessarily the URL or credentials supplied by the bank.
+- Normalize and authenticate bank payment notifications before forwarding them to `POST /api/webhooks/payments` on the backend origin. Configure `PAYMENT_WEBHOOK_SECRET` only between the adapter and backend; the backend expects a Base64 HMAC-SHA256 signature in `x-slowfit-signature` over the raw body.
+- Confirm verified `payment.paid` events preserve the checkout `reference`, customer `email`, `amount`, `currency`, and every item's `variantId` and `quantity`; inventory deduction rejects incomplete paid events.
+- Complete sandbox checkout, cancellation, declined-payment, duplicate-notification, and status-reconciliation tests before production certification.
 - Configure the R2 bucket, public media domain, and CORS for the admin origin.
 - Verify duplicate deliveries return success without duplicating downstream processing.
 - Verify failed deliveries appear in Admin Operations and can be replayed.
