@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarOutlined, DownloadOutlined, HistoryOutlined, LineChartOutlined, SettingOutlined, ShoppingCartOutlined, UploadOutlined } from "@ant-design/icons";
+import { DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Alert, Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select,
   Space, Statistic, Switch, Table, Tag, Typography, Upload, message,
@@ -10,7 +10,7 @@ import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
-import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
+import { apiRequest, ApiError, formatApiError, isApiErrorStatus } from "./lib/api-client";
 import { exportInventoryWorkbook, parseInventoryWorkbook, type XlsxLine } from "./lib/inventory-xlsx";
 
 const SIZES = ["S", "M", "L", "XL", "OS"] as const;
@@ -79,6 +79,8 @@ type ImportPreview = {
 type FxRate = { date: string; buyRate: number; sellRate: number; stale: boolean };
 type SaleForm = { size: Size; quantity: number; unitPriceCrc: number; discountCrc: number; soldAt: dayjs.Dayjs; paymentMethod: string; note?: string };
 
+type EditForm = { code: string; productName: string; color: string; unitPriceUsd: number; piecesPerGarment: number; salePriceCrc: number | null } & Record<Size, number>;
+
 const SETTING_FIELDS: Array<{ key: string; es: string; en: string }> = [
   { key: "fxRate", es: "Tipo de cambio CRC/USD", en: "Exchange rate CRC/USD" },
   { key: "hkShippingUsd", es: "Envio HK USD", en: "HK shipping USD" },
@@ -111,6 +113,9 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [importLines, setImportLines] = useState<XlsxLine[] | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
+  const [reading, setReading] = useState(false);
+  const [editLine, setEditLine] = useState<Line | "new" | null>(null);
+  const [editForm] = Form.useForm<EditForm>();
 
   const es = locale === "es";
   const labels = useMemo(() => es ? {
@@ -134,6 +139,13 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     importTitle: "Revisar importacion", importApply: "Aplicar cambios", created: "Nuevas", updated: "Actualizadas", unchanged: "Sin cambios",
     missing: "No incluidas en el archivo (no se eliminan)", errors: "Errores", importDone: "Importacion aplicada.", importFail: "No pudimos leer el archivo.",
     fxLabel: "BCCR venta", fxUse: "Usar tipo de cambio", fxStale: "(ultimo disponible)",
+    edit: "Editar", addLine: "Agregar articulo", editTitle: "Editar inventario", newTitle: "Nuevo articulo", pieces: "Piezas por prenda",
+    reading: "Leyendo archivo...", noChanges: "El archivo no contiene cambios respecto al inventario actual.",
+    importErrors: {
+      NO_SHEET: "El archivo no tiene hojas.", NO_HEADER: "No se encontro la columna \"Código\" en el archivo.",
+      MISSING_COLUMNS: "Faltan columnas obligatorias: ", INVALID_IMPORT: "El archivo no tiene filas validas o tiene demasiadas filas.",
+    } as Record<string, string>,
+    errors2: { SOLD_EXCEEDS_STOCK: "Las cantidades no pueden ser menores a lo ya vendido.", ALREADY_EXISTS: "Ya existe un articulo con ese codigo y color." } as Record<string, string>,
   } : {
     title: "Inventory & costs",
     subtitle: "Prices, import costs, stock and sales by garment, color and size.",
@@ -155,6 +167,13 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     importTitle: "Review import", importApply: "Apply changes", created: "New", updated: "Updated", unchanged: "Unchanged",
     missing: "Not in the file (not deleted)", errors: "Errors", importDone: "Import applied.", importFail: "We could not read the file.",
     fxLabel: "BCCR sell rate", fxUse: "Use exchange rate", fxStale: "(latest available)",
+    edit: "Edit", addLine: "Add item", editTitle: "Edit inventory", newTitle: "New item", pieces: "Pieces per garment",
+    reading: "Reading file...", noChanges: "The file has no changes compared to the current inventory.",
+    importErrors: {
+      NO_SHEET: "The file has no sheets.", NO_HEADER: "The \"Código\" column was not found in the file.",
+      MISSING_COLUMNS: "Missing required columns: ", INVALID_IMPORT: "The file has no valid rows or has too many rows.",
+    } as Record<string, string>,
+    errors2: { SOLD_EXCEEDS_STOCK: "Quantities cannot be lower than what was already sold.", ALREADY_EXISTS: "An item with that code and color already exists." } as Record<string, string>,
   }, [es]);
 
   const crc = useMemo(() => new Intl.NumberFormat(es ? "es-CR" : "en-US", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }), [es]);
@@ -165,7 +184,8 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       setAuthorized(false);
       return;
     }
-    api.error(formatApiError(error, locale, { fallback }));
+    const known = error instanceof Error ? labels.errors2[error.message] : undefined;
+    api.error(known ?? formatApiError(error, locale, { fallback }));
   };
 
   const load = async () => {
@@ -237,15 +257,52 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   };
 
   const previewImport = async (file: File) => {
+    setReading(true);
     try {
       const parsed = await parseInventoryWorkbook(file);
       const preview = await apiRequest<ImportPreview>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: parsed }) });
+      if (!preview.summary.errors.length && preview.summary.created + preview.summary.updated === 0) {
+        api.info(labels.noChanges);
+        return;
+      }
       setImportLines(parsed);
       setImportPreview(preview);
     } catch (error) {
       if (isApiErrorStatus(error, 401)) setAuthorized(false);
-      else api.error(error instanceof Error && !("status" in error) ? labels.importFail : formatApiError(error, locale, { fallback: labels.importFail }));
+      else if (error instanceof ApiError) api.error(labels.importErrors[error.message] ?? formatApiError(error, locale, { fallback: labels.importFail }));
+      else {
+        const [code, detail] = (error instanceof Error ? error.message : "").split(":");
+        api.error(labels.importErrors[code] ? `${labels.importErrors[code]}${detail ?? ""}` : labels.importFail);
+      }
+    } finally {
+      setReading(false);
     }
+  };
+
+  const openEdit = (line: Line | "new") => {
+    setEditLine(line);
+    if (line === "new") {
+      editForm.resetFields();
+      editForm.setFieldsValue({ S: 0, M: 0, L: 0, XL: 0, OS: 0, unitPriceUsd: 0, piecesPerGarment: 1, salePriceCrc: null });
+      return;
+    }
+    editForm.setFieldsValue({
+      code: line.code, productName: line.productName, color: line.color, ...line.sizes,
+      unitPriceUsd: line.unitPriceUsd, piecesPerGarment: line.piecesPerGarment, salePriceCrc: line.cost.salePriceCrc,
+    });
+  };
+
+  const submitEdit = async (values: EditForm) => {
+    if (!editLine) return;
+    const body = {
+      code: values.code, productName: values.productName, color: values.color,
+      sizes: Object.fromEntries(SIZES.map((size) => [size, values[size] ?? 0])),
+      unitPriceUsd: values.unitPriceUsd ?? 0, piecesPerGarment: values.piecesPerGarment ?? 1, salePriceCrc: values.salePriceCrc ?? null,
+    };
+    const ok = editLine === "new"
+      ? await mutate("/api/admin/inventory/lines", "POST", body, labels.saved)
+      : await mutate(`/api/admin/inventory/lines/${editLine.id}`, "PATCH", body, labels.saved);
+    if (ok) setEditLine(null);
   };
 
   const applyImport = async () => {
@@ -395,7 +452,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       title: labels.actions,
       fixed: "right",
       render: (_, line) => (
-        <Button size="small" icon={<ShoppingCartOutlined />} disabled={line.remainingQuantity < 1} onClick={() => openSale(line)}>{labels.sell}</Button>
+        <Space size={4}>
+          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(line)}>{labels.edit}</Button>
+          <Button size="small" icon={<ShoppingCartOutlined />} disabled={line.remainingQuantity < 1} onClick={() => openSale(line)}>{labels.sell}</Button>
+        </Space>
       ),
     },
   ];
@@ -440,11 +500,12 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
         </Row>
         <Space wrap style={{ marginBottom: 16 }}>
           <Input.Search allowClear placeholder={labels.search} value={search} onChange={(event) => setSearch(event.target.value)} style={{ minWidth: 300 }} />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openEdit("new")}>{labels.addLine}</Button>
           <Button icon={<SettingOutlined />} onClick={openSettings}>{labels.settings}</Button>
           <Button icon={<HistoryOutlined />} onClick={() => void openHistory()}>{labels.history}</Button>
           <Button icon={<DownloadOutlined />} disabled={!view} onClick={() => view && void exportInventoryWorkbook(view as never)}>{labels.exportXlsx}</Button>
           <Upload accept=".xlsx" showUploadList={false} beforeUpload={(file) => { void previewImport(file); return false; }}>
-            <Button icon={<UploadOutlined />}>{labels.importXlsx}</Button>
+            <Button icon={<UploadOutlined />} loading={reading}>{reading ? labels.reading : labels.importXlsx}</Button>
           </Upload>
           <Link href={`/${locale}/admin/inventory/analytics`}><Button icon={<LineChartOutlined />}>{labels.charts}</Button></Link>
           {fx ? (
@@ -492,6 +553,27 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
             <Form.Item name="note" label={labels.note}>
               <Input.TextArea rows={2} maxLength={500} />
             </Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal title={editLine === "new" ? labels.newTitle : labels.editTitle} open={Boolean(editLine)} onCancel={() => setEditLine(null)}
+          okText={labels.save} cancelText={labels.cancel} onOk={() => editForm.submit()} destroyOnHidden forceRender>
+          <Form form={editForm} layout="vertical" onFinish={(values) => void submitEdit(values)}>
+            <Form.Item name="code" label={labels.code} rules={[{ required: true, message: labels.required }]}><Input maxLength={80} /></Form.Item>
+            <Form.Item name="productName" label={labels.product} rules={[{ required: true, message: labels.required }]}><Input maxLength={160} /></Form.Item>
+            <Form.Item name="color" label={labels.color} rules={[{ required: true, message: labels.required }]}><Input maxLength={160} /></Form.Item>
+            <Row gutter={8}>
+              {SIZES.map((size) => (
+                <Col key={size} span={4}>
+                  <Form.Item name={size} label={size}><InputNumber min={0} max={100000} precision={0} style={{ width: "100%" }} /></Form.Item>
+                </Col>
+              ))}
+            </Row>
+            <Row gutter={8}>
+              <Col span={8}><Form.Item name="unitPriceUsd" label={labels.unitUsd}><InputNumber min={0} style={{ width: "100%" }} /></Form.Item></Col>
+              <Col span={8}><Form.Item name="piecesPerGarment" label={labels.pieces}><InputNumber min={1} max={20} precision={0} style={{ width: "100%" }} /></Form.Item></Col>
+              <Col span={8}><Form.Item name="salePriceCrc" label={labels.price}><InputNumber min={0} style={{ width: "100%" }} /></Form.Item></Col>
+            </Row>
           </Form>
         </Modal>
 

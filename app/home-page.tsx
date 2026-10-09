@@ -181,14 +181,14 @@ export default function HomePage({ copy, locale }: HomePageProps) {
           <Space size={42} className="slowfit-footer-links" wrap>
             <a
               className="slowfit-footer-link"
-              href="https://wa.me/50686437162?text=Hola%20Slow%20Fit%2C%20quiero%20mas%20informacion"
+              href="https://wa.me/50684839410?text=Hola%20Slow%20Fit%2C%20quiero%20mas%20informacion"
               target="_blank"
               rel="noopener noreferrer"
               aria-label="WhatsApp"
               onClick={() => trackEvent("contact_whatsapp_click", { locale })}
             >
               <WhatsAppOutlined />
-              <span>8643-7162</span>
+              <span>8483-9410</span>
             </a>
             <a
               className="slowfit-footer-link"
