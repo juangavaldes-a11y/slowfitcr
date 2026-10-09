@@ -12,6 +12,7 @@ import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
 import { apiRequest, ApiError, formatApiError, isApiErrorStatus } from "./lib/api-client";
 import { exportInventoryWorkbook, parseInventoryWorkbook, type XlsxLine } from "./lib/inventory-xlsx";
+import { parseInvoicePdf } from "./lib/inventory-pdf";
 
 const SIZES = ["S", "M", "L", "XL", "OS"] as const;
 type Size = (typeof SIZES)[number];
@@ -76,6 +77,8 @@ type ImportPreview = {
   updated?: Array<{ code: string; color: string; changes: Record<string, unknown> }>;
   missing?: Array<{ code: string; color: string }>;
 };
+type ImportLine = Pick<XlsxLine, "code" | "productName" | "color" | "sizes" | "unitPriceUsd"> & Partial<XlsxLine>;
+const matchKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 type FxRate = { date: string; buyRate: number; sellRate: number; stale: boolean };
 type SaleForm = { size: Size; quantity: number; unitPriceCrc: number; discountCrc: number; soldAt: dayjs.Dayjs; paymentMethod: string; note?: string };
 
@@ -110,7 +113,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [refundSale, setRefundSale] = useState<SaleRow | null>(null);
   const [refundForm] = Form.useForm<{ quantity: number; restock: boolean; note?: string }>();
   const [fx, setFx] = useState<FxRate | null>(null);
-  const [importLines, setImportLines] = useState<XlsxLine[] | null>(null);
+  const [importLines, setImportLines] = useState<ImportLine[] | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
   const [reading, setReading] = useState(false);
@@ -135,7 +138,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     void: "Anular", voidConfirm: "Anular esta venta y devolver el inventario?", status: "Estado", active: "Activa", voidedTag: "Anulada",
     refund: "Devolver", refundTitle: "Registrar devolucion", restock: "Regresar al inventario", refunded: "Devolucion registrada.", refundedUnits: "devueltas",
     total: "Total", loadFail: "No pudimos cargar el inventario.", saveFail: "No pudimos guardar los cambios.",
-    exportXlsx: "Exportar Excel", importXlsx: "Importar Excel", charts: "Ventas y proyecciones",
+    exportXlsx: "Exportar Excel", importXlsx: "Importar Excel o PDF", charts: "Ventas y proyecciones",
     importTitle: "Revisar importacion", importApply: "Aplicar cambios", created: "Nuevas", updated: "Actualizadas", unchanged: "Sin cambios",
     missing: "No incluidas en el archivo (no se eliminan)", errors: "Errores", importDone: "Importacion aplicada.", importFail: "No pudimos leer el archivo.",
     fxLabel: "BCCR venta", fxUse: "Usar tipo de cambio", fxStale: "(ultimo disponible)",
@@ -143,7 +146,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     reading: "Leyendo archivo...", noChanges: "El archivo no contiene cambios respecto al inventario actual.",
     importErrors: {
       NO_SHEET: "El archivo no tiene hojas.", NO_HEADER: "No se encontro la columna \"Código\" en el archivo.",
-      MISSING_COLUMNS: "Faltan columnas obligatorias: ", INVALID_IMPORT: "El archivo no tiene filas validas o tiene demasiadas filas.",
+      MISSING_COLUMNS: "Faltan columnas obligatorias: ", PDF_PARSE: "No pudimos leer el articulo numero ", PDF_QTY_MISMATCH: "El total de prendas no coincide con el PDF en: ", PDF_EMPTY: "No encontramos articulos en el PDF.", INVALID_IMPORT: "El archivo no tiene filas validas o tiene demasiadas filas.",
     } as Record<string, string>,
     errors2: { SOLD_EXCEEDS_STOCK: "Las cantidades no pueden ser menores a lo ya vendido.", ALREADY_EXISTS: "Ya existe un articulo con ese codigo y color." } as Record<string, string>,
   } : {
@@ -163,7 +166,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     void: "Void", voidConfirm: "Void this sale and restore stock?", status: "Status", active: "Active", voidedTag: "Voided",
     refund: "Refund", refundTitle: "Record refund", restock: "Return units to stock", refunded: "Refund recorded.", refundedUnits: "refunded",
     total: "Total", loadFail: "We could not load the inventory.", saveFail: "We could not save the changes.",
-    exportXlsx: "Export Excel", importXlsx: "Import Excel", charts: "Sales & projections",
+    exportXlsx: "Export Excel", importXlsx: "Import Excel or PDF", charts: "Sales & projections",
     importTitle: "Review import", importApply: "Apply changes", created: "New", updated: "Updated", unchanged: "Unchanged",
     missing: "Not in the file (not deleted)", errors: "Errors", importDone: "Import applied.", importFail: "We could not read the file.",
     fxLabel: "BCCR sell rate", fxUse: "Use exchange rate", fxStale: "(latest available)",
@@ -171,7 +174,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     reading: "Reading file...", noChanges: "The file has no changes compared to the current inventory.",
     importErrors: {
       NO_SHEET: "The file has no sheets.", NO_HEADER: "The \"Código\" column was not found in the file.",
-      MISSING_COLUMNS: "Missing required columns: ", INVALID_IMPORT: "The file has no valid rows or has too many rows.",
+      MISSING_COLUMNS: "Missing required columns: ", PDF_PARSE: "We could not read item number ", PDF_QTY_MISMATCH: "Item total does not match the PDF for: ", PDF_EMPTY: "No items were found in the PDF.", INVALID_IMPORT: "The file has no valid rows or has too many rows.",
     } as Record<string, string>,
     errors2: { SOLD_EXCEEDS_STOCK: "Quantities cannot be lower than what was already sold.", ALREADY_EXISTS: "An item with that code and color already exists." } as Record<string, string>,
   }, [es]);
@@ -256,10 +259,19 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     void mutate(`/api/admin/inventory/lines/${line.id}`, "PATCH", { salePriceCrc: value }, labels.saved);
   };
 
+  const readImportFile = async (file: File): Promise<ImportLine[]> => {
+    if (!file.name.toLowerCase().endsWith(".pdf")) return parseInventoryWorkbook(file);
+    const existing = new Map((view?.lines ?? []).map((line) => [`${matchKey(line.code)}|${matchKey(line.color)}`, line]));
+    return (await parseInvoicePdf(file)).map((row) => {
+      const current = existing.get(`${matchKey(row.code)}|${matchKey(row.color)}`);
+      return { code: current?.code ?? row.code, productName: current?.productName ?? row.productName, color: current?.color ?? row.color, sizes: row.sizes, unitPriceUsd: row.unitPriceUsd };
+    });
+  };
+
   const previewImport = async (file: File) => {
     setReading(true);
     try {
-      const parsed = await parseInventoryWorkbook(file);
+      const parsed = await readImportFile(file);
       const preview = await apiRequest<ImportPreview>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: parsed }) });
       if (!preview.summary.errors.length && preview.summary.created + preview.summary.updated === 0) {
         api.info(labels.noChanges);
@@ -504,7 +516,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           <Button icon={<SettingOutlined />} onClick={openSettings}>{labels.settings}</Button>
           <Button icon={<HistoryOutlined />} onClick={() => void openHistory()}>{labels.history}</Button>
           <Button icon={<DownloadOutlined />} disabled={!view} onClick={() => view && void exportInventoryWorkbook(view as never)}>{labels.exportXlsx}</Button>
-          <Upload accept=".xlsx" showUploadList={false} beforeUpload={(file) => { void previewImport(file); return false; }}>
+          <Upload accept=".xlsx,.pdf" showUploadList={false} beforeUpload={(file) => { void previewImport(file); return false; }}>
             <Button icon={<UploadOutlined />} loading={reading}>{reading ? labels.reading : labels.importXlsx}</Button>
           </Upload>
           <Link href={`/${locale}/admin/inventory/analytics`}><Button icon={<LineChartOutlined />}>{labels.charts}</Button></Link>
