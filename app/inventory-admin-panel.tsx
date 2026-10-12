@@ -2,7 +2,7 @@
 
 import { DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, UploadOutlined } from "@ant-design/icons";
 import {
-  Alert, Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select,
+  Alert, Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Radio, Row, Select,
   Space, Statistic, Switch, Table, Tag, Typography, Upload, message,
 } from "antd";
 import Link from "next/link";
@@ -116,6 +116,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [importLines, setImportLines] = useState<ImportLine[] | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importMode, setImportMode] = useState<"add" | "replace">("replace");
   const [reading, setReading] = useState(false);
   const [editLine, setEditLine] = useState<Line | "new" | null>(null);
   const [editForm] = Form.useForm<EditForm>();
@@ -144,6 +145,9 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     fxLabel: "BCCR venta", fxUse: "Usar tipo de cambio", fxStale: "(ultimo disponible)",
     edit: "Editar", addLine: "Agregar articulo", editTitle: "Editar inventario", newTitle: "Nuevo articulo", pieces: "Piezas por prenda",
     reading: "Leyendo archivo...", noChanges: "El archivo no contiene cambios respecto al inventario actual.",
+    importMode: "Modo de importacion", modeAdd: "Sumar al inventario", modeReplace: "Reemplazar inventario",
+    modeAddHint: "Las cantidades del archivo se suman a las existencias actuales (ideal para un nuevo pedido).",
+    modeReplaceHint: "Las cantidades iniciales se reemplazan por las del archivo; lo ya vendido sigue vendido.",
     importErrors: {
       NO_SHEET: "El archivo no tiene hojas.", NO_HEADER: "No se encontro la columna \"Código\" en el archivo.",
       MISSING_COLUMNS: "Faltan columnas obligatorias: ", PDF_PARSE: "No pudimos leer el articulo numero ", PDF_QTY_MISMATCH: "El total de prendas no coincide con el PDF en: ", PDF_EMPTY: "No encontramos articulos en el PDF.", INVALID_IMPORT: "El archivo no tiene filas validas o tiene demasiadas filas.",
@@ -172,6 +176,9 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     fxLabel: "BCCR sell rate", fxUse: "Use exchange rate", fxStale: "(latest available)",
     edit: "Edit", addLine: "Add item", editTitle: "Edit inventory", newTitle: "New item", pieces: "Pieces per garment",
     reading: "Reading file...", noChanges: "The file has no changes compared to the current inventory.",
+    importMode: "Import mode", modeAdd: "Add to inventory", modeReplace: "Replace inventory",
+    modeAddHint: "File quantities are added to current stock (ideal for a new order).",
+    modeReplaceHint: "Initial quantities are replaced with the file's; items already sold stay sold.",
     importErrors: {
       NO_SHEET: "The file has no sheets.", NO_HEADER: "The \"Código\" column was not found in the file.",
       MISSING_COLUMNS: "Missing required columns: ", PDF_PARSE: "We could not read item number ", PDF_QTY_MISMATCH: "Item total does not match the PDF for: ", PDF_EMPTY: "No items were found in the PDF.", INVALID_IMPORT: "The file has no valid rows or has too many rows.",
@@ -272,7 +279,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     setReading(true);
     try {
       const parsed = await readImportFile(file);
-      const preview = await apiRequest<ImportPreview>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: parsed }) });
+      const preview = await apiRequest<ImportPreview>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: parsed, mode: importMode }) });
       if (!preview.summary.errors.length && preview.summary.created + preview.summary.updated === 0) {
         api.info(labels.noChanges);
         return;
@@ -317,11 +324,21 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     if (ok) setEditLine(null);
   };
 
+  const changeImportMode = async (mode: "add" | "replace") => {
+    setImportMode(mode);
+    if (!importLines) return;
+    try {
+      setImportPreview(await apiRequest<ImportPreview>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: importLines, mode }) }));
+    } catch (error) {
+      handleError(error, labels.importFail);
+    }
+  };
+
   const applyImport = async () => {
     if (!importLines) return;
     setImporting(true);
     try {
-      setView(await apiRequest<View>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: importLines, apply: true }) }));
+      setView(await apiRequest<View>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: importLines, apply: true, mode: importMode }) }));
       api.success(labels.importDone);
       setImportLines(null);
       setImportPreview(null);
@@ -595,6 +612,9 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           onOk={() => void applyImport()} width={640}>
           {importPreview ? (
             <Space orientation="vertical" style={{ width: "100%" }}>
+              <Radio.Group value={importMode} onChange={(event) => void changeImportMode(event.target.value)} optionType="button" buttonStyle="solid"
+                options={[{ value: "add", label: labels.modeAdd }, { value: "replace", label: labels.modeReplace }]} />
+              <Typography.Text type="secondary">{importMode === "add" ? labels.modeAddHint : labels.modeReplaceHint}</Typography.Text>
               <Space wrap>
                 <Tag color="green">{labels.created}: {importPreview.summary.created}</Tag>
                 <Tag color="blue">{labels.updated}: {importPreview.summary.updated}</Tag>

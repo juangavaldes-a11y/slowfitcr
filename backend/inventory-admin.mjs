@@ -1,4 +1,5 @@
 import { buildAnalytics } from "./inventory-analytics.mjs";
+import { buildRestock } from "./inventory-restock.mjs";
 import { fetchBccrRate } from "./inventory-fx.mjs";
 import { computeInventoryCosts, SIZE_KEYS, sumSizes } from "./inventory-costing.mjs";
 
@@ -143,7 +144,8 @@ export function buildInventoryView(settingsRow, lineRows, sales) {
 const IMPORT_FIELDS = ["productName", "sizes", "piecesPerGarment", "unitPriceUsd", "salePriceCrc", "supplierEquivalence"];
 const MAX_IMPORT_ROWS = 1000;
 
-export function diffImport(existingLines, incomingLines, soldByLine = new Map()) {
+// mode "replace" overwrites the initial quantities (sales stay recorded); "add" adds the incoming quantities to the current ones.
+export function diffImport(existingLines, incomingLines, mode = "replace") {
   const existing = new Map(existingLines.map((line) => [`${line.code}\u0000${line.color}`, line]));
   const seen = new Set();
   const result = { created: [], updated: [], unchanged: [], errors: [], missing: [] };
@@ -166,10 +168,8 @@ export function diffImport(existingLines, incomingLines, soldByLine = new Map())
       result.created.push(data);
       return;
     }
-    const sold = soldByLine.get(current.id) ?? {};
-    if (SIZE_KEYS.some((size) => data.sizes[size] < (sold[size] ?? 0))) {
-      result.errors.push({ row: index + 1, code: data.code, error: "SOLD_EXCEEDS_STOCK" });
-      return;
+    if (mode === "add") {
+      data.sizes = Object.fromEntries(SIZE_KEYS.map((size) => [size, (current.sizes[size] ?? 0) + data.sizes[size]]));
     }
     const changes = {};
     for (const field of IMPORT_FIELDS) {
@@ -381,11 +381,9 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     const incoming = Array.isArray(body.lines) ? body.lines : null;
     if (!incoming || incoming.length === 0 || incoming.length > MAX_IMPORT_ROWS) throw new Error("INVALID_IMPORT");
     const apply = body.apply === true;
-    const [existing, sales] = await Promise.all([
-      prisma.inventoryLine.findMany(),
-      prisma.inventorySale.findMany({ where: { voidedAt: null } }),
-    ]);
-    const diff = diffImport(existing, incoming, soldBySize(sales));
+    const mode = body.mode === "add" ? "add" : "replace";
+    const existing = await prisma.inventoryLine.findMany();
+    const diff = diffImport(existing, incoming, mode);
     const summary = { created: diff.created.length, updated: diff.updated.length, unchanged: diff.unchanged.length, missing: diff.missing.length, errors: diff.errors };
     if (!apply) return jsonResponse({ applied: false, summary, created: diff.created, updated: diff.updated, missing: diff.missing });
     if (diff.errors.length) return jsonResponse({ applied: false, summary, error: "IMPORT_HAS_ERRORS" }, 422);
@@ -393,7 +391,7 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
       for (const data of diff.created) await transaction.inventoryLine.create({ data });
       for (const row of diff.updated) await transaction.inventoryLine.update({ where: { id: row.id }, data: row.changes });
     }, { timeout: 30000 });
-    await appendAudit("inventory.import.applied", { created: summary.created, updated: summary.updated, unchanged: summary.unchanged }, "admin");
+    await appendAudit("inventory.import.applied", { mode, created: summary.created, updated: summary.updated, unchanged: summary.unchanged }, "admin");
     return jsonResponse({ applied: true, summary, ...(await loadView()) });
   });
 
@@ -423,9 +421,11 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     });
   });
 
-  const getAnalytics = guard(async () => {
+  const getAnalytics = guard(async (request) => {
+    const params = new URL(request.url).searchParams;
     const [view, sales] = await Promise.all([loadView(), prisma.inventorySale.findMany({ orderBy: { soldAt: "asc" } })]);
     return jsonResponse({
+      restock: buildRestock({ lines: view.lines, sales, leadTimeDays: params.get("leadTimeDays"), coverageDays: params.get("coverageDays") }),
       crReady: view.crReady,
       ...buildAnalytics({
         lines: view.lines,

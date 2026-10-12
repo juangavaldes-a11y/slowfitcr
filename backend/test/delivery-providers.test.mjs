@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { afterEach, test } from "node:test";
 import {
+  cancelProvider,
   configuredDeliveryProviders,
+  configuredPickup,
   dispatchProvider,
   normalizeDeliveryDestination,
   quoteProvider,
@@ -133,4 +135,73 @@ test("verifies provider webhook HMAC signatures without timing leaks", () => {
   assert.equal(verifyProviderWebhook(body, signature, secret), true);
   assert.equal(verifyProviderWebhook(`${body} `, signature, secret), false);
   assert.equal(verifyProviderWebhook(body, "invalid", secret), false);
+});
+const validDestination = { name: "Ana", phone: "88888888", streetAddress: "Centro", city: "Heredia", state: "Heredia" };
+
+test("validates destination fields, coordinates and country", () => {
+  assert.throws(() => normalizeDeliveryDestination({ ...validDestination, name: "" }), /INVALID_DELIVERY_NAME/);
+  assert.throws(() => normalizeDeliveryDestination({ ...validDestination, country: "CRI" }), /INVALID_DELIVERY_COUNTRY/);
+  assert.throws(() => normalizeDeliveryDestination({ ...validDestination, latitude: 120 }), /INVALID_DELIVERY_LATITUDE/);
+  assert.throws(() => normalizeDeliveryDestination({ ...validDestination, longitude: "abc" }), /INVALID_DELIVERY_LONGITUDE/);
+  const ok = normalizeDeliveryDestination({ ...validDestination, latitude: "9.99", longitude: -84.1, addressLine2: "Casa 2", country: "cr" });
+  assert.equal(ok.address.latitude, 9.99);
+  assert.deepEqual(ok.address.streetAddress, ["Centro", "Casa 2"]);
+  assert.equal(ok.address.country, "CR");
+});
+
+test("builds the configured pickup from the environment", () => {
+  const keys = ["NAME", "PHONE", "ADDRESS", "CITY", "STATE"];
+  keys.forEach((key) => { process.env[`DELIVERY_PICKUP_${key}`] = { NAME: "Slow Fit", PHONE: "88919417", ADDRESS: "Barva", CITY: "Barva", STATE: "Heredia" }[key]; });
+  try {
+    const pickup = configuredPickup();
+    assert.equal(pickup.name, "Slow Fit");
+    assert.equal(pickup.phone, "+50688919417");
+  } finally {
+    keys.forEach((key) => delete process.env[`DELIVERY_PICKUP_${key}`]);
+  }
+});
+
+test("Uber requests surface provider errors and support cancel", async () => {
+  process.env.UBER_DIRECT_CLIENT_ID = "c";
+  process.env.UBER_DIRECT_CLIENT_SECRET = "s";
+  process.env.UBER_DIRECT_CUSTOMER_ID = "cust";
+  const urls = [];
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    if (String(url).includes("oauth/v2/token")) return Response.json({ access_token: "t", expires_in: 3600 });
+    if (String(url).endsWith("/cancel")) return Response.json({ status: "canceled" });
+    return Response.json({ message: "bad" }, { status: 422 });
+  };
+  await assert.rejects(quoteProvider("uber", { pickup: normalizeDeliveryDestination(validDestination), dropoff: normalizeDeliveryDestination(validDestination) }),
+    (error) => error.message === "UBER_DELIVERY_ERROR" && error.status === 422 && error.providerPayload.message === "bad");
+  const cancelled = await cancelProvider({ provider: "uber", externalDeliveryId: "del 1" });
+  assert.equal(cancelled.status, "canceled");
+  assert.ok(urls.some((url) => url.endsWith("/deliveries/del%201/cancel")));
+});
+
+test("DiDi gateway dispatch, cancel and configuration errors", async () => {
+  await assert.rejects(quoteProvider("didi", {}), /INVALID_DELIVERY_DIDI_GATEWAY_URL/);
+  process.env.DIDI_DELIVERY_GATEWAY_URL = "https://didi-gateway.example/api/";
+  process.env.DIDI_DELIVERY_GATEWAY_TOKEN = "tok";
+  const urls = [];
+  globalThis.fetch = async (url) => {
+    urls.push(String(url));
+    return String(url).endsWith("/cancel") ? Response.json({ ok: true }) : Response.json({ id: "d1", status: "assigned", trackingUrl: "https://t.example/d1" });
+  };
+  const delivery = await dispatchProvider({ provider: "didi", id: "x" });
+  assert.equal(delivery.externalDeliveryId, "d1");
+  assert.equal(delivery.trackingUrl, "https://t.example/d1");
+  await cancelProvider({ provider: "didi", externalDeliveryId: "d/1" });
+  assert.ok(urls.at(-1).endsWith("deliveries/d%2F1/cancel"));
+  assert.deepEqual(configuredDeliveryProviders(), [{ id: "didi", label: "DiDi" }]);
+  globalThis.fetch = async () => new Response("nope", { status: 500 });
+  await assert.rejects(dispatchProvider({ provider: "didi" }), /DIDI_DELIVERY_ERROR/);
+});
+
+test("unknown providers and undispatched cancels are rejected", async () => {
+  await assert.rejects(quoteProvider("x", {}), /DELIVERY_PROVIDER_NOT_CONFIGURED/);
+  await assert.rejects(dispatchProvider({ provider: "x" }), /DELIVERY_PROVIDER_NOT_CONFIGURED/);
+  await assert.rejects(cancelProvider({ provider: "uber" }), /DELIVERY_NOT_DISPATCHED/);
+  await assert.rejects(cancelProvider({ provider: "x", externalDeliveryId: "1" }), /DELIVERY_PROVIDER_NOT_CONFIGURED/);
+  assert.equal(verifyProviderWebhook("b", "", "s"), false);
 });

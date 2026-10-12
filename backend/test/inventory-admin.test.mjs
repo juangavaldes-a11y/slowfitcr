@@ -62,13 +62,19 @@ test("diffImport classifies created, updated, unchanged, missing and invalid row
     row({ code: "N", color: "New" }),
     row({ code: "B", color: "Red", sizes: { S: 1 } }),
     row({ code: "", color: "X" }),
-  ], new Map([["2", { S: 2 }]]));
+  ]);
   assert.equal(diff.unchanged.length, 1);
   assert.equal(diff.updated.length, 1);
   assert.deepEqual(diff.updated[0].changes, { salePriceCrc: 9000 });
   assert.equal(diff.created.length, 1);
   assert.deepEqual(diff.missing, [{ code: "C", color: "Navy" }]);
   assert.deepEqual(diff.errors.map((entry) => entry.error).sort(), ["INVALID_DUPLICATE_ROW", "INVALID_TEXT"]);
+
+  const replaced = diffImport(existing, [row({ sizes: { S: 0, M: 0 } })], "replace");
+  assert.deepEqual(replaced.errors, []);
+  assert.deepEqual(replaced.updated[0].changes.sizes, { S: 0, M: 0, L: 0, XL: 0, OS: 0 });
+  const added = diffImport(existing, [row({ sizes: { S: 3, L: 2 } })], "add");
+  assert.deepEqual(added.updated[0].changes.sizes, { S: 4, M: 1, L: 2, XL: 0, OS: 0 });
 });
 
 test("exchange rate falls back to the cached rate when the provider fails", async () => {
@@ -183,4 +189,90 @@ test("voiding a website sale leaves storefront stock untouched", async () => {
   await handlers.voidSale({}, "w1");
   assert.equal(state.variant.inventoryQuantity, 5);
   await handlers.refundSale({ body: { quantity: 1, restock: true } }, "missing").catch(() => undefined);
+});
+
+function makeImportLedger() {
+  const state = {
+    lines: [{ id: "L1", code: "A", color: "Black", productName: "Top", sizes: { S: 2, M: 1, L: 0, XL: 0, OS: 0 }, piecesPerGarment: 1, unitPriceUsd: "10", salePriceCrc: null, supplierEquivalence: null }],
+    sales: [{ id: "s1", lineId: "L1", size: "S", quantity: 2, voidedAt: null, refundedQuantity: 0, restockedQuantity: 0, soldAt: new Date("2026-09-01"), unitPriceCrc: 10000, discountCrc: 0, paymentMethod: "Cash" }],
+    audits: [],
+  };
+  const model = {
+    inventoryLine: {
+      findMany: async () => state.lines,
+      create: async ({ data }) => { const line = { id: `L${state.lines.length + 1}`, ...data }; state.lines.push(line); return line; },
+      update: async ({ where, data }) => {
+        const line = state.lines.find((entry) => entry.id === where.id);
+        if (!line) throw Object.assign(new Error("missing"), { code: "P2025" });
+        Object.assign(line, data);
+        return line;
+      },
+    },
+    inventorySale: { findMany: async ({ where } = {}) => state.sales.filter((sale) => !where?.lineId || sale.lineId === where.lineId) },
+    inventorySettings: { findUnique: async () => null, upsert: async () => undefined },
+    paymentMethod: { findMany: async () => [] },
+    order: { findMany: async () => [] },
+  };
+  const handlers = createInventoryHandlers({
+    prisma: { ...model, $transaction: async (fn) => fn(model) },
+    jsonResponse: (body, status = 200) => ({ body, status }),
+    readJson: async (request) => request.body,
+    isAuthorized: async () => true,
+    appendAudit: async (action, details) => { state.audits.push({ action, details }); },
+  });
+  return { state, handlers };
+}
+
+const importRow = (extra) => ({ code: "A", productName: "Top", color: "Black", sizes: { S: 5, M: 0 }, piecesPerGarment: 1, unitPriceUsd: 10, ...extra });
+
+test("import preview does not write; add mode sums stock and replace mode overwrites it", async () => {
+  const { state, handlers } = makeImportLedger();
+  const preview = await handlers.importLines({ body: { lines: [importRow({})], mode: "add" } });
+  assert.equal(preview.body.applied, false);
+  assert.equal(preview.body.summary.updated, 1);
+  assert.equal(state.lines[0].sizes.S, 2);
+
+  const added = await handlers.importLines({ body: { lines: [importRow({})], mode: "add", apply: true } });
+  assert.equal(added.body.applied, true);
+  assert.deepEqual(state.lines[0].sizes, { S: 7, M: 1, L: 0, XL: 0, OS: 0 });
+  assert.equal(added.body.lines[0].soldQuantity, 2);
+  assert.equal(added.body.lines[0].remaining.S, 5);
+
+  await handlers.importLines({ body: { lines: [importRow({ sizes: { S: 1 } })], apply: true } });
+  assert.deepEqual(state.lines[0].sizes, { S: 1, M: 0, L: 0, XL: 0, OS: 0 });
+  assert.equal((await handlers.getInventory({})).body.lines[0].remaining.S, -1);
+  assert.equal(state.audits.at(-1).details.mode, "replace");
+});
+
+test("import creates new lines and rejects invalid payloads or rows", async () => {
+  const { state, handlers } = makeImportLedger();
+  const created = await handlers.importLines({ body: { lines: [importRow({ code: "N", color: "Red" })], apply: true } });
+  assert.equal(created.body.summary.created, 1);
+  assert.equal(state.lines.length, 2);
+  assert.equal((await handlers.importLines({ body: { lines: [] } })).status, 400);
+  assert.equal((await handlers.importLines({ body: {} })).status, 400);
+  const bad = await handlers.importLines({ body: { lines: [importRow({ code: "" })], apply: true } });
+  assert.equal(bad.status, 422);
+  assert.equal(bad.body.error, "IMPORT_HAS_ERRORS");
+});
+
+test("line and settings handlers create, update and report missing lines", async () => {
+  const { state, handlers } = makeImportLedger();
+  assert.equal((await handlers.createLine({ body: importRow({ code: "Z", color: "Blue" }) })).status, 201);
+  assert.equal((await handlers.updateLine({ body: { salePriceCrc: 9000 } }, "L1")).status, 200);
+  assert.equal(state.lines[0].salePriceCrc, 9000);
+  assert.equal((await handlers.updateLine({ body: { sizes: { S: 1 } } }, "L1")).status, 400);
+  assert.equal((await handlers.updateLine({ body: { salePriceCrc: 1 } }, "nope")).status, 404);
+  assert.equal((await handlers.updateSettings({ body: { fxRate: 500 } })).status, 200);
+  assert.equal((await handlers.updateSettings({ body: { fxRate: "x" } })).status, 400);
+});
+
+test("analytics returns restock recommendations using query params and listSales filters by line", async () => {
+  const { state, handlers } = makeImportLedger();
+  const analytics = await handlers.getAnalytics({ url: "http://x/api/admin/inventory/analytics?leadTimeDays=10&coverageDays=20" });
+  assert.equal(analytics.body.restock.params.leadTimeDays, 10);
+  assert.equal(analytics.body.restock.params.coverageDays, 20);
+  assert.ok(Array.isArray(analytics.body.restock.nextOrder.lines));
+  state.sales[0].line = { code: "A" };
+  assert.equal((await handlers.listSales({ url: "http://x/api/admin/inventory/sales?lineId=L1" })).body.sales.length, 1);
 });

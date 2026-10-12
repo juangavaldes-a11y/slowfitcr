@@ -1,6 +1,7 @@
 "use client";
 
-import { Alert, Card, Col, Empty, Row, Segmented, Space, Statistic, Table, Tag, Typography, message } from "antd";
+import { Alert, Card, Col, Empty, InputNumber, Row, Segmented, Space, Statistic, Table, Tag, Typography, message } from "antd";
+import type { ColumnsType } from "antd/es/table";
 import dynamic from "next/dynamic";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
@@ -18,7 +19,19 @@ type Scenario = {
   roiAtSellOut: number | null;
   curve: Array<{ week: number; date: string; recovered: number }>;
 };
+type RestockSize = { size: string; stock: number; sold: number; velocityPerWeek: number; suggested: number };
+type RestockItem = {
+  lineId: string; code: string; productName: string; color: string; stock: number; unitsSold: number; velocityPerWeek: number;
+  daysOfStock: number | null; sizes: RestockSize[]; suggested: number; estimatedCostUsd: number;
+  status: "reorder_fast" | "reorder" | "fast" | "slow" | "dead" | "normal" | "none";
+};
+type Restock = {
+  params: { leadTimeDays: number; coverageDays: number; windowDays: number; enoughHistory: boolean };
+  fastest: RestockItem[]; slowest: RestockItem[]; needsReorder: RestockItem[];
+  nextOrder: { lines: RestockItem[]; totalUnits: number; estimatedCostUsd: number };
+};
 type Analytics = {
+  restock: Restock;
   crReady: boolean;
   totals: {
     units: number; revenue: number; commission: number; cost: number; profit: number; netRevenue: number;
@@ -38,6 +51,8 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
   const [loginLoading, setLoginLoading] = useState(false);
   const [data, setData] = useState<Analytics | null>(null);
   const [range, setRange] = useState<"30" | "90" | "all">("all");
+  const [leadTime, setLeadTime] = useState(45);
+  const [coverage, setCoverage] = useState(60);
   const es = locale === "es";
 
   const labels = useMemo(() => es ? {
@@ -51,6 +66,12 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
     never: "No alcanza con el inventario actual", noSales: "Aun no hay ventas registradas.", pending: "Completa los supuestos de importacion para calcular la inversion.",
     thinData: "Hay menos de 4 semanas de historial: los escenarios usan estimaciones amplias.",
     investedLine: "Inversion", date: "Fecha", amount: "CRC", product: "Producto", method: "Metodo", scenarioKey: "Escenario",
+    restockTitle: "Reabastecimiento y proximo pedido", status: "Estado", leadTime: "Dias de entrega del proveedor", coverage: "Dias de venta a cubrir",
+    fastest: "Lo que mas se mueve", slowest: "Lo que casi no se mueve", needsReorder: "Necesita pedido pronto", nextOrder: "Pedido recomendado",
+    item: "Articulo", perWeek: "Prendas/semana", stockNow: "En existencia", daysLeft: "Dias de inventario", suggested: "Pedir",
+    sizesCol: "Por talla", totalUnits: "Prendas a pedir", estCost: "Costo estimado USD", nothingToOrder: "Por ahora no hace falta pedir nada.",
+    thinRestock: "Hay menos de 4 semanas de ventas: las recomendaciones son aproximadas y mejoran con mas datos.",
+    st_reorder_fast: "Pedir ya (alta rotacion)", st_reorder: "Pedir pronto", st_fast: "Alta rotacion", st_slow: "Baja rotacion", st_dead: "Sin ventas", st_normal: "Normal", st_none: "-",
   } : {
     title: "Sales & projections",
     subtitle: "Sales, margin, investment recovery and return projections.",
@@ -62,14 +83,20 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
     never: "Not reachable with current stock", noSales: "No sales recorded yet.", pending: "Complete the import assumptions to compute the investment.",
     thinData: "Less than 4 weeks of history: scenarios use wide estimates.",
     investedLine: "Investment", date: "Date", amount: "CRC", product: "Product", method: "Method", scenarioKey: "Scenario",
+    restockTitle: "Restock & next order", status: "Status", leadTime: "Supplier lead time (days)", coverage: "Days of sales to cover",
+    fastest: "Fastest movers", slowest: "Slowest movers", needsReorder: "Needs reorder soon", nextOrder: "Recommended next order",
+    item: "Item", perWeek: "Units/week", stockNow: "In stock", daysLeft: "Days of stock", suggested: "Order",
+    sizesCol: "By size", totalUnits: "Units to order", estCost: "Estimated cost USD", nothingToOrder: "Nothing needs to be ordered right now.",
+    thinRestock: "Less than 4 weeks of sales: recommendations are approximate and improve with more data.",
+    st_reorder_fast: "Reorder now (fast mover)", st_reorder: "Reorder soon", st_fast: "Fast mover", st_slow: "Slow mover", st_dead: "No sales", st_normal: "Normal", st_none: "-",
   }, [es]);
 
   const crc = useMemo(() => new Intl.NumberFormat(es ? "es-CR" : "en-US", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }), [es]);
   const percent = (value: number | null) => (value === null ? "-" : `${(value * 100).toFixed(1)}%`);
 
-  const load = async () => {
+  const load = async (lead = leadTime, cover = coverage) => {
     try {
-      setData(await apiRequest<Analytics>("/api/admin/inventory/analytics", { cache: "no-store" }));
+      setData(await apiRequest<Analytics>(`/api/admin/inventory/analytics?leadTimeDays=${lead}&coverageDays=${cover}`, { cache: "no-store" }));
       setAuthorized(true);
     } catch (error) {
       if (isApiErrorStatus(error, 401)) setAuthorized(false);
@@ -125,6 +152,14 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
   const totals = data?.totals;
   const hasSales = (data?.daily.length ?? 0) > 0;
   const axisMoney = { labelFormatter: (value: number) => `${Math.round(value / 1000)}k` };
+  const statusColor: Record<RestockItem["status"], string> = { reorder_fast: "red", reorder: "orange", fast: "green", slow: "gold", dead: "default", normal: "blue", none: "default" };
+  const movementColumns: ColumnsType<RestockItem> = [
+    { title: labels.item, render: (_, row) => `${row.productName} · ${row.color} (${row.code})` },
+    { title: labels.perWeek, dataIndex: "velocityPerWeek", align: "right" },
+    { title: labels.stockNow, dataIndex: "stock", align: "right" },
+    { title: labels.daysLeft, dataIndex: "daysOfStock", align: "right", render: (value: number | null) => (value === null ? "-" : Math.round(value)) },
+    { title: labels.status, dataIndex: "status", render: (value: RestockItem["status"]) => <Tag color={statusColor[value]}>{labels[`st_${value}` as const]}</Tag> },
+  ];
 
   return (
     <>
@@ -183,6 +218,46 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
               { title: labels.payback, dataIndex: "paybackDate", render: (value: string | null) => value ?? <Typography.Text type="secondary">{labels.never}</Typography.Text> },
               { title: labels.roiEnd, dataIndex: "roiAtSellOut", align: "right", render: (value: number | null) => percent(value) },
             ]} />
+        </Card>
+
+        <Card title={labels.restockTitle} style={{ marginTop: 16 }}
+          extra={(
+            <Space wrap>
+              <span>{labels.leadTime}</span>
+              <InputNumber min={0} max={365} precision={0} value={leadTime} onChange={(value) => { const next = value ?? 45; setLeadTime(next); void load(next, coverage); }} />
+              <span>{labels.coverage}</span>
+              <InputNumber min={7} max={365} precision={0} value={coverage} onChange={(value) => { const next = value ?? 60; setCoverage(next); void load(leadTime, next); }} />
+            </Space>
+          )}>
+          {data && !data.restock.params.enoughHistory ? <Alert type="info" showIcon title={labels.thinRestock} style={{ marginBottom: 12 }} /> : null}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Typography.Title level={5}>{labels.fastest}</Typography.Title>
+              <Table<RestockItem> rowKey="lineId" size="small" pagination={false} dataSource={data?.restock.fastest ?? []} columns={movementColumns} />
+            </Col>
+            <Col xs={24} lg={12}>
+              <Typography.Title level={5}>{labels.slowest}</Typography.Title>
+              <Table<RestockItem> rowKey="lineId" size="small" pagination={false} dataSource={data?.restock.slowest ?? []} columns={movementColumns} />
+            </Col>
+            <Col span={24}>
+              <Typography.Title level={5}>{labels.nextOrder}</Typography.Title>
+              {data && data.restock.nextOrder.lines.length === 0 ? <Typography.Text type="secondary">{labels.nothingToOrder}</Typography.Text> : (
+                <>
+                  <Space size="large" style={{ marginBottom: 12 }}>
+                    <Statistic title={labels.totalUnits} value={data?.restock.nextOrder.totalUnits ?? 0} />
+                    <Statistic title={labels.estCost} value={(data?.restock.nextOrder.estimatedCostUsd ?? 0).toLocaleString(es ? "es-CR" : "en-US", { style: "currency", currency: "USD" })} />
+                  </Space>
+                  <Table<RestockItem> rowKey="lineId" size="small" pagination={{ pageSize: 10, showSizeChanger: false }} scroll={{ x: "max-content" }}
+                    dataSource={data?.restock.nextOrder.lines ?? []}
+                    columns={[
+                      ...movementColumns,
+                      { title: labels.sizesCol, render: (_, row) => row.sizes.filter((entry) => entry.suggested > 0).map((entry) => `${entry.size}: ${entry.suggested}`).join("  ") },
+                      { title: labels.suggested, dataIndex: "suggested", align: "right", render: (value: number) => <strong>{value}</strong> },
+                    ]} />
+                </>
+              )}
+            </Col>
+          </Row>
         </Card>
       </AdminShell>
     </>
