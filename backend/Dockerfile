@@ -12,6 +12,7 @@ COPY backend/inventory-costing.mjs ./inventory-costing.mjs
 COPY backend/inventory-admin.mjs ./inventory-admin.mjs
 COPY backend/inventory-fx.mjs ./inventory-fx.mjs
 COPY backend/inventory-analytics.mjs ./inventory-analytics.mjs
+COPY backend/inventory-restock.mjs ./inventory-restock.mjs
 COPY backend/package-lock.json ./package-lock.json
 
 RUN npm ci
