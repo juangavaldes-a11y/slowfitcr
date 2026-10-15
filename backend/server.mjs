@@ -16,6 +16,7 @@ import {
   verifyProviderWebhook,
 } from "./delivery-providers.mjs";
 import { createInventoryHandlers } from "./inventory-admin.mjs";
+import { createLoyverseStockHandler } from "./loyverse-stock.mjs";
 
 const prisma = new PrismaClient();
 
@@ -586,6 +587,7 @@ function getBackendRouteRequirements(pathname) {
   if (pathname.startsWith("/api/delivery/")) return [{ module: "delivery" }];
   if (pathname.startsWith("/api/admin/")) return [{ module: "admin" }];
   if (pathname === "/api/webhooks/payments") return [{ module: "checkout" }];
+  if (pathname === "/api/webhooks/loyverse-stock") return [{ module: "catalog" }];
   if (pathname.startsWith("/api/webhooks/deliveries/")) return [{ module: "delivery" }];
   return [];
 }
@@ -605,6 +607,8 @@ async function appendAudit(action, details, actor = "system") {
     },
   });
 }
+
+const loyverseStock = createLoyverseStockHandler({ prisma, jsonResponse });
 
 const inventory = createInventoryHandlers({
   prisma,
@@ -1379,6 +1383,13 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
   }
 
   await queueWebhook(process.env.ORDER_EVENTS_WEBHOOK_URL, event);
+  if (topic === "payment.paid") {
+    await queueWebhook(process.env.LOYVERSE_SYNC_WEBHOOK_URL, {
+      topic,
+      orderId: externalPaymentId,
+      items: event.items.map((item) => ({ sku: item?.sku || null, quantity: item?.quantity, preorder: Boolean(item?.preorder) })),
+    });
+  }
   await queueWebhook(process.env.CRM_ORDER_WEBHOOK_URL, {
     source: options.replay ? "slowfit-webhook-replay" : "slowfit-payment-webhook",
     event,
@@ -3060,6 +3071,10 @@ export async function route(request) {
 
   if (pathname === "/api/webhooks/payments" && method === "POST") {
     return handlePaymentWebhook(request);
+  }
+
+  if (pathname === "/api/webhooks/loyverse-stock" && method === "POST") {
+    return loyverseStock.handleLoyverseStockWebhook(request);
   }
 
   const deliveryWebhookMatch = pathname.match(/^\/api\/webhooks\/deliveries\/(uber|didi)$/);

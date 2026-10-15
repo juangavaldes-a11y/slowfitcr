@@ -1733,3 +1733,19 @@ a {
     min-height: 320px;
   }
 }
+
+@media (hover: none) and (pointer: coarse) and (max-width: 1400px) {
+  .slowfit-nav {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .slowfit-nav-actions {
+    display: none;
+  }
+
+  .slowfit-menu-trigger.ant-btn {
+    display: inline-flex;
+  }
+}

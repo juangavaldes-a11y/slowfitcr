@@ -409,3 +409,10 @@ model ExchangeRate {
   source    String   @default("BCCR")
   fetchedAt DateTime @default(now())
 }
+
+model LoyverseStockLedger {
+  key       String   @id
+  sku       String
+  quantity  Int
+  updatedAt DateTime @updatedAt
+}

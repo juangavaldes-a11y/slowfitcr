@@ -260,6 +260,25 @@ The receiver must return a 2xx response. Slow Fit retries transient failures acc
 `WEBHOOK_MAX_ATTEMPTS`. When `OUTBOUND_WEBHOOK_SECRET` is set, the receiver must verify the
 `X-Slowfit-Timestamp` and `X-Slowfit-Signature` headers before accepting the lead.
 
+### Loyverse stock synchronization
+
+The companion Loyverse integration service keeps stock in sync in both directions, matching variants by `sku`
+(variants without a SKU are ignored):
+
+- Paid website orders: set `LOYVERSE_SYNC_WEBHOOK_URL` to `https://<sync-service>/webhooks/website/orders` and
+  `OUTBOUND_WEBHOOK_SECRET` to the same value as the service's `WEBSITE_SYNC_SECRET`. Each `payment.paid` event sends only
+  the order id and each item's `sku`, `quantity`, and `preorder` flag; preorder items are skipped.
+- Loyverse sales, refunds, and cancellations: the service posts signed receipt line quantities to
+  `POST /api/webhooks/loyverse-stock`. Set `LOYVERSE_SYNC_SECRET` to the same value as `WEBSITE_SYNC_SECRET`. Updates are
+  idempotent per receipt line (`LoyverseStockLedger`), and website stock is never reduced below zero.
+
+```bash
+LOYVERSE_SYNC_WEBHOOK_URL=https://your-sync-service.example.com/webhooks/website/orders
+LOYVERSE_SYNC_SECRET=the-same-random-secret-as-WEBSITE_SYNC_SECRET
+```
+
+Manual stock edits in either system (receiving goods, corrections) are not mirrored; only sales, refunds, and cancellations are.
+
 Customer logins are locked for 15 minutes after five consecutive failures by default. Password recovery links are stored as hashes, expire after 30 minutes, and can only be used once. Reset email delivery uses `ACCOUNT_RESET_FROM` when set, otherwise `ORDER_CONFIRM_FROM`.
 
 Required frontend secrets:
