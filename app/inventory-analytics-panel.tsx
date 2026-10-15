@@ -5,6 +5,7 @@ import type { ColumnsType } from "antd/es/table";
 import dynamic from "next/dynamic";
 import { useEffect, useEffectEvent, useMemo, useState } from "react";
 import AdminShell from "./admin-shell";
+import ChartBoundary from "./chart-boundary";
 import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
 
 const Line = dynamic(() => import("@ant-design/charts").then((module) => module.Line), { ssr: false });
@@ -57,6 +58,7 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
 
   const labels = useMemo(() => es ? {
     title: "Ventas y proyecciones",
+    chartFail: "No pudimos mostrar esta grafica.",
     subtitle: "Ventas, margen, recuperacion de la inversion y proyecciones de retorno.",
     revenue: "Ingresos", profit: "Utilidad", units: "Prendas vendidas", invested: "Inversion", recovered: "Recuperado",
     roi: "ROI actual", remaining: "Inventario restante (a precio, neto)", range30: "30 dias", range90: "90 dias", all: "Todo",
@@ -74,6 +76,7 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
     st_reorder_fast: "Pedir ya (alta rotacion)", st_reorder: "Pedir pronto", st_fast: "Alta rotacion", st_slow: "Baja rotacion", st_dead: "Sin ventas", st_normal: "Normal", st_none: "-",
   } : {
     title: "Sales & projections",
+    chartFail: "We could not display this chart.",
     subtitle: "Sales, margin, investment recovery and return projections.",
     revenue: "Revenue", profit: "Profit", units: "Units sold", invested: "Investment", recovered: "Recovered",
     roi: "Current ROI", remaining: "Remaining inventory (at price, net)", range30: "30 days", range90: "90 days", all: "All",
@@ -132,7 +135,7 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
   };
 
   const daily = useMemo(() => {
-    if (!data) return [];
+    if (!data?.daily) return [];
     if (range === "all") return data.daily;
     const lastDay = data.daily.at(-1)?.date ?? "";
     const cutoff = new Date(new Date(lastDay).getTime() - Number(range) * 86_400_000).toISOString().slice(0, 10);
@@ -140,7 +143,7 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
   }, [data, range]);
 
   const projectionSeries = useMemo(() => {
-    if (!data) return [];
+    if (!data?.projection) return [];
     const scenarioLabel = (name: Scenario["name"]) => labels[name];
     const points = data.projection.scenarios.flatMap((scenario) => scenario.curve.map((point) => ({
       date: point.date, value: point.recovered, series: scenarioLabel(scenario.name),
@@ -150,7 +153,7 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
   }, [data, labels]);
 
   const totals = data?.totals;
-  const hasSales = (data?.daily.length ?? 0) > 0;
+  const hasSales = (data?.daily?.length ?? 0) > 0;
   const axisMoney = { labelFormatter: (value: number) => `${Math.round(value / 1000)}k` };
   const statusColor: Record<RestockItem["status"], string> = { reorder_fast: "red", reorder: "orange", fast: "green", slow: "gold", dead: "default", normal: "blue", none: "default" };
   const movementColumns: ColumnsType<RestockItem> = [
@@ -185,22 +188,22 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
             <Row gutter={[16, 16]}>
               <Col xs={24} lg={12}>
                 <Card title={labels.salesOverTime}>
-                  <Column data={daily} xField="date" yField="revenue" height={280} axis={{ y: axisMoney }} />
+                  <ChartBoundary message={labels.chartFail} resetKey={daily}><Column data={daily} xField="date" yField="revenue" height={280} axis={{ y: axisMoney }} /></ChartBoundary>
                 </Card>
               </Col>
               <Col xs={24} lg={12}>
                 <Card title={labels.cumulative}>
-                  <Line data={daily} xField="date" yField="cumulativeProfit" height={280} axis={{ y: axisMoney }} />
+                  <ChartBoundary message={labels.chartFail} resetKey={daily}><Line data={daily} xField="date" yField="cumulativeProfit" height={280} axis={{ y: axisMoney }} /></ChartBoundary>
                 </Card>
               </Col>
               <Col xs={24} lg={12}>
                 <Card title={labels.byMethod}>
-                  <Column data={data?.byMethod ?? []} xField="method" yField="revenue" height={280} axis={{ y: axisMoney }} />
+                  <ChartBoundary message={labels.chartFail} resetKey={data}><Column data={data?.byMethod ?? []} xField="method" yField="revenue" height={280} axis={{ y: axisMoney }} /></ChartBoundary>
                 </Card>
               </Col>
               <Col xs={24} lg={12}>
                 <Card title={labels.byProduct}>
-                  <Bar data={data?.byProduct ?? []} xField="product" yField="revenue" height={280} axis={{ y: axisMoney }} />
+                  <ChartBoundary message={labels.chartFail} resetKey={data}><Bar data={data?.byProduct ?? []} xField="product" yField="revenue" height={280} axis={{ y: axisMoney }} /></ChartBoundary>
                 </Card>
               </Col>
             </Row>
@@ -208,8 +211,8 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
         )}
 
         <Card title={labels.projection} style={{ marginTop: 16 }}>
-          {data && data.projection.weeksOfHistory < 4 ? <Alert type="info" showIcon title={labels.thinData} style={{ marginBottom: 12 }} /> : null}
-          <Line data={projectionSeries} xField="date" yField="value" colorField="series" height={320} axis={{ y: axisMoney }} />
+          {data?.projection && data.projection.weeksOfHistory < 4 ? <Alert type="info" showIcon title={labels.thinData} style={{ marginBottom: 12 }} /> : null}
+          <ChartBoundary message={labels.chartFail} resetKey={projectionSeries}><Line data={projectionSeries} xField="date" yField="value" colorField="series" height={320} axis={{ y: axisMoney }} /></ChartBoundary>
           <Table<Scenario> rowKey="name" size="small" pagination={false} style={{ marginTop: 16 }} dataSource={data?.projection.scenarios ?? []}
             columns={[
               { title: labels.scenario, dataIndex: "name", render: (name: Scenario["name"]) => <Tag color={name === "best" ? "green" : name === "worst" ? "red" : "blue"}>{labels[name]}</Tag> },
@@ -229,26 +232,26 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
               <InputNumber min={7} max={365} precision={0} value={coverage} onChange={(value) => { const next = value ?? 60; setCoverage(next); void load(leadTime, next); }} />
             </Space>
           )}>
-          {data && !data.restock.params.enoughHistory ? <Alert type="info" showIcon title={labels.thinRestock} style={{ marginBottom: 12 }} /> : null}
+          {data?.restock?.params && !data.restock.params.enoughHistory ? <Alert type="info" showIcon title={labels.thinRestock} style={{ marginBottom: 12 }} /> : null}
           <Row gutter={[16, 16]}>
             <Col xs={24} lg={12}>
               <Typography.Title level={5}>{labels.fastest}</Typography.Title>
-              <Table<RestockItem> rowKey="lineId" size="small" pagination={false} dataSource={data?.restock.fastest ?? []} columns={movementColumns} />
+              <Table<RestockItem> rowKey="lineId" size="small" pagination={false} dataSource={data?.restock?.fastest ?? []} columns={movementColumns} />
             </Col>
             <Col xs={24} lg={12}>
               <Typography.Title level={5}>{labels.slowest}</Typography.Title>
-              <Table<RestockItem> rowKey="lineId" size="small" pagination={false} dataSource={data?.restock.slowest ?? []} columns={movementColumns} />
+              <Table<RestockItem> rowKey="lineId" size="small" pagination={false} dataSource={data?.restock?.slowest ?? []} columns={movementColumns} />
             </Col>
             <Col span={24}>
               <Typography.Title level={5}>{labels.nextOrder}</Typography.Title>
-              {data && data.restock.nextOrder.lines.length === 0 ? <Typography.Text type="secondary">{labels.nothingToOrder}</Typography.Text> : (
+              {!data?.restock?.nextOrder || data.restock.nextOrder.lines.length === 0 ? <Typography.Text type="secondary">{labels.nothingToOrder}</Typography.Text> : (
                 <>
                   <Space size="large" style={{ marginBottom: 12 }}>
-                    <Statistic title={labels.totalUnits} value={data?.restock.nextOrder.totalUnits ?? 0} />
-                    <Statistic title={labels.estCost} value={(data?.restock.nextOrder.estimatedCostUsd ?? 0).toLocaleString(es ? "es-CR" : "en-US", { style: "currency", currency: "USD" })} />
+                    <Statistic title={labels.totalUnits} value={data.restock.nextOrder.totalUnits} />
+                    <Statistic title={labels.estCost} value={data.restock.nextOrder.estimatedCostUsd.toLocaleString(es ? "es-CR" : "en-US", { style: "currency", currency: "USD" })} />
                   </Space>
                   <Table<RestockItem> rowKey="lineId" size="small" pagination={{ pageSize: 10, showSizeChanger: false }} scroll={{ x: "max-content" }}
-                    dataSource={data?.restock.nextOrder.lines ?? []}
+                    dataSource={data.restock.nextOrder.lines}
                     columns={[
                       ...movementColumns,
                       { title: labels.sizesCol, render: (_, row) => row.sizes.filter((entry) => entry.suggested > 0).map((entry) => `${entry.size}: ${entry.suggested}`).join("  ") },

@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, UploadOutlined } from "@ant-design/icons";
+import { DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, StopOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Alert, Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Radio, Row, Select,
   Space, Statistic, Switch, Table, Tag, Typography, Upload, message,
@@ -8,7 +8,7 @@ import {
 import Link from "next/link";
 import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
-import { useEffect, useEffectEvent, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import AdminShell from "./admin-shell";
 import { apiRequest, ApiError, formatApiError, isApiErrorStatus } from "./lib/api-client";
 import { exportInventoryWorkbook, parseInventoryWorkbook, type XlsxLine } from "./lib/inventory-xlsx";
@@ -108,6 +108,8 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [search, setSearch] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [saleLine, setSaleLine] = useState<Line | null>(null);
+  const [saleSaving, setSaleSaving] = useState(false);
+  const saleSubmitting = useRef(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sales, setSales] = useState<SaleRow[]>([]);
   const [refundSale, setRefundSale] = useState<SaleRow | null>(null);
@@ -152,7 +154,15 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       NO_SHEET: "El archivo no tiene hojas.", NO_HEADER: "No se encontro la columna \"Código\" en el archivo.",
       MISSING_COLUMNS: "Faltan columnas obligatorias: ", PDF_PARSE: "No pudimos leer el articulo numero ", PDF_QTY_MISMATCH: "El total de prendas no coincide con el PDF en: ", PDF_EMPTY: "No encontramos articulos en el PDF.", INVALID_IMPORT: "El archivo no tiene filas validas o tiene demasiadas filas.",
     } as Record<string, string>,
-    errors2: { SOLD_EXCEEDS_STOCK: "Las cantidades no pueden ser menores a lo ya vendido.", ALREADY_EXISTS: "Ya existe un articulo con ese codigo y color." } as Record<string, string>,
+    errors2: {
+      SOLD_EXCEEDS_STOCK: "Las cantidades no pueden ser menores a lo ya vendido.", ALREADY_EXISTS: "Ya existe un articulo con ese codigo y color.",
+      INVALID_NUMBER: "Revisa los numeros: no pueden estar vacios ni ser negativos (piezas por prenda entre 1 y 20).",
+      INVALID_SIZES: "Las cantidades por talla deben ser numeros enteros mayores o iguales a 0.",
+      INVALID_TEXT: "Codigo, producto y color son obligatorios.", MISSING_FIELD: "Faltan campos obligatorios.",
+      INVALID_QUANTITY: "La cantidad debe ser un numero entero mayor a 0.", INVALID_QUANTITY_EXCEEDS_STOCK: "La cantidad supera las existencias disponibles de esa talla.",
+      INVALID_SIZE: "Talla no valida.", INVALID_PAYMENT_METHOD: "Selecciona un metodo de pago.", INVALID_DISCOUNT: "El descuento no puede superar el total de la venta.",
+      INVALID_DATE: "La fecha de la venta no es valida.", NOT_FOUND: "El registro ya no existe. Actualiza la pagina.", ALREADY_VOIDED: "Esta venta ya fue anulada.",
+    } as Record<string, string>,
   } : {
     title: "Inventory & costs",
     subtitle: "Prices, import costs, stock and sales by garment, color and size.",
@@ -183,7 +193,15 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       NO_SHEET: "The file has no sheets.", NO_HEADER: "The \"Código\" column was not found in the file.",
       MISSING_COLUMNS: "Missing required columns: ", PDF_PARSE: "We could not read item number ", PDF_QTY_MISMATCH: "Item total does not match the PDF for: ", PDF_EMPTY: "No items were found in the PDF.", INVALID_IMPORT: "The file has no valid rows or has too many rows.",
     } as Record<string, string>,
-    errors2: { SOLD_EXCEEDS_STOCK: "Quantities cannot be lower than what was already sold.", ALREADY_EXISTS: "An item with that code and color already exists." } as Record<string, string>,
+    errors2: {
+      SOLD_EXCEEDS_STOCK: "Quantities cannot be lower than what was already sold.", ALREADY_EXISTS: "An item with that code and color already exists.",
+      INVALID_NUMBER: "Check the numbers: they cannot be empty or negative (pieces per garment between 1 and 20).",
+      INVALID_SIZES: "Size quantities must be whole numbers of 0 or more.",
+      INVALID_TEXT: "Code, product and color are required.", MISSING_FIELD: "Required fields are missing.",
+      INVALID_QUANTITY: "Quantity must be a whole number greater than 0.", INVALID_QUANTITY_EXCEEDS_STOCK: "Quantity exceeds the available stock for that size.",
+      INVALID_SIZE: "Invalid size.", INVALID_PAYMENT_METHOD: "Select a payment method.", INVALID_DISCOUNT: "The discount cannot exceed the sale total.",
+      INVALID_DATE: "The sale date is not valid.", NOT_FOUND: "The record no longer exists. Refresh the page.", ALREADY_VOIDED: "This sale was already voided.",
+    } as Record<string, string>,
   }, [es]);
 
   const crc = useMemo(() => new Intl.NumberFormat(es ? "es-CR" : "en-US", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }), [es]);
@@ -377,13 +395,20 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   };
 
   const submitSale = async (values: SaleForm) => {
-    if (!saleLine) return;
-    const ok = await mutate("/api/admin/inventory/sales", "POST", {
-      ...values,
-      lineId: saleLine.id,
-      soldAt: values.soldAt.toISOString(),
-    }, labels.saleSaved);
-    if (ok) setSaleLine(null);
+    if (!saleLine || saleSubmitting.current) return;
+    saleSubmitting.current = true;
+    setSaleSaving(true);
+    try {
+      const ok = await mutate("/api/admin/inventory/sales", "POST", {
+        ...values,
+        lineId: saleLine.id,
+        soldAt: values.soldAt.toISOString(),
+      }, labels.saleSaved);
+      if (ok) setSaleLine(null);
+    } finally {
+      saleSubmitting.current = false;
+      setSaleSaving(false);
+    }
   };
 
   const openHistory = async () => {
@@ -480,8 +505,9 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     {
       title: labels.actions,
       fixed: "right",
+      width: 190,
       render: (_, line) => (
-        <Space size={4}>
+        <Space size={4} wrap={false}>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(line)}>{labels.edit}</Button>
           <Button size="small" icon={<ShoppingCartOutlined />} disabled={line.remainingQuantity < 1} onClick={() => openSale(line)}>{labels.sell}</Button>
         </Space>
@@ -499,11 +525,13 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     { title: labels.status, render: (_, row) => <Tag color={row.voidedAt ? "red" : "green"}>{row.voidedAt ? labels.voidedTag : labels.active}</Tag> },
     {
       title: labels.actions,
+      fixed: "right",
+      width: 190,
       render: (_, row) => row.voidedAt ? null : (
-        <Space size={4}>
+        <Space size={4} wrap={false}>
           <Button size="small" disabled={row.refundedQuantity >= row.quantity} onClick={() => { setRefundSale(row); refundForm.setFieldsValue({ quantity: 1, restock: true, note: "" }); }}>{labels.refund}</Button>
-          <Popconfirm title={labels.voidConfirm} okText={labels.void} cancelText={labels.cancel} onConfirm={() => void voidSale(row.id)}>
-          <Button size="small" danger>{labels.void}</Button>
+          <Popconfirm title={labels.voidConfirm} okText={labels.void} cancelText={labels.cancel} okButtonProps={{ danger: true }} placement="topRight" onConfirm={() => voidSale(row.id)}>
+            <Button size="small" danger icon={<StopOutlined />}>{labels.void}</Button>
           </Popconfirm>
         </Space>
       ),
@@ -559,7 +587,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
         </Drawer>
 
         <Modal title={saleLine ? `${labels.saleTitle}: ${saleLine.code} ${saleLine.color}` : labels.saleTitle} open={Boolean(saleLine)}
-          onCancel={() => setSaleLine(null)} okText={labels.save} cancelText={labels.cancel} onOk={() => saleForm.submit()} destroyOnHidden forceRender>
+          onCancel={() => setSaleLine(null)} okText={labels.save} cancelText={labels.cancel} onOk={() => saleForm.submit()} confirmLoading={saleSaving} destroyOnHidden forceRender>
           <Form form={saleForm} layout="vertical" onFinish={(values) => void submitSale(values)}>
             <Form.Item name="size" label={labels.size} rules={[{ required: true, message: labels.required }]}>
               <Select options={SIZES.map((size) => ({ value: size, label: `${size} (${saleLine?.remaining[size] ?? 0})`, disabled: (saleLine?.remaining[size] ?? 0) < 1 }))} />
@@ -645,7 +673,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
 
         <Drawer title={labels.history} open={historyOpen} onClose={() => setHistoryOpen(false)} size="min(96vw, 820px)">
           {sales.length === 0 ? <Typography.Text type="secondary">-</Typography.Text> : null}
-          <Table<SaleRow> rowKey="id" size="small" columns={saleColumns} dataSource={sales} pagination={{ pageSize: 15, showSizeChanger: false }} />
+          <Table<SaleRow> rowKey="id" size="small" columns={saleColumns} dataSource={sales} scroll={{ x: 820 }} pagination={{ pageSize: 15, showSizeChanger: false }} />
         </Drawer>
       </AdminShell>
     </>
