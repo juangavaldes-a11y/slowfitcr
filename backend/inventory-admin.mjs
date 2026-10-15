@@ -4,6 +4,12 @@ import { fetchBccrRate } from "./inventory-fx.mjs";
 import { computeInventoryCosts, SIZE_KEYS, sumSizes } from "./inventory-costing.mjs";
 
 const VARIANT_SIZE = { OS: "One Size" };
+
+// Positive/negative per-size change between two size maps, used to mirror stock edits into the storefront and Loyverse.
+const sizeDeltas = (before, after) => SIZE_KEYS
+  .map((size) => [size, (after?.[size] ?? 0) - (before?.[size] ?? 0)])
+  .filter(([, delta]) => delta !== 0);
+
 const SETTING_FIELDS = [
   "hkShippingUsd", "invoiceAdjustmentUsd", "fxRate", "crShippingUsd", "nationalizationCrc",
   "otherImportCrc", "extraUnitCrc", "cardCommissionRate", "customizationPerPieceUsd",
@@ -222,7 +228,7 @@ export function planWebsiteSales(orders, variantsById, lines) {
   return { sales: [...grouped.values()], unmatched };
 }
 
-export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuthorized, appendAudit, fetchRate = fetchBccrRate }) {
+export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuthorized, appendAudit, fetchRate = fetchBccrRate, pushInventory = async () => undefined }) {
   const guard = (handler) => async (request, ...args) => {
     if (!(await isAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
     try {
@@ -278,7 +284,15 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
 
   const createLine = guard(async (request) => {
     const data = parseLineInput(await readJson(request));
-    const line = await prisma.inventoryLine.create({ data });
+    const changes = [];
+    const line = await prisma.$transaction(async (transaction) => {
+      const created = await transaction.inventoryLine.create({ data });
+      for (const [size, delta] of sizeDeltas(null, created.sizes)) {
+        changes.push(await syncStorefrontStock(transaction, created, size, delta));
+      }
+      return created;
+    });
+    await pushInventory(changes.filter(Boolean));
     await appendAudit("inventory.line.created", { lineId: line.id, code: line.code, color: line.color }, "admin");
     return jsonResponse(await loadView(), 201);
   });
@@ -289,30 +303,45 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
       const sold = soldBySize(await prisma.inventorySale.findMany({ where: { lineId, voidedAt: null } })).get(lineId) ?? {};
       if (SIZE_KEYS.some((key) => data.sizes[key] < (sold[key] ?? 0))) throw new Error("SOLD_EXCEEDS_STOCK");
     }
-    try {
-      await prisma.inventoryLine.update({ where: { id: lineId }, data });
-    } catch (error) {
-      if (error?.code === "P2025") throw new Error("NOT_FOUND");
-      throw error;
-    }
+    const changes = [];
+    await prisma.$transaction(async (transaction) => {
+      const before = data.sizes ? await transaction.inventoryLine.findUnique({ where: { id: lineId } }) : null;
+      const beforeSizes = before ? { ...before.sizes } : null;
+      let updated;
+      try {
+        updated = await transaction.inventoryLine.update({ where: { id: lineId }, data });
+      } catch (error) {
+        if (error?.code === "P2025") throw new Error("NOT_FOUND");
+        throw error;
+      }
+      if (beforeSizes && data.sizes) {
+        for (const [size, delta] of sizeDeltas(beforeSizes, data.sizes)) {
+          changes.push(await syncStorefrontStock(transaction, updated, size, delta));
+        }
+      }
+    });
+    await pushInventory(changes.filter(Boolean));
     await appendAudit("inventory.line.updated", { lineId, fields: Object.keys(data) }, "admin");
     return jsonResponse(await loadView());
   });
 
   const syncStorefrontStock = async (transaction, line, size, delta) => {
-    if (!line.productHandle || !line.color) return;
+    if (!line.productHandle || !line.color || !delta) return null;
     const variant = await transaction.productVariant.findFirst({
       where: { product: { handle: line.productHandle }, color: line.color, size: VARIANT_SIZE[size] ?? size },
     });
-    if (!variant) return;
-    const quantity = Math.max(0, variant.inventoryQuantity + delta);
+    if (!variant) return null;
+    const current = variant.inventoryQuantity;
+    const quantity = Math.max(0, current + delta);
     await transaction.productVariant.update({ where: { id: variant.id }, data: { inventoryQuantity: quantity } });
     const aggregate = await transaction.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { inventoryQuantity: true } });
     await transaction.product.update({ where: { id: variant.productId }, data: { inventoryTotal: aggregate._sum.inventoryQuantity ?? 0 } });
+    return variant.sku ? { sku: variant.sku, delta: quantity - current } : null;
   };
 
   const createSale = guard(async (request) => {
     const input = parseSaleInput(await readJson(request));
+    const changes = [];
     const sale = await prisma.$transaction(async (transaction) => {
       const line = await transaction.inventoryLine.findUnique({ where: { id: input.lineId } });
       if (!line) throw new Error("NOT_FOUND");
@@ -320,21 +349,24 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
       const available = (line.sizes[input.size] ?? 0) - active.reduce((total, row) => total + row.quantity - row.restockedQuantity, 0);
       if (input.quantity > available) throw new Error("INVALID_QUANTITY_EXCEEDS_STOCK");
       const created = await transaction.inventorySale.create({ data: input });
-      await syncStorefrontStock(transaction, line, input.size, -input.quantity);
+      changes.push(await syncStorefrontStock(transaction, line, input.size, -input.quantity));
       return created;
     });
+    await pushInventory(changes.filter(Boolean));
     await appendAudit("inventory.sale.created", { saleId: sale.id, lineId: sale.lineId, size: sale.size, quantity: sale.quantity, paymentMethod: sale.paymentMethod }, "admin");
     return jsonResponse(await loadView(), 201);
   });
 
   const voidSale = guard(async (request, saleId) => {
+    const changes = [];
     await prisma.$transaction(async (transaction) => {
       const sale = await transaction.inventorySale.findUnique({ where: { id: saleId }, include: { line: true } });
       if (!sale) throw new Error("NOT_FOUND");
       if (sale.voidedAt) throw new Error("ALREADY_VOIDED");
       await transaction.inventorySale.update({ where: { id: saleId }, data: { voidedAt: new Date() } });
-      if (sale.source !== "WEBSITE") await syncStorefrontStock(transaction, sale.line, sale.size, sale.quantity - sale.restockedQuantity);
+      if (sale.source !== "WEBSITE") changes.push(await syncStorefrontStock(transaction, sale.line, sale.size, sale.quantity - sale.restockedQuantity));
     });
+    await pushInventory(changes.filter(Boolean));
     await appendAudit("inventory.sale.voided", { saleId }, "admin");
     return jsonResponse(await loadView());
   });
@@ -343,6 +375,7 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     const body = await readJson(request);
     const quantity = Number(body.quantity);
     const restock = body.restock === true;
+    const changes = [];
     await prisma.$transaction(async (transaction) => {
       const sale = await transaction.inventorySale.findUnique({ where: { id: saleId }, include: { line: true } });
       if (!sale) throw new Error("NOT_FOUND");
@@ -358,8 +391,9 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
           note: [sale.note, String(body.note || "").slice(0, 200)].filter(Boolean).join(" | "),
         },
       });
-      if (restock) await syncStorefrontStock(transaction, sale.line, sale.size, quantity);
+      if (restock) changes.push(await syncStorefrontStock(transaction, sale.line, sale.size, quantity));
     });
+    await pushInventory(changes.filter(Boolean));
     await appendAudit("inventory.sale.refunded", { saleId, quantity, restock }, "admin");
     return jsonResponse(await loadView());
   });
@@ -387,10 +421,25 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     const summary = { created: diff.created.length, updated: diff.updated.length, unchanged: diff.unchanged.length, missing: diff.missing.length, errors: diff.errors };
     if (!apply) return jsonResponse({ applied: false, summary, created: diff.created, updated: diff.updated, missing: diff.missing });
     if (diff.errors.length) return jsonResponse({ applied: false, summary, error: "IMPORT_HAS_ERRORS" }, 422);
+    const existingById = new Map(existing.map((line) => [line.id, { ...line.sizes }]));
+    const changes = [];
     await prisma.$transaction(async (transaction) => {
-      for (const data of diff.created) await transaction.inventoryLine.create({ data });
-      for (const row of diff.updated) await transaction.inventoryLine.update({ where: { id: row.id }, data: row.changes });
+      for (const data of diff.created) {
+        const created = await transaction.inventoryLine.create({ data });
+        for (const [size, delta] of sizeDeltas(null, created.sizes)) {
+          changes.push(await syncStorefrontStock(transaction, created, size, delta));
+        }
+      }
+      for (const row of diff.updated) {
+        const updated = await transaction.inventoryLine.update({ where: { id: row.id }, data: row.changes });
+        if (row.changes.sizes) {
+          for (const [size, delta] of sizeDeltas(existingById.get(row.id), updated.sizes)) {
+            changes.push(await syncStorefrontStock(transaction, updated, size, delta));
+          }
+        }
+      }
     }, { timeout: 30000 });
+    await pushInventory(changes.filter(Boolean));
     await appendAudit("inventory.import.applied", { mode, created: summary.created, updated: summary.updated, unchanged: summary.unchanged }, "admin");
     return jsonResponse({ applied: true, summary, ...(await loadView()) });
   });

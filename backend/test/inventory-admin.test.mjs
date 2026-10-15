@@ -127,7 +127,7 @@ test("planWebsiteSales groups items per order, line and size and counts unmatche
 function makeLedger() {
   const state = {
     line: { id: "L1", productHandle: "jacket", color: "Black", sizes: { S: 0, M: 3, L: 0, XL: 0, OS: 0 } },
-    sales: [], variant: { id: "v1", productId: "p1", inventoryQuantity: 5 }, audits: [],
+    sales: [], variant: { id: "v1", productId: "p1", sku: "SKU-M", inventoryQuantity: 5 }, audits: [], pushed: [],
   };
   const model = {
     inventoryLine: { findUnique: async () => state.line, findMany: async () => [state.line] },
@@ -158,6 +158,7 @@ function makeLedger() {
     readJson: async (request) => request.body,
     isAuthorized: async () => true,
     appendAudit: async (action) => { state.audits.push(action); },
+    pushInventory: async (changes) => { state.pushed.push(...changes); },
   });
   return { state, handlers };
 }
@@ -181,6 +182,11 @@ test("sale, refund (with and without restock) and void keep stock and storefront
   assert.equal(state.variant.inventoryQuantity, 5);
   assert.equal((await handlers.voidSale({}, "s1")).status, 400);
   assert.deepEqual(state.audits.filter((action) => action.includes("refunded")).length, 2);
+  assert.deepEqual(state.pushed, [
+    { sku: "SKU-M", delta: -2 },
+    { sku: "SKU-M", delta: 1 },
+    { sku: "SKU-M", delta: 1 },
+  ]);
 });
 
 test("voiding a website sale leaves storefront stock untouched", async () => {
@@ -193,9 +199,11 @@ test("voiding a website sale leaves storefront stock untouched", async () => {
 
 function makeImportLedger() {
   const state = {
-    lines: [{ id: "L1", code: "A", color: "Black", productName: "Top", sizes: { S: 2, M: 1, L: 0, XL: 0, OS: 0 }, piecesPerGarment: 1, unitPriceUsd: "10", salePriceCrc: null, supplierEquivalence: null }],
+    lines: [{ id: "L1", code: "A", color: "Black", productName: "Top", productHandle: "jacket", sizes: { S: 2, M: 1, L: 0, XL: 0, OS: 0 }, piecesPerGarment: 1, unitPriceUsd: "10", salePriceCrc: null, supplierEquivalence: null }],
     sales: [{ id: "s1", lineId: "L1", size: "S", quantity: 2, voidedAt: null, refundedQuantity: 0, restockedQuantity: 0, soldAt: new Date("2026-09-01"), unitPriceCrc: 10000, discountCrc: 0, paymentMethod: "Cash" }],
+    variant: { id: "v1", productId: "p1", sku: "SKU-S", inventoryQuantity: 4 },
     audits: [],
+    pushed: [],
   };
   const model = {
     inventoryLine: {
@@ -209,6 +217,12 @@ function makeImportLedger() {
       },
     },
     inventorySale: { findMany: async ({ where } = {}) => state.sales.filter((sale) => !where?.lineId || sale.lineId === where.lineId) },
+    productVariant: {
+      findFirst: async () => state.variant,
+      update: async ({ data }) => { state.variant.inventoryQuantity = data.inventoryQuantity; },
+      aggregate: async () => ({ _sum: { inventoryQuantity: state.variant.inventoryQuantity } }),
+    },
+    product: { update: async () => undefined },
     inventorySettings: { findUnique: async () => null, upsert: async () => undefined },
     paymentMethod: { findMany: async () => [] },
     order: { findMany: async () => [] },
@@ -219,6 +233,7 @@ function makeImportLedger() {
     readJson: async (request) => request.body,
     isAuthorized: async () => true,
     appendAudit: async (action, details) => { state.audits.push({ action, details }); },
+    pushInventory: async (changes) => { state.pushed.push(...changes); },
   });
   return { state, handlers };
 }
@@ -242,6 +257,11 @@ test("import preview does not write; add mode sums stock and replace mode overwr
   assert.deepEqual(state.lines[0].sizes, { S: 1, M: 0, L: 0, XL: 0, OS: 0 });
   assert.equal((await handlers.getInventory({})).body.lines[0].remaining.S, -1);
   assert.equal(state.audits.at(-1).details.mode, "replace");
+  assert.deepEqual(state.pushed, [
+    { sku: "SKU-S", delta: 5 },
+    { sku: "SKU-S", delta: -6 },
+    { sku: "SKU-S", delta: -1 },
+  ]);
 });
 
 test("import creates new lines and rejects invalid payloads or rows", async () => {
@@ -249,6 +269,7 @@ test("import creates new lines and rejects invalid payloads or rows", async () =
   const created = await handlers.importLines({ body: { lines: [importRow({ code: "N", color: "Red" })], apply: true } });
   assert.equal(created.body.summary.created, 1);
   assert.equal(state.lines.length, 2);
+  assert.deepEqual(state.pushed, []);
   assert.equal((await handlers.importLines({ body: { lines: [] } })).status, 400);
   assert.equal((await handlers.importLines({ body: {} })).status, 400);
   const bad = await handlers.importLines({ body: { lines: [importRow({ code: "" })], apply: true } });

@@ -616,6 +616,7 @@ const inventory = createInventoryHandlers({
   readJson,
   isAuthorized: (request) => isModeratorAuthorized(request),
   appendAudit,
+  pushInventory: pushInventoryToLoyverse,
 });
 
 async function resolveCartItems(lines) {
@@ -1027,6 +1028,19 @@ async function queueWebhook(url, payload) {
   if (!url) return;
   await enqueueOutbox("webhook", url, payload);
   await drainOutbox(1);
+}
+
+// Mirrors storefront stock changes into Loyverse as signed SKU deltas, applied once per event.
+async function pushInventoryToLoyverse(changes) {
+  const items = (Array.isArray(changes) ? changes : [])
+    .filter((change) => change?.sku && Number.isInteger(change?.delta) && change.delta !== 0)
+    .map((change) => ({ sku: change.sku, delta: change.delta }));
+  if (!items.length) return;
+  await queueWebhook(process.env.LOYVERSE_INVENTORY_WEBHOOK_URL, {
+    topic: "inventory.adjust",
+    eventId: randomUUID(),
+    items,
+  });
 }
 
 async function queueTransactionalEmail(payload) {
@@ -2352,6 +2366,10 @@ async function handleCreateCatalogProduct(request) {
       include: CATALOG_ADMIN_PRODUCT_INCLUDE,
     });
     await appendAudit("catalog.product.created", { productId: product.id, handle: product.handle }, "catalog-admin");
+    await pushInventoryToLoyverse(input.variants.map((variant) => ({
+      sku: variant.sku,
+      delta: variant.inventoryQuantity,
+    })));
     return jsonResponse({ product: serializeCatalogProduct(product) }, 201);
   } catch (error) {
     if (error?.code === "P2002") {
@@ -2371,14 +2389,16 @@ async function handleUpdateCatalogProduct(request, productId) {
 
   try {
     const input = normalizeCatalogProduct(await readJson(request));
+    let previousVariants = [];
     const product = await prisma.$transaction(async (transaction) => {
       const existing = await transaction.product.findUnique({
         where: { id: productId },
-        select: { id: true, variants: { select: { id: true } }, images: { select: { id: true } } },
+        select: { id: true, variants: { select: { id: true, sku: true, inventoryQuantity: true } }, images: { select: { id: true } } },
       });
       if (!existing) {
         return null;
       }
+      previousVariants = existing.variants;
       const variantIds = new Set(existing.variants.map((variant) => variant.id));
       const imageIds = new Set(existing.images.map((image) => image.id));
       if (input.variants.some((variant) => variant.id && !variantIds.has(variant.id))
@@ -2420,6 +2440,12 @@ async function handleUpdateCatalogProduct(request, productId) {
       return jsonResponse({ error: "Not found" }, 404);
     }
     await refreshPreorderAvailability(product.id);
+    const previousById = new Map(previousVariants.map((variant) => [variant.id, variant.inventoryQuantity]));
+    await pushInventoryToLoyverse(input.variants.map((variant) => {
+      if (!variant.sku) return null;
+      const previous = variant.id ? previousById.get(variant.id) : 0;
+      return previous === undefined ? null : { sku: variant.sku, delta: variant.inventoryQuantity - previous };
+    }));
     await appendAudit("catalog.product.updated", { productId, handle: product.handle }, "catalog-admin");
     return jsonResponse({ product: serializeCatalogProduct(product) });
   } catch (error) {
