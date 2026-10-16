@@ -4,6 +4,7 @@ import { HomeOutlined, ReloadOutlined, ShoppingOutlined } from "@ant-design/icon
 import { Button, Space, Typography } from "antd";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isModuleEnabled } from "../packages/core/config";
 
 type ErrorRecoveryProps = {
   kind: "error" | "not-found";
@@ -54,9 +55,11 @@ export default function ErrorRecovery({ kind, reset }: ErrorRecoveryProps) {
           <Link href={`/${locale}`}>
             <Button icon={<HomeOutlined />}>{labels.home}</Button>
           </Link>
-          <Link href={`/${locale}/shop`}>
-            <Button icon={<ShoppingOutlined />}>{labels.shop}</Button>
-          </Link>
+          {isModuleEnabled("catalog") ? (
+            <Link href={`/${locale}/shop`}>
+              <Button icon={<ShoppingOutlined />}>{labels.shop}</Button>
+            </Link>
+          ) : null}
         </Space>
       </section>
     </main>

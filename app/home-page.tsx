@@ -11,7 +11,7 @@ import Image from "next/image";
 import ContactForm from "./contact-form";
 import { trackEvent } from "./lib/analytics";
 import type { Copy, Locale } from "./i18n";
-import { isRuntimeFeatureEnabled } from "../packages/core/config";
+import { isModuleEnabled, isRuntimeFeatureEnabled } from "../packages/core/config";
 
 type HomePageProps = {
   copy: Copy;
@@ -99,9 +99,11 @@ export default function HomePage({ copy, locale }: HomePageProps) {
               <Typography.Paragraph className="slowfit-collection-copy">
                 {collection.description}
               </Typography.Paragraph>
-              <Button type="primary" href={shopHref} className="slowfit-block-cta">
-                {collection.ctaLabel}
-              </Button>
+              {isModuleEnabled("catalog") ? (
+                <Button type="primary" href={shopHref} className="slowfit-block-cta">
+                  {collection.ctaLabel}
+                </Button>
+              ) : null}
             </div>
           </div>
         ))}

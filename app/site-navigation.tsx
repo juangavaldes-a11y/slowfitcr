@@ -19,9 +19,10 @@ import LocaleSwitcher from "./locale-switcher";
 type SiteNavigationProps = {
   copy: Copy;
   locale: Locale;
+  modules: { catalog: boolean; customerAccount: boolean; reviews: boolean; admin: boolean };
 };
 
-export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
+export default function SiteNavigation({ copy, locale, modules }: SiteNavigationProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -44,13 +45,13 @@ export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
     { href: `/${locale}/privacy`, label: copy.nav.privacy },
     { href: `/${locale}/terms`, label: copy.nav.terms },
   ];
-  const adminRoutes = [
-    { href: `/${locale}/admin/catalog`, label: copy.nav.catalog },
-    { href: `/${locale}/admin/reviews`, label: copy.nav.reviews },
+  const adminRoutes = modules.admin ? [
+    ...(modules.catalog ? [{ href: `/${locale}/admin/catalog`, label: copy.nav.catalog }] : []),
+    ...(modules.reviews ? [{ href: `/${locale}/admin/reviews`, label: copy.nav.reviews }] : []),
     { href: `/${locale}/admin/ops`, label: copy.nav.operations },
     { href: `/${locale}/admin/inventory`, label: copy.nav.inventory },
     { href: `/${locale}/admin/inventory/analytics`, label: copy.nav.inventoryAnalytics },
-  ];
+  ] : [];
   const sectionHashes = new Set(["#collections", "#why-slow", "#contacto"]);
   const active = {
     home: pathname === homeHref && !sectionHashes.has(hash),
@@ -89,19 +90,21 @@ export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
   };
 
   const accountItems: MenuProps["items"] = [
-    {
-      key: accountHref,
-      icon: customerAuthenticated ? <UserOutlined /> : <LoginOutlined />,
-      label: <Link href={accountHref}>{customerAuthenticated ? copy.nav.myAccount : copy.nav.signIn}</Link>,
-    },
-    ...(customerAuthenticated ? [{
-      key: "customer-sign-out",
-      icon: <LogoutOutlined />,
-      label: copy.nav.signOut,
-      onClick: () => void signOutCustomer(),
-    }] : []),
-    { type: "divider" as const },
-    ...(!adminAuthorized ? [{
+    ...(modules.customerAccount ? [
+      {
+        key: accountHref,
+        icon: customerAuthenticated ? <UserOutlined /> : <LoginOutlined />,
+        label: <Link href={accountHref}>{customerAuthenticated ? copy.nav.myAccount : copy.nav.signIn}</Link>,
+      },
+      ...(customerAuthenticated ? [{
+        key: "customer-sign-out",
+        icon: <LogoutOutlined />,
+        label: copy.nav.signOut,
+        onClick: () => void signOutCustomer(),
+      }] : []),
+    ] : []),
+    ...(modules.customerAccount && modules.admin ? [{ type: "divider" as const }] : []),
+    ...(!modules.admin ? [] : !adminAuthorized ? [{
       key: "staff-access",
       icon: <SafetyCertificateOutlined />,
       label: copy.nav.staffAccess,
@@ -138,8 +141,8 @@ export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
       if (typeof authenticated === "boolean") setCustomerAuthenticated(authenticated);
       else checkCustomerSession();
     };
-    checkAdminSession();
-    checkCustomerSession();
+    if (modules.admin) checkAdminSession();
+    if (modules.customerAccount) checkCustomerSession();
     window.addEventListener("slowfit:admin-auth-changed", checkAdminSession);
     window.addEventListener("slowfit:auth-changed", handleCustomerAuthChanged);
     return () => {
@@ -147,7 +150,7 @@ export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
       window.removeEventListener("slowfit:admin-auth-changed", checkAdminSession);
       window.removeEventListener("slowfit:auth-changed", handleCustomerAuthChanged);
     };
-  }, []);
+  }, [modules.admin, modules.customerAccount]);
 
   const submitAdminLogin = async ({ token }: { token: string }) => {
     setAdminLoginLoading(true);
@@ -157,7 +160,7 @@ export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
       setAdminAuthorized(true);
       setAdminLoginOpen(false);
       window.dispatchEvent(new Event("slowfit:admin-auth-changed"));
-      router.push(`/${locale}/admin/catalog`);
+      router.push(adminRoutes[0]?.href ?? homeHref);
     } catch {
       setAdminLoginError(copy.nav.adminLoginFailed);
     } finally {
@@ -176,19 +179,21 @@ export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
           <div className="slowfit-nav-actions">
             <Space size={12} wrap>
               <Button type="text" href={homeHref} className={navClass(active.home)}>{copy.nav.home}</Button>
-              <Button type="text" href={shopHref} className={navClass(active.shop)}>{copy.nav.shop}</Button>
+              {modules.catalog ? <Button type="text" href={shopHref} className={navClass(active.shop)}>{copy.nav.shop}</Button> : null}
               <Button type="text" href={collectionsHref} className={navClass(active.collections)}>{copy.nav.collections}</Button>
               <Button type="text" href={whySlowHref} className={navClass(active.whySlow)}>{copy.nav.whySlow}</Button>
               <Button type="text" href={contactHref} className={navClass(active.contact)}>{copy.nav.contact}</Button>
               <Dropdown menu={{ items: informationItems, selectedKeys: active.information ? [pathname] : [] }} trigger={["click"]}>
                 <Button type="text" className={navClass(active.information)}>{copy.nav.information} <DownOutlined /></Button>
               </Dropdown>
-              <Dropdown menu={{ items: accountItems, selectedKeys: active.account ? [accountHref] : [] }} trigger={["click"]}>
-                <Button type="text" icon={<UserOutlined />} className={navClass(active.account)}>
-                  {customerAuthenticated ? copy.nav.myAccount : copy.nav.account} <DownOutlined />
-                </Button>
-              </Dropdown>
-              {adminAuthorized ? (
+              {accountItems.length ? (
+                <Dropdown menu={{ items: accountItems, selectedKeys: active.account ? [accountHref] : [] }} trigger={["click"]}>
+                  <Button type="text" icon={<UserOutlined />} className={navClass(active.account)}>
+                    {customerAuthenticated ? copy.nav.myAccount : copy.nav.account} <DownOutlined />
+                  </Button>
+                </Dropdown>
+              ) : null}
+              {adminAuthorized && modules.admin ? (
                 <Dropdown menu={{ items: adminItems, selectedKeys: active.administration ? [pathname] : [] }} trigger={["click"]}>
                   <Button type="text" icon={<SafetyCertificateOutlined />} className={navClass(active.administration)}>
                     {copy.nav.administration} <DownOutlined />
@@ -219,21 +224,29 @@ export default function SiteNavigation({ copy, locale }: SiteNavigationProps) {
       >
         <nav className="slowfit-mobile-menu-links" aria-label={locale === "es" ? "Navegación principal" : "Main navigation"}>
           <Button className={mobileClass(active.home)} type="text" href={homeHref} onClick={closeMobileMenu}>{copy.nav.home}</Button>
-          <Button className={mobileClass(active.shop)} type="text" href={shopHref} onClick={closeMobileMenu}>{copy.nav.shop}</Button>
+          {modules.catalog ? <Button className={mobileClass(active.shop)} type="text" href={shopHref} onClick={closeMobileMenu}>{copy.nav.shop}</Button> : null}
           <Button className={mobileClass(active.collections)} type="text" href={collectionsHref} onClick={closeMobileMenu}>{copy.nav.collections}</Button>
           <Button className={mobileClass(active.whySlow)} type="text" href={whySlowHref} onClick={closeMobileMenu}>{copy.nav.whySlow}</Button>
           <Button className={mobileClass(active.contact)} type="text" href={contactHref} onClick={closeMobileMenu}>{copy.nav.contact}</Button>
-          <Divider plain>{copy.nav.account}</Divider>
+          {modules.customerAccount || modules.admin ? <Divider plain>{copy.nav.account}</Divider> : null}
+          {modules.customerAccount ? (
+            <>
           <Button className={mobileClass(active.account)} type="text" icon={<UserOutlined />} href={accountHref} onClick={closeMobileMenu}>
             {customerAuthenticated ? copy.nav.myAccount : copy.nav.signIn}
           </Button>
           {customerAuthenticated ? <Button type="text" icon={<LogoutOutlined />} onClick={() => { closeMobileMenu(); void signOutCustomer(); }}>{copy.nav.signOut}</Button> : null}
+            </>
+          ) : null}
+          {modules.admin ? (
+            <>
           {!adminAuthorized
             ? <Button type="text" icon={<SafetyCertificateOutlined />} onClick={() => { closeMobileMenu(); setAdminLoginOpen(true); }}>{copy.nav.staffAccess}</Button>
             : <Button type="text" icon={<LogoutOutlined />} onClick={() => { closeMobileMenu(); void signOutAdmin(); }}>{copy.nav.adminSignOut}</Button>}
+            </>
+          ) : null}
           <Divider plain>{copy.nav.information}</Divider>
           {publicRoutes.map((route) => <Button className={mobileClass(route.href === pathname)} key={route.href} type="text" href={route.href} onClick={closeMobileMenu}>{route.label}</Button>)}
-          {adminAuthorized ? (
+          {adminAuthorized && modules.admin ? (
             <>
               <Divider plain>{copy.nav.administration}</Divider>
               {adminRoutes.map((route) => <Button className={mobileClass(route.href === pathname)} key={route.href} type="text" href={route.href} onClick={closeMobileMenu}>{route.label}</Button>)}
