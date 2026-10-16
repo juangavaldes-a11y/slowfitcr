@@ -398,6 +398,48 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     return jsonResponse(await loadView());
   });
 
+  // Corrects a manually recorded sale: the size/quantity/price are overwritten and the storefront stock
+  // is rebalanced (reverse the old sale, apply the new one) and pushed to Loyverse as a net delta.
+  const updateSale = guard(async (request, saleId) => {
+    const input = parseSaleInput(await readJson(request));
+    const changes = [];
+    await prisma.$transaction(async (transaction) => {
+      const sale = await transaction.inventorySale.findUnique({ where: { id: saleId }, include: { line: true } });
+      if (!sale) throw new Error("NOT_FOUND");
+      if (sale.voidedAt) throw new Error("ALREADY_VOIDED");
+      if (sale.source === "WEBSITE") throw new Error("INVALID_SOURCE");
+      if (sale.refundedQuantity > 0 || sale.restockedQuantity > 0) throw new Error("ALREADY_REFUNDED");
+      const line = sale.line;
+      const others = await transaction.inventorySale.findMany({
+        where: { lineId: line.id, size: input.size, voidedAt: null, id: { not: sale.id } },
+      });
+      const committed = others.reduce((total, row) => total + row.quantity - row.restockedQuantity, 0);
+      if (input.quantity > (line.sizes[input.size] ?? 0) - committed) throw new Error("INVALID_QUANTITY_EXCEEDS_STOCK");
+      await transaction.inventorySale.update({
+        where: { id: sale.id },
+        data: {
+          size: input.size,
+          quantity: input.quantity,
+          unitPriceCrc: input.unitPriceCrc,
+          discountCrc: input.discountCrc,
+          soldAt: input.soldAt,
+          paymentMethod: input.paymentMethod,
+          note: input.note,
+        },
+      });
+      if (sale.size === input.size) {
+        const delta = sale.quantity - input.quantity;
+        if (delta) changes.push(await syncStorefrontStock(transaction, line, sale.size, delta));
+      } else {
+        changes.push(await syncStorefrontStock(transaction, line, sale.size, sale.quantity));
+        changes.push(await syncStorefrontStock(transaction, line, input.size, -input.quantity));
+      }
+    });
+    await pushInventory(changes.filter(Boolean));
+    await appendAudit("inventory.sale.updated", { saleId, size: input.size, quantity: input.quantity }, "admin");
+    return jsonResponse(await loadView());
+  });
+
   const listSales = guard(async (request) => {
     const url = new URL(request.url);
     const lineId = url.searchParams.get("lineId") || undefined;
@@ -520,5 +562,5 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     });
   });
 
-  return { getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, voidSale, refundSale, listSales, syncCatalogToLoyverse };
+  return { getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, updateSale, voidSale, refundSale, listSales, syncCatalogToLoyverse };
 }

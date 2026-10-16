@@ -3119,6 +3119,8 @@ export async function route(request) {
   if (inventoryRefundMatch && method === "POST") return inventory.refundSale(request, decodeURIComponent(inventoryRefundMatch[1]));
   const inventorySaleMatch = pathname.match(/^\/api\/admin\/inventory\/sales\/([^/]+)\/void$/);
   if (inventorySaleMatch && method === "POST") return inventory.voidSale(request, decodeURIComponent(inventorySaleMatch[1]));
+  const inventorySaleEditMatch = pathname.match(/^\/api\/admin\/inventory\/sales\/([^/]+)$/);
+  if (inventorySaleEditMatch && method === "PATCH") return inventory.updateSale(request, decodeURIComponent(inventorySaleEditMatch[1]));
 
   const adminDeliveryMatch = pathname.match(/^\/api\/admin\/deliveries\/([^/]+)\/(dispatch|cancel)$/);
   if (adminDeliveryMatch && method === "POST") {

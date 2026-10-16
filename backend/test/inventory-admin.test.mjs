@@ -133,7 +133,13 @@ function makeLedger() {
   const model = {
     inventoryLine: { findUnique: async () => state.line, findMany: async () => [state.line] },
     inventorySale: {
-      findMany: async () => state.sales.filter((row) => !row.voidedAt),
+      findMany: async ({ where } = {}) => state.sales.filter((row) => {
+        if (where?.voidedAt === null && row.voidedAt) return false;
+        if (where?.lineId && row.lineId !== where.lineId) return false;
+        if (where?.size && row.size !== where.size) return false;
+        if (where?.id?.not && row.id === where.id.not) return false;
+        return true;
+      }),
       findUnique: async ({ where }) => { const row = state.sales.find((entry) => entry.id === where.id); return row && { ...row, line: state.line }; },
       create: async ({ data }) => { const row = { id: `s${state.sales.length + 1}`, voidedAt: null, refundedQuantity: 0, restockedQuantity: 0, source: "MANUAL", ...data }; state.sales.push(row); return row; },
       update: async ({ where, data }) => {
@@ -196,6 +202,71 @@ test("voiding a website sale leaves storefront stock untouched", async () => {
   await handlers.voidSale({}, "w1");
   assert.equal(state.variant.inventoryQuantity, 5);
   await handlers.refundSale({ body: { quantity: 1, restock: true } }, "missing").catch(() => undefined);
+});
+
+test("editing a sale updates its fields and pushes only the net stock delta", async () => {
+  const { state, handlers } = makeLedger();
+  await handlers.createSale({ body: { lineId: "L1", size: "M", quantity: 2, unitPriceCrc: 10000, paymentMethod: "Cash" } });
+  assert.equal(state.variant.inventoryQuantity, 3);
+
+  const updated = await handlers.updateSale({
+    body: { lineId: "L1", size: "M", quantity: 1, unitPriceCrc: 9000, discountCrc: 500, paymentMethod: "Card" },
+  }, "s1");
+  assert.equal(updated.status, 200);
+  assert.equal(state.variant.inventoryQuantity, 4);
+  assert.equal(state.sales[0].quantity, 1);
+  assert.equal(state.sales[0].unitPriceCrc, 9000);
+  assert.equal(state.sales[0].paymentMethod, "Card");
+  assert.deepEqual(state.pushed, [
+    { sku: "SKU-M", delta: -2 },
+    { sku: "SKU-M", delta: 1 },
+  ]);
+
+  // Only three M exist on the line, so bumping the sale past that is rejected.
+  assert.equal((await handlers.updateSale({
+    body: { lineId: "L1", size: "M", quantity: 4, unitPriceCrc: 10000, paymentMethod: "Cash" },
+  }, "s1")).status, 400);
+
+  // Re-saving the same size and quantity is a stock no-op (no extra push).
+  const pushedSoFar = state.pushed.length;
+  assert.equal((await handlers.updateSale({
+    body: { lineId: "L1", size: "M", quantity: 1, unitPriceCrc: 9000, paymentMethod: "Card" },
+  }, "s1")).status, 200);
+  assert.equal(state.pushed.length, pushedSoFar);
+});
+
+test("moving a sale to another size releases the old size and consumes the new one", async () => {
+  const { state, handlers } = makeLedger();
+  state.line.sizes = { S: 3, M: 3, L: 0, XL: 0, OS: 0 };
+  await handlers.createSale({ body: { lineId: "L1", size: "M", quantity: 2, unitPriceCrc: 10000, paymentMethod: "Cash" } });
+  state.pushed.length = 0;
+
+  const moved = await handlers.updateSale({
+    body: { lineId: "L1", size: "S", quantity: 2, unitPriceCrc: 10000, paymentMethod: "Cash" },
+  }, "s1");
+  assert.equal(moved.status, 200);
+  assert.equal(state.sales[0].size, "S");
+  assert.deepEqual(state.pushed, [
+    { sku: "SKU-M", delta: 2 },
+    { sku: "SKU-M", delta: -2 },
+  ]);
+});
+
+test("editing rejects website, refunded, voided and missing sales", async () => {
+  const { state, handlers } = makeLedger();
+  state.sales.push(
+    { id: "w1", lineId: "L1", size: "M", quantity: 1, source: "WEBSITE", refundedQuantity: 0, restockedQuantity: 0, voidedAt: null },
+    { id: "r1", lineId: "L1", size: "M", quantity: 1, source: "MANUAL", refundedQuantity: 1, restockedQuantity: 0, voidedAt: null },
+    { id: "k1", lineId: "L1", size: "M", quantity: 1, source: "MANUAL", refundedQuantity: 0, restockedQuantity: 1, voidedAt: null },
+    { id: "v1", lineId: "L1", size: "M", quantity: 1, source: "MANUAL", refundedQuantity: 0, restockedQuantity: 0, voidedAt: new Date() },
+  );
+  const body = { lineId: "L1", size: "M", quantity: 1, unitPriceCrc: 1000, paymentMethod: "Cash" };
+  assert.equal((await handlers.updateSale({ body }, "w1")).status, 400);
+  assert.equal((await handlers.updateSale({ body }, "r1")).status, 400);
+  assert.equal((await handlers.updateSale({ body }, "k1")).status, 400);
+  assert.equal((await handlers.updateSale({ body }, "v1")).status, 400);
+  assert.equal((await handlers.updateSale({ body }, "missing")).status, 404);
+  assert.deepEqual(state.pushed, []);
 });
 
 function makeImportLedger() {
