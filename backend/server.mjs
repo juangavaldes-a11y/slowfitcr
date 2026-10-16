@@ -17,6 +17,7 @@ import {
 } from "./delivery-providers.mjs";
 import { createInventoryHandlers } from "./inventory-admin.mjs";
 import { createLoyverseStockHandler } from "./loyverse-stock.mjs";
+import { createOrderAdminHandlers } from "./order-admin.mjs";
 
 const prisma = new PrismaClient();
 
@@ -618,6 +619,15 @@ const inventory = createInventoryHandlers({
   appendAudit,
   pushInventory: pushInventoryToLoyverse,
   pushCatalog: pushCatalogToLoyverse,
+});
+
+const orderAdmin = createOrderAdminHandlers({
+  prisma,
+  jsonResponse,
+  readJson,
+  isAuthorized: (request) => isModeratorAuthorized(request),
+  appendAudit,
+  pushInventory: pushInventoryToLoyverse,
 });
 
 async function resolveCartItems(lines) {
@@ -3083,6 +3093,15 @@ export async function route(request) {
 
   if (pathname === "/api/admin/deliveries" && method === "GET") {
     return handleAdminDeliveries(request);
+  }
+
+  if (pathname === "/api/admin/orders" && method === "GET") {
+    return orderAdmin.listOrders(request);
+  }
+
+  const adminOrderCancelMatch = pathname.match(/^\/api\/admin\/orders\/([^/]+)\/cancel$/);
+  if (adminOrderCancelMatch && method === "POST") {
+    return orderAdmin.cancelOrder(request, decodeURIComponent(adminOrderCancelMatch[1]));
   }
 
   if (pathname === "/api/admin/inventory" && method === "GET") return inventory.getInventory(request);

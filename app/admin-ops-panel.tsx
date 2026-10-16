@@ -9,6 +9,7 @@ import {
   Empty,
   Grid,
   Input,
+  Modal,
   Pagination,
   Popconfirm,
   Select,
@@ -74,6 +75,30 @@ type OutboxRow = {
   createdAt: string;
 };
 
+type OrderRow = {
+  id: string;
+  orderNumber?: string | null;
+  name?: string | null;
+  email: string;
+  financialStatus?: string | null;
+  fulfillmentStatus?: string | null;
+  total?: string | null;
+  currency?: string | null;
+  preorderStatus?: string | null;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
+  paymentCreatedAt?: string | null;
+  updatedAt: string;
+  delivery?: { id: string; status: string; provider: string } | null;
+};
+
+type OrderQuery = {
+  page: number;
+  pageSize: number;
+  search: string;
+  status: string;
+};
+
 const DEFAULT_AUDIT_QUERY: AuditQuery = {
   page: 1,
   pageSize: 8,
@@ -88,6 +113,19 @@ const DEFAULT_WEBHOOK_QUERY: WebhookQuery = {
   status: "all",
 };
 
+const DEFAULT_ORDER_QUERY: OrderQuery = {
+  page: 1,
+  pageSize: 10,
+  search: "",
+  status: "all",
+};
+
+const ORDER_STATUS_OPTIONS = [
+  { value: "all", label: "All orders" },
+  { value: "active", label: "Active" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
 const AUDIT_ACTION_OPTIONS = [
   "admin.login",
   "admin.login.failed",
@@ -98,6 +136,7 @@ const AUDIT_ACTION_OPTIONS = [
   "customer.login.failed",
   "customer.registered",
   "event.ingested",
+  "order.cancelled",
   "payment.webhook.failed",
   "payment.webhook.processed",
   "payment.webhook.replayed",
@@ -130,6 +169,13 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
   const [replayingEventId, setReplayingEventId] = useState<string | null>(null);
   const [outbox, setOutbox] = useState<OutboxRow[]>([]);
   const [outboxLoading, setOutboxLoading] = useState(false);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [orderTotal, setOrderTotal] = useState(0);
+  const [orderQuery, setOrderQuery] = useState<OrderQuery>(DEFAULT_ORDER_QUERY);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<OrderRow | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
   const labels = useMemo(
     () =>
@@ -177,6 +223,22 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             payload: "Payload",
             notAvailable: "No disponible",
             tableEmpty: "No hay resultados para esta busqueda.",
+            ordersTitle: "Ordenes",
+            ordersSearch: "Buscar por numero, cliente o correo",
+            ordersStatus: "Filtrar por estado",
+            orderNumber: "Orden",
+            customer: "Cliente",
+            total: "Total",
+            orderStatus: "Estado",
+            placed: "Creada",
+            cancelOrder: "Anular",
+            cancelTitle: "Anular orden",
+            cancelConfirm: "Esta accion restaura el inventario reservado y registra la anulacion. El reembolso se gestiona manualmente.",
+            cancelReasonLabel: "Motivo (opcional)",
+            cancelReasonPlaceholder: "Motivo de la anulacion",
+            cancelOk: "Orden anulada",
+            cancelFail: "No se pudo anular la orden",
+            cancelled: "Anulada",
           }
         : {
             title: "Operations",
@@ -221,6 +283,22 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
             payload: "Payload",
             notAvailable: "Not available",
             tableEmpty: "No results for this search.",
+            ordersTitle: "Orders",
+            ordersSearch: "Search by number, customer, or email",
+            ordersStatus: "Filter by status",
+            orderNumber: "Order",
+            customer: "Customer",
+            total: "Total",
+            orderStatus: "Status",
+            placed: "Placed",
+            cancelOrder: "Cancel",
+            cancelTitle: "Cancel order",
+            cancelConfirm: "This restores reserved inventory and records the cancellation. Refunds are handled manually.",
+            cancelReasonLabel: "Reason (optional)",
+            cancelReasonPlaceholder: "Cancellation reason",
+            cancelOk: "Order cancelled",
+            cancelFail: "Could not cancel the order",
+            cancelled: "Cancelled",
           },
     [locale],
   );
@@ -316,6 +394,37 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
     }
   };
 
+  const loadOrders = async (query: OrderQuery) => {
+    setOrderLoading(true);
+    try {
+      const payload = await apiRequest<{ orders: OrderRow[]; total: number }>(
+        buildUrl("/api/admin/orders", {
+          page: query.page,
+          pageSize: query.pageSize,
+          search: query.search,
+          status: query.status,
+        }),
+        { cache: "no-store" },
+      );
+      setAuthorized(true);
+      setOrders(payload.orders);
+      setOrderTotal(payload.total);
+      return true;
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) {
+        setAuthorized(false);
+        setOrders([]);
+        setOrderTotal(0);
+        return false;
+      }
+      api.error(formatApiError(error, locale, { fallback: labels.loadFail }));
+      return false;
+    } finally {
+      setOrderLoading(false);
+      setSessionReady(true);
+    }
+  };
+
   const refreshAll = async () => {
     const auditOk = await loadAuditLogs(auditQuery);
     if (!auditOk) {
@@ -324,6 +433,7 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
 
     await loadWebhookEvents(webhookQuery);
     await loadOutbox();
+    await loadOrders(orderQuery);
   };
 
   const loadInitialData = useEffectEvent(() => refreshAll());
@@ -397,6 +507,32 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
       api.error(formatApiError(error, locale, { fallback: labels.replayFail }));
     } finally {
       setReplayingEventId(null);
+    }
+  };
+
+  const confirmCancelOrder = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await apiRequest<{ ok: true }>(`/api/admin/orders/${encodeURIComponent(cancelTarget.id)}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: cancelReason.trim() || undefined }),
+      });
+      api.success(labels.cancelOk);
+      setCancelTarget(null);
+      setCancelReason("");
+      await loadOrders(orderQuery);
+      await loadAuditLogs(auditQuery);
+    } catch (error) {
+      if (isApiErrorStatus(error, 401)) {
+        setAuthorized(false);
+        api.warning(formatApiError(error, locale));
+        return;
+      }
+      api.error(formatApiError(error, locale, { fallback: labels.cancelFail }));
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -502,6 +638,69 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
           {replayAction(record)}
         </Space>
       ),
+    },
+  ];
+
+  const orderColumns: ColumnsType<OrderRow> = [
+    {
+      title: labels.orderNumber,
+      dataIndex: "orderNumber",
+      key: "orderNumber",
+      width: 120,
+      render: (value: string | null | undefined, record) => value || record.id.slice(0, 8),
+    },
+    {
+      title: labels.customer,
+      key: "customer",
+      width: 220,
+      render: (_value, record) => (
+        <Space orientation="vertical" size={0}>
+          <Typography.Text>{record.name || "-"}</Typography.Text>
+          <Typography.Text type="secondary">{record.email}</Typography.Text>
+        </Space>
+      ),
+    },
+    {
+      title: labels.total,
+      key: "total",
+      width: 130,
+      render: (_value, record) => (record.total ? `${record.total} ${record.currency || ""}`.trim() : "-"),
+    },
+    {
+      title: labels.orderStatus,
+      key: "orderStatus",
+      width: 150,
+      render: (_value, record) =>
+        record.cancelledAt ? (
+          <Tag color="error">{labels.cancelled}</Tag>
+        ) : (
+          <Tag color="success">{record.financialStatus || labels.orderStatus}</Tag>
+        ),
+    },
+    {
+      title: labels.placed,
+      dataIndex: "updatedAt",
+      key: "updatedAt",
+      width: 200,
+      render: (value: string) => formatDate(value),
+    },
+    {
+      title: "",
+      key: "action",
+      width: 130,
+      render: (_value, record) =>
+        record.cancelledAt ? null : (
+          <Button
+            danger
+            size="small"
+            onClick={() => {
+              setCancelReason("");
+              setCancelTarget(record);
+            }}
+          >
+            {labels.cancelOrder}
+          </Button>
+        ),
     },
   ];
 
@@ -646,6 +845,92 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
               <Space className="slowfit-admin-controls" wrap>
                 <Input.Search
                   allowClear
+                  placeholder={labels.ordersSearch}
+                  value={orderQuery.search}
+                  onSearch={(value) => {
+                    const next = { ...orderQuery, search: value.trim(), page: 1 };
+                    setOrderQuery(next);
+                    void loadOrders(next);
+                  }}
+                  onChange={(event) => setOrderQuery((current) => ({ ...current, search: event.target.value }))}
+                  style={{ minWidth: 260 }}
+                />
+                <Select
+                  value={orderQuery.status}
+                  onChange={(value) => {
+                    const next = { ...orderQuery, status: value, page: 1 };
+                    setOrderQuery(next);
+                    void loadOrders(next);
+                  }}
+                  options={ORDER_STATUS_OPTIONS}
+                  style={{ minWidth: 180 }}
+                />
+              </Space>
+              <Typography.Title level={4}>{labels.ordersTitle}</Typography.Title>
+              {screens.md ? (
+                <Table
+                  rowKey="id"
+                  columns={orderColumns}
+                  dataSource={orders}
+                  loading={orderLoading}
+                  locale={{ emptyText: labels.tableEmpty }}
+                  pagination={{
+                    current: orderQuery.page,
+                    pageSize: orderQuery.pageSize,
+                    total: orderTotal,
+                    showSizeChanger: true,
+                    onChange: (page, pageSize) => {
+                      const next = { ...orderQuery, page, pageSize: pageSize || orderQuery.pageSize };
+                      setOrderQuery(next);
+                      void loadOrders(next);
+                    },
+                  }}
+                  scroll={{ x: 1040 }}
+                  className="slowfit-admin-table"
+                />
+              ) : (
+                <Spin spinning={orderLoading}>
+                  <div className="slowfit-webhook-list">
+                    {orders.length === 0 ? <Empty description={labels.tableEmpty} /> : null}
+                    {orders.map((order) => (
+                      <article className="slowfit-webhook-item" key={order.id}>
+                        <Space className="slowfit-webhook-item-heading">
+                          <Typography.Text strong>{order.orderNumber || order.id.slice(0, 8)}</Typography.Text>
+                          {order.cancelledAt ? <Tag color="error">{labels.cancelled}</Tag> : null}
+                        </Space>
+                        <Typography.Text type="secondary">{order.name || order.email}</Typography.Text>
+                        <Typography.Text type="secondary">{formatDate(order.updatedAt)}</Typography.Text>
+                        {order.cancelledAt ? null : (
+                          <Button danger block onClick={() => { setCancelReason(""); setCancelTarget(order); }}>
+                            {labels.cancelOrder}
+                          </Button>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                  {orderTotal > orderQuery.pageSize ? (
+                    <Pagination
+                      className="slowfit-admin-pagination"
+                      align="center"
+                      current={orderQuery.page}
+                      pageSize={orderQuery.pageSize}
+                      total={orderTotal}
+                      size="small"
+                      onChange={(page) => {
+                        const next = { ...orderQuery, page };
+                        setOrderQuery(next);
+                        void loadOrders(next);
+                      }}
+                    />
+                  ) : null}
+                </Spin>
+              )}
+            </section>
+
+            <section className="slowfit-policy-card slowfit-admin-card">
+              <Space className="slowfit-admin-controls" wrap>
+                <Input.Search
+                  allowClear
                   placeholder={labels.auditSearch}
                   value={auditQuery.search}
                   onSearch={(value) => {
@@ -782,6 +1067,42 @@ export default function AdminOpsPanel({ locale }: AdminOpsPanelProps) {
           </Space>
         ) : null}
       </Drawer>
+      <Modal
+        title={labels.cancelTitle}
+        open={cancelTarget !== null}
+        onCancel={() => {
+          if (!cancelling) {
+            setCancelTarget(null);
+            setCancelReason("");
+          }
+        }}
+        onOk={() => void confirmCancelOrder()}
+        okText={labels.cancelOrder}
+        cancelText={labels.cancel}
+        okButtonProps={{ danger: true, loading: cancelling }}
+        cancelButtonProps={{ disabled: cancelling }}
+        destroyOnHidden
+      >
+        <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
+          <Typography.Paragraph>{labels.cancelConfirm}</Typography.Paragraph>
+          {cancelTarget ? (
+            <Typography.Text type="secondary">
+              {cancelTarget.orderNumber || cancelTarget.id.slice(0, 8)} · {cancelTarget.name || cancelTarget.email}
+            </Typography.Text>
+          ) : null}
+          <div>
+            <Typography.Text>{labels.cancelReasonLabel}</Typography.Text>
+            <Input.TextArea
+              value={cancelReason}
+              onChange={(event) => setCancelReason(event.target.value)}
+              placeholder={labels.cancelReasonPlaceholder}
+              maxLength={280}
+              rows={3}
+              disabled={cancelling}
+            />
+          </div>
+        </Space>
+      </Modal>
     </>
   );
 }

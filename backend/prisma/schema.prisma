@@ -193,6 +193,9 @@ model Order {
   totalOrderAmount String?
   paymentCreatedAt DateTime?
   inventoryAdjustedAt DateTime?
+  cancelledAt    DateTime?
+  cancellationReason String?
+  cancelledBy    String?
   updatedAt      DateTime   @updatedAt
   customerId     String?
   customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
