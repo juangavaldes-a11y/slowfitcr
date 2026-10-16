@@ -617,6 +617,7 @@ const inventory = createInventoryHandlers({
   isAuthorized: (request) => isModeratorAuthorized(request),
   appendAudit,
   pushInventory: pushInventoryToLoyverse,
+  pushCatalog: pushCatalogToLoyverse,
 });
 
 async function resolveCartItems(lines) {
@@ -1041,6 +1042,18 @@ async function pushInventoryToLoyverse(changes) {
     eventId: randomUUID(),
     items,
   });
+}
+
+// One-time bootstrap: pushes the whole website catalog to Loyverse as absolute values.
+// Loyverse creates any missing items/variants, replicates prices, and sets stock_after to the website quantity.
+async function pushCatalogToLoyverse(products) {
+  const list = Array.isArray(products) ? products : [];
+  const variants = list.reduce((total, product) => total + (product.variants?.length || 0), 0);
+  const url = process.env.LOYVERSE_CATALOG_WEBHOOK_URL;
+  if (!url) return { queued: false, reason: "missing_url", products: list.length, variants };
+  if (!list.length) return { queued: false, reason: "empty", products: 0, variants: 0 };
+  await queueWebhook(url, { topic: "catalog.sync", products: list });
+  return { queued: true, products: list.length, variants };
 }
 
 async function queueTransactionalEmail(payload) {
@@ -3077,6 +3090,7 @@ export async function route(request) {
   if (pathname === "/api/admin/inventory/exchange-rate" && method === "GET") return inventory.getExchangeRate(request);
   if (pathname === "/api/admin/inventory/analytics" && method === "GET") return inventory.getAnalytics(request);
   if (pathname === "/api/admin/inventory/import" && method === "POST") return inventory.importLines(request);
+  if (pathname === "/api/admin/inventory/sync-catalog" && method === "POST") return inventory.syncCatalogToLoyverse(request);
   if (pathname === "/api/admin/inventory/lines" && method === "POST") return inventory.createLine(request);
   const inventoryLineMatch = pathname.match(/^\/api\/admin\/inventory\/lines\/([^/]+)$/);
   if (inventoryLineMatch && method === "PATCH") return inventory.updateLine(request, decodeURIComponent(inventoryLineMatch[1]));

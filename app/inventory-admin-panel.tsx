@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, StopOutlined, UploadOutlined } from "@ant-design/icons";
+import { CloudUploadOutlined, DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, StopOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Alert, Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Radio, Row, Select,
   Space, Statistic, Switch, Table, Tag, Typography, Upload, message,
@@ -80,6 +80,7 @@ type ImportPreview = {
 type ImportLine = Pick<XlsxLine, "code" | "productName" | "color" | "sizes" | "unitPriceUsd"> & Partial<XlsxLine>;
 const matchKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 type FxRate = { date: string; buyRate: number; sellRate: number; stale: boolean };
+type CatalogSync = { queued: boolean; products: number; variants: number; reason?: string };
 type SaleForm = { size: Size; quantity: number; unitPriceCrc: number; discountCrc: number; soldAt: dayjs.Dayjs; paymentMethod: string; note?: string };
 
 type EditForm = { code: string; productName: string; color: string; unitPriceUsd: number; piecesPerGarment: number; salePriceCrc: number | null } & Record<Size, number>;
@@ -120,6 +121,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [importing, setImporting] = useState(false);
   const [importMode, setImportMode] = useState<"add" | "replace">("replace");
   const [reading, setReading] = useState(false);
+  const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [editLine, setEditLine] = useState<Line | "new" | null>(null);
   const [editForm] = Form.useForm<EditForm>();
 
@@ -150,6 +152,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     importMode: "Modo de importacion", modeAdd: "Sumar al inventario", modeReplace: "Reemplazar inventario",
     modeAddHint: "Las cantidades del archivo se suman a las existencias actuales (ideal para un nuevo pedido).",
     modeReplaceHint: "Las cantidades iniciales se reemplazan por las del archivo; lo ya vendido sigue vendido.",
+    syncLoyverse: "Sincronizar con Loyverse",
+    syncLoyverseConfirm: "Esto envia todo el catalogo activo (precios, colores, tallas y existencias) a Loyverse. Usalo la primera vez, cuando Loyverse esta vacio. Continuar?",
+    syncQueued: "Catalogo enviado a Loyverse", syncEmpty: "No hay productos activos para sincronizar.",
+    syncNoTarget: "Loyverse no esta configurado (falta la URL del webhook).", syncFail: "No pudimos sincronizar con Loyverse.",
     importErrors: {
       NO_SHEET: "El archivo no tiene hojas.", NO_HEADER: "No se encontro la columna \"Código\" en el archivo.",
       MISSING_COLUMNS: "Faltan columnas obligatorias: ", PDF_PARSE: "No pudimos leer el articulo numero ", PDF_QTY_MISMATCH: "El total de prendas no coincide con el PDF en: ", PDF_EMPTY: "No encontramos articulos en el PDF.", INVALID_IMPORT: "El archivo no tiene filas validas o tiene demasiadas filas.",
@@ -189,6 +195,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     importMode: "Import mode", modeAdd: "Add to inventory", modeReplace: "Replace inventory",
     modeAddHint: "File quantities are added to current stock (ideal for a new order).",
     modeReplaceHint: "Initial quantities are replaced with the file's; items already sold stay sold.",
+    syncLoyverse: "Sync with Loyverse",
+    syncLoyverseConfirm: "This sends the entire active catalog (prices, colors, sizes and stock) to Loyverse. Use it the first time, when Loyverse is empty. Continue?",
+    syncQueued: "Catalog sent to Loyverse", syncEmpty: "There are no active products to sync.",
+    syncNoTarget: "Loyverse is not configured (the webhook URL is missing).", syncFail: "We could not sync with Loyverse.",
     importErrors: {
       NO_SHEET: "The file has no sheets.", NO_HEADER: "The \"Código\" column was not found in the file.",
       MISSING_COLUMNS: "Missing required columns: ", PDF_PARSE: "We could not read item number ", PDF_QTY_MISMATCH: "Item total does not match the PDF for: ", PDF_EMPTY: "No items were found in the PDF.", INVALID_IMPORT: "The file has no valid rows or has too many rows.",
@@ -236,6 +246,22 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       setFx(await apiRequest<FxRate>("/api/admin/inventory/exchange-rate", { cache: "no-store" }));
     } catch {
       setFx(null);
+    }
+  };
+
+  const syncCatalogToLoyverse = async () => {
+    setSyncingCatalog(true);
+    try {
+      const result = await apiRequest<CatalogSync>("/api/admin/inventory/sync-catalog", { method: "POST" });
+      if (!result.queued) {
+        api.warning(result.reason === "empty" ? labels.syncEmpty : labels.syncNoTarget);
+        return;
+      }
+      api.success(`${labels.syncQueued}: ${result.products} / ${result.variants}`);
+    } catch (error) {
+      handleError(error, labels.syncFail);
+    } finally {
+      setSyncingCatalog(false);
     }
   };
 
@@ -564,6 +590,9 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           <Upload accept=".xlsx,.pdf" showUploadList={false} beforeUpload={(file) => { void previewImport(file); return false; }}>
             <Button icon={<UploadOutlined />} loading={reading}>{reading ? labels.reading : labels.importXlsx}</Button>
           </Upload>
+          <Popconfirm title={labels.syncLoyverseConfirm} okText={labels.syncLoyverse} cancelText={labels.cancel} onConfirm={() => void syncCatalogToLoyverse()}>
+            <Button icon={<CloudUploadOutlined />} loading={syncingCatalog}>{labels.syncLoyverse}</Button>
+          </Popconfirm>
           <Link href={`/${locale}/admin/inventory/analytics`}><Button icon={<LineChartOutlined />}>{labels.charts}</Button></Link>
           {fx ? (
             <Space size={4}>

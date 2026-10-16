@@ -228,7 +228,7 @@ export function planWebsiteSales(orders, variantsById, lines) {
   return { sales: [...grouped.values()], unmatched };
 }
 
-export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuthorized, appendAudit, fetchRate = fetchBccrRate, pushInventory = async () => undefined }) {
+export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuthorized, appendAudit, fetchRate = fetchBccrRate, pushInventory = async () => undefined, pushCatalog = async () => ({ queued: false }) }) {
   const guard = (handler) => async (request, ...args) => {
     if (!(await isAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
     try {
@@ -410,6 +410,41 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     return jsonResponse({ sales });
   });
 
+  // One-time bootstrap: sends the full active catalog (prices, colors, sizes, stock) to Loyverse.
+  const syncCatalogToLoyverse = guard(async () => {
+    const products = await prisma.product.findMany({
+      where: { status: "ACTIVE" },
+      orderBy: { title: "asc" },
+      select: {
+        handle: true,
+        title: true,
+        variants: {
+          orderBy: { position: "asc" },
+          select: { sku: true, color: true, size: true, price: true, inventoryQuantity: true },
+        },
+      },
+    });
+    const payload = products
+      .map((product) => ({
+        handle: product.handle,
+        name: product.title,
+        variants: product.variants
+          .filter((variant) => variant.sku)
+          .map((variant) => ({
+            sku: variant.sku,
+            color: variant.color,
+            size: variant.size,
+            price: variant.price == null ? null : Number(variant.price),
+            quantity: variant.inventoryQuantity,
+          })),
+      }))
+      .filter((product) => product.variants.length);
+    const variants = payload.reduce((total, product) => total + product.variants.length, 0);
+    const result = await pushCatalog(payload);
+    await appendAudit("inventory.catalog.synced", { products: payload.length, variants, queued: Boolean(result?.queued) }, "admin");
+    return jsonResponse({ ...(result || {}), products: payload.length, variants });
+  });
+
   const importLines = guard(async (request) => {
     const body = await readJson(request);
     const incoming = Array.isArray(body.lines) ? body.lines : null;
@@ -485,5 +520,5 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     });
   });
 
-  return { getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, voidSale, refundSale, listSales };
+  return { getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, voidSale, refundSale, listSales, syncCatalogToLoyverse };
 }

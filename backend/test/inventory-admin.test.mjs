@@ -46,6 +46,7 @@ test("handlers reject unauthorized requests", async () => {
     appendAudit: async () => undefined,
   });
   assert.equal((await handlers.getInventory({})).status, 401);
+  assert.equal((await handlers.syncCatalogToLoyverse({})).status, 401);
 });
 
 test("diffImport classifies created, updated, unchanged, missing and invalid rows", async () => {
@@ -296,4 +297,46 @@ test("analytics returns restock recommendations using query params and listSales
   assert.ok(Array.isArray(analytics.body.restock.nextOrder.lines));
   state.sales[0].line = { code: "A" };
   assert.equal((await handlers.listSales({ url: "http://x/api/admin/inventory/sales?lineId=L1" })).body.sales.length, 1);
+});
+
+test("syncCatalogToLoyverse sends active products with prices, colors, sizes and stock", async () => {
+  const catalog = [];
+  const audits = [];
+  const products = [
+    { handle: "tee", title: "Tee", variants: [
+      { sku: "T-1", color: "Red", size: "S", price: "19.5", inventoryQuantity: 4 },
+      { sku: "T-2", color: "Red", size: "M", price: "19.5", inventoryQuantity: 0 },
+      { sku: null, color: "Red", size: "L", price: "19.5", inventoryQuantity: 2 },
+    ] },
+    { handle: "nosku", title: "No SKU", variants: [{ sku: null, color: "Blue", size: "S", price: "5", inventoryQuantity: 1 }] },
+  ];
+  const handlers = createInventoryHandlers({
+    prisma: { product: { findMany: async (args) => { assert.equal(args.where.status, "ACTIVE"); return products; } } },
+    jsonResponse: (body, status = 200) => ({ body, status }),
+    readJson: async () => ({}),
+    isAuthorized: async () => true,
+    appendAudit: async (action, details) => { audits.push({ action, details }); },
+    pushCatalog: async (payload) => {
+      catalog.push(payload);
+      return { queued: true, products: payload.length, variants: payload.reduce((total, product) => total + product.variants.length, 0) };
+    },
+  });
+  const result = await handlers.syncCatalogToLoyverse({});
+  assert.equal(result.body.queued, true);
+  assert.equal(result.body.products, 1);
+  assert.equal(result.body.variants, 2);
+  assert.deepEqual(catalog[0], [{ handle: "tee", name: "Tee", variants: [
+    { sku: "T-1", color: "Red", size: "S", price: 19.5, quantity: 4 },
+    { sku: "T-2", color: "Red", size: "M", price: 19.5, quantity: 0 },
+  ] }]);
+  assert.deepEqual(audits[0], { action: "inventory.catalog.synced", details: { products: 1, variants: 2, queued: true } });
+
+  const empty = createInventoryHandlers({
+    prisma: { product: { findMany: async () => [] } },
+    jsonResponse: (body, status = 200) => ({ body, status }),
+    readJson: async () => ({}),
+    isAuthorized: async () => true,
+    appendAudit: async () => undefined,
+  });
+  assert.equal((await empty.syncCatalogToLoyverse({})).body.queued, false);
 });
