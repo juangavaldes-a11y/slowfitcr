@@ -2,6 +2,7 @@
 
 import {
   DeleteOutlined,
+  DownloadOutlined,
   EditOutlined,
   PlusOutlined,
   UploadOutlined,
@@ -301,6 +302,40 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     setModalOpen(true);
   };
 
+  const generateCatalog = async () => {
+    try {
+      // Show loading message
+      const loadingKey = "catalog-generation";
+      message.loading({ content: locale === "es" ? "Generando catálogo..." : "Generating catalog...", key: loadingKey, duration: 0 });
+
+      // Call the API endpoint to generate the catalog
+      const response = await fetch("/api/admin/catalog/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // In a real implementation, you would include authentication
+          "Authorization": "Bearer " + (typeof window !== "undefined" ? localStorage.getItem("admin-token") : ""),
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        message.success({ content: locale === "es" ? "Catálogo generado con éxito" : "Catalog generated successfully", key: loadingKey });
+        // Optionally, you could automatically trigger the download
+        // window.open(result.downloadUrl, "_blank");
+      } else {
+        message.error({ content: locale === "es" ? `Error: ${result.message}` : `Error: ${result.message}`, key: loadingKey });
+      }
+    } catch (error) {
+      message.error({
+        content: locale === "es" ? "Error al generar el catálogo" : "Error generating catalog",
+        key: "catalog-generation-error"
+      });
+      console.error("Error generating catalog:", error);
+    }
+  };
+
   const saveProduct = async (values: ProductForm) => {
     setSaving(true);
     try {
@@ -470,6 +505,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
             { value: "ARCHIVED", label: labels.archived },
           ]} />
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{labels.create}</Button>
+          <Button icon={<DownloadOutlined />} onClick={generateCatalog}>{locale === "es" ? "Generar Catálogo" : "Generate Catalog"}</Button>
         </Space>
         <Spin spinning={loading}>
           {products.length ? <Table rowKey="id" columns={columns} dataSource={products} scroll={{ x: 1360 }} onChange={(pagination, _filters, sorter) => {

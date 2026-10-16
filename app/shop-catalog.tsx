@@ -1,6 +1,6 @@
 "use client";
 
-import { HeartFilled, HeartOutlined, SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { DownloadOutlined, HeartFilled, HeartOutlined, SearchOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Alert, Button, Checkbox, Empty, Input, Modal, Segmented, Select, Space, Spin, Tag, Tooltip } from "antd";
 import Image from "next/image";
 import Link from "next/link";
@@ -157,6 +157,14 @@ export default function ShopCatalog({
           ...tags.map((value) => ({ value, label: value })),
         ]} />
         <Checkbox checked={preorderOnly} onChange={(event) => setPreorderOnly(event.target.checked)}>{labels.preorderOnly}</Checkbox>
+        <Button
+          type="primary"
+          icon={<DownloadOutlined />}
+          href="/slowfit/catalog.pdf"
+          target="_blank"
+        >
+          {locale === "es" ? "Descargar Catálogo" : "Download Catalog"}
+        </Button>
       </Space>
       {loadError ? <Alert type="error" showIcon message={labels.error} /> : null}
       <Spin spinning={loading} description={labels.loading} size="large">
