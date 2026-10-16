@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { Typography } from "antd";
 import { notFound } from "next/navigation";
+import PolicyPage from "../../policy-page";
 import { getCopy, isLocale, locales } from "../../i18n";
 
 type PolicyPageProps = {
@@ -41,24 +41,5 @@ export default async function PrivacyPage({ params }: PolicyPageProps) {
 
   const copy = getCopy(locale);
 
-  return (
-    <main className="slowfit-policy-page">
-      <section className="slowfit-shell slowfit-policy-hero">
-        <span className="slowfit-kicker">Slow Fit CR</span>
-        <Typography.Title className="slowfit-display slowfit-section-title">
-          {copy.policies.privacy.title}
-        </Typography.Title>
-        <Typography.Paragraph className="slowfit-policy-lead">{copy.policies.privacy.intro}</Typography.Paragraph>
-      </section>
-      <section className="slowfit-shell slowfit-policy-section">
-        <article className="slowfit-policy-card">
-          <ul>
-            {copy.policies.privacy.items.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </article>
-      </section>
-    </main>
-  );
+  return <PolicyPage title={copy.policies.privacy.title} intro={copy.policies.privacy.intro} items={copy.policies.privacy.items} />;
 }

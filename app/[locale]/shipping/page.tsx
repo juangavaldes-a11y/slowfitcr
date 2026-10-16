@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { Typography } from "antd";
 import { notFound } from "next/navigation";
+import PolicyPage from "../../policy-page";
 import { getCopy, isLocale, locales } from "../../i18n";
 
 type PolicyPageProps = {
@@ -41,24 +41,5 @@ export default async function ShippingPage({ params }: PolicyPageProps) {
 
   const copy = getCopy(locale);
 
-  return (
-    <main className="slowfit-policy-page">
-      <section className="slowfit-shell slowfit-policy-hero">
-        <span className="slowfit-kicker">Slow Fit CR</span>
-        <Typography.Title className="slowfit-display slowfit-section-title">
-          {copy.policies.shipping.title}
-        </Typography.Title>
-        <Typography.Paragraph className="slowfit-policy-lead">{copy.policies.shipping.intro}</Typography.Paragraph>
-      </section>
-      <section className="slowfit-shell slowfit-policy-section">
-        <article className="slowfit-policy-card">
-          <ul>
-            {copy.policies.shipping.items.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        </article>
-      </section>
-    </main>
-  );
+  return <PolicyPage title={copy.policies.shipping.title} intro={copy.policies.shipping.intro} items={copy.policies.shipping.items} />;
 }
