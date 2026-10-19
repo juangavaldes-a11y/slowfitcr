@@ -308,25 +308,22 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       const loadingKey = "catalog-generation";
       message.loading({ content: locale === "es" ? "Generando catálogo..." : "Generating catalog...", key: loadingKey, duration: 0 });
 
-      // Call the API endpoint to generate the catalog
-      const response = await fetch("/api/admin/catalog/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // In a real implementation, you would include authentication
-          "Authorization": "Bearer " + (typeof window !== "undefined" ? localStorage.getItem("admin-token") : ""),
-        },
-      });
+      // The admin session cookie authenticates the request; the response is the PDF itself.
+      const response = await fetch("/api/admin/catalog/generate", { method: "POST" });
 
-      const result = await response.json();
-
-      if (result.success) {
-        message.success({ content: locale === "es" ? "Catálogo generado con éxito" : "Catalog generated successfully", key: loadingKey });
-        // Optionally, you could automatically trigger the download
-        // window.open(result.downloadUrl, "_blank");
-      } else {
-        message.error({ content: locale === "es" ? `Error: ${result.message}` : `Error: ${result.message}`, key: loadingKey });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({ message: "" }));
+        message.error({ content: `Error: ${result.message || response.status}`, key: loadingKey });
+        return;
       }
+
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "Catalogo_Slow.pdf";
+      link.click();
+      URL.revokeObjectURL(url);
+      message.success({ content: locale === "es" ? "Catálogo generado con éxito" : "Catalog generated successfully", key: loadingKey });
     } catch (error) {
       message.error({
         content: locale === "es" ? "Error al generar el catálogo" : "Error generating catalog",
