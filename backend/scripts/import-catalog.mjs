@@ -7,6 +7,8 @@ const prisma = new PrismaClient();
 const defaultManifestUrl = new URL("../data/catalog-products.json", import.meta.url);
 const manifestPath = process.env.CATALOG_IMPORT_PATH || fileURLToPath(defaultManifestUrl);
 const dryRun = process.argv.includes("--dry-run");
+// Keeps image colors across re-imports, since images are recreated on every run.
+const imageColors = JSON.parse(await readFile(new URL("../data/catalog-image-colors.json", import.meta.url), "utf8").catch(() => "{}"));
 
 function validateProduct(product, index) {
   const label = `Product ${index + 1}`;
@@ -52,6 +54,7 @@ async function importProduct(product) {
   const images = product.images.map((image, position) => ({
     url: image.url,
     altText: image.altText,
+    color: imageColors[product.handle]?.[image.url] ?? null,
     position,
   }));
 

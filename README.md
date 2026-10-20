@@ -310,6 +310,7 @@ Production rollout steps:
 - `GET /api/catalog/products/:handle` returns an active internal product.
 - `GET|POST /api/admin/catalog/products` lists or creates products for authenticated admins.
 - `PUT|DELETE /api/admin/catalog/products/:id` updates or deletes an internal product.
+- Product images carry an optional `color` (the inventory color name, or `General`; several colors separated by commas for photos showing more than one). `npm --prefix backend run catalog:apply-image-colors` loads the initial labels from `backend/data/catalog-image-colors.json`. The catalog PDF only includes photos whose color is still in stock, plus untagged or `General` photos.
 - `POST /api/admin/catalog/images/presign` creates a temporary Cloudflare R2 upload URL.
 - `POST /api/cart/checkout` validates internal prices and stock, then creates a bank payment session.
 - `POST /api/events` ingests conversion and UX events server-side.

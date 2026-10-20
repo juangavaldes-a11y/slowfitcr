@@ -1210,16 +1210,17 @@ function normalizeCatalogProduct(payload) {
     const id = String(image.id || "").trim() || undefined;
     const url = String(image.url || "").trim();
     const altText = String(image.altText || "").trim();
+    const color = String(image.color || "").trim() || null;
     let parsedUrl;
     try {
       parsedUrl = new URL(url);
     } catch {
       throw new Error("Invalid product image URL");
     }
-    if (!["http:", "https:"].includes(parsedUrl.protocol) || altText.length > 160) {
+    if (!["http:", "https:"].includes(parsedUrl.protocol) || altText.length > 160 || (color && color.length > 60)) {
       throw new Error("Invalid product image URL");
     }
-    return { id, url, altText, position };
+    return { id, url, altText, color, position };
   });
 
   return { title, handle, description, status, published, preorderEnabled, tags, variants, images };
@@ -2383,6 +2384,7 @@ async function handleCreateCatalogProduct(request) {
         images: { create: input.images.map((image) => ({
           url: image.url,
           altText: image.altText,
+          color: image.color,
           position: image.position,
         })) },
       },

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "catalog:import": "node scripts/import-catalog.mjs",
+    "catalog:apply-image-colors": "node scripts/apply-image-colors.mjs",
     "catalog:upload-images": "node --env-file-if-exists=../.env.docker scripts/upload-catalog-images.mjs",
     "inventory:seed": "node scripts/seed-inventory.mjs",
     "catalog:tag-gender": "node scripts/tag-catalog-gender.mjs",

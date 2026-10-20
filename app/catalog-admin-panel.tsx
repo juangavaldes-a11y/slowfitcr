@@ -8,6 +8,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import {
+  AutoComplete,
   Button,
   Card,
   Col,
@@ -36,7 +37,7 @@ import AdminShell from "./admin-shell";
 import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
 import { getProductColor, productColors } from "./lib/product-colors";
 
-type CatalogImage = { id?: string; url: string; altText: string; position?: number };
+type CatalogImage = { id?: string; url: string; altText: string; color?: string | null; position?: number };
 type CatalogVariant = {
   id?: string;
   title: string;
@@ -126,6 +127,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     images: "Imagenes",
     imageUrl: "URL de imagen",
     imageAlt: "Texto alternativo",
+    imageColor: "Color de la prenda",
+    imageColorHint: "Vacio = siempre visible. Varios: coma",
     upload: "Subir a R2",
     variants: "Variantes",
     variant: "Variante",
@@ -184,6 +187,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     images: "Images",
     imageUrl: "Image URL",
     imageAlt: "Alternative text",
+    imageColor: "Garment color",
+    imageColorHint: "Empty = always shown. Several: comma",
     upload: "Upload to R2",
     variants: "Variants",
     variant: "Variant",
@@ -294,7 +299,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       published: product.published,
       preorderEnabled: product.preorderEnabled,
       tags: product.tags,
-      images: product.images.map(({ id, url, altText }) => ({ id, url, altText })),
+      images: product.images.map(({ id, url, altText, color }) => ({ id, url, altText, color: color ?? "" })),
       variants: product.variants.map(({ id, title, size, color, colorHex, sku, price, compareAtPrice, inventoryQuantity }) => ({
         id, title, size: size || title, color, colorHex, sku, price, compareAtPrice, inventoryQuantity,
       })),
@@ -385,6 +390,9 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       setUploading(false);
     }
   };
+
+  // Free text on purpose: the value must match the inventory color name used by the catalog PDF; these are only suggestions.
+  const imageColorOptions = useMemo(() => [...new Set([...productColors.map((color) => color.value), "General"])].map((value) => ({ value })), []);
 
   const columns: ColumnsType<CatalogProduct> = [
     {
@@ -548,12 +556,13 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
             {(fields, { add, remove }) => <Space orientation="vertical" className="slowfit-form-list">
               {fields.map(({ key, name, ...restField }) => <Card key={key} size="small">
                 <Row gutter={12} align="middle">
-                  <Col xs={24} md={11}><Form.Item {...restField} name={[name, "url"]} label={labels.imageUrl} rules={[{ required: true, type: "url" }]}><Input /></Form.Item></Col>
-                  <Col xs={20} md={11}><Form.Item {...restField} name={[name, "altText"]} label={labels.imageAlt}><Input /></Form.Item></Col>
-                  <Col xs={4} md={2}><Button danger icon={<DeleteOutlined />} aria-label={labels.remove} onClick={() => remove(name)} /></Col>
+                  <Col xs={24} md={9}><Form.Item {...restField} name={[name, "url"]} label={labels.imageUrl} rules={[{ required: true, type: "url" }]}><Input /></Form.Item></Col>
+                  <Col xs={24} md={6}><Form.Item {...restField} name={[name, "altText"]} label={labels.imageAlt}><Input /></Form.Item></Col>
+                  <Col xs={20} md={6}><Form.Item {...restField} name={[name, "color"]} label={labels.imageColor}><AutoComplete allowClear placeholder={labels.imageColorHint} options={imageColorOptions} /></Form.Item></Col>
+                  <Col xs={4} md={3}><Button danger icon={<DeleteOutlined />} aria-label={labels.remove} onClick={() => remove(name)} /></Col>
                 </Row>
               </Card>)}
-              <Button icon={<PlusOutlined />} onClick={() => add({ url: "", altText: "" })}>{labels.addImage}</Button>
+              <Button icon={<PlusOutlined />} onClick={() => add({ url: "", altText: "", color: "" })}>{labels.addImage}</Button>
             </Space>}
           </Form.List>
 
