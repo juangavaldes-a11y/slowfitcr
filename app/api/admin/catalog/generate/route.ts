@@ -2,28 +2,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { backendJson, UpstreamError } from "../../../../lib/admin-backend";
 import { buildCatalogEntries, type CatalogProductImages, type InventoryViewLine } from "../../../../lib/catalog-pdf/data";
 import { renderCatalogPdf } from "../../../../lib/catalog-pdf/render";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const BACKEND_ORIGIN = process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
 const PRODUCT_PAGE_SIZE = 100;
 const MAX_PRODUCT_PAGES = 20;
-
-class UpstreamError extends Error {
-  constructor(public status: number) {
-    super(`UPSTREAM_${status}`);
-  }
-}
-
-// The admin session cookie is forwarded so the backend decides who may read the inventory.
-async function backendJson<T>(request: NextRequest, pathAndQuery: string): Promise<T> {
-  const response = await fetch(new URL(pathAndQuery, BACKEND_ORIGIN), { headers: { cookie: request.headers.get("cookie") ?? "" }, cache: "no-store" });
-  if (!response.ok) throw new UpstreamError(response.status);
-  return (await response.json()) as T;
-}
 
 async function loadProductImages(request: NextRequest) {
   const products: CatalogProductImages[] = [];

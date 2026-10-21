@@ -5,6 +5,7 @@ import {
   DownloadOutlined,
   EditOutlined,
   PlusOutlined,
+  PrinterOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import {
@@ -19,6 +20,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Radio,
   Row,
   Select,
   Space,
@@ -88,6 +90,12 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [editing, setEditing] = useState<CatalogProduct | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [labelsOpen, setLabelsOpen] = useState(false);
+  const [labelFormat, setLabelFormat] = useState<"thermal" | "a4">("thermal");
+  const [labelMode, setLabelMode] = useState<"copies" | "stock">("copies");
+  const [labelCopies, setLabelCopies] = useState(1);
+  const [printingLabels, setPrintingLabels] = useState(false);
 
   const labels = useMemo(() => locale === "es" ? {
     title: "Catalogo e inventario",
@@ -338,6 +346,45 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     }
   };
 
+  const printLabels = async () => {
+    const es = locale === "es";
+    setPrintingLabels(true);
+    try {
+      const response = await fetch("/api/admin/catalog/labels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productIds: selectedIds.length ? selectedIds : undefined,
+          format: labelFormat,
+          perStock: labelMode === "stock",
+          copies: labelCopies,
+        }),
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({ message: "" }));
+        api.error(result.message || (es ? "No se pudieron generar las etiquetas." : "Could not generate labels."));
+        return;
+      }
+      const skipped = Number(response.headers.get("X-Labels-Skipped") || 0);
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "Etiquetas_Slow.pdf";
+      link.click();
+      URL.revokeObjectURL(url);
+      setLabelsOpen(false);
+      if (skipped) {
+        api.warning(es ? `${skipped} variante(s) sin SKU válido no se imprimieron.` : `${skipped} variant(s) without a valid SKU were not printed.`);
+      } else {
+        api.success(es ? "Etiquetas generadas." : "Labels generated.");
+      }
+    } catch (error) {
+      api.error(formatApiError(error, locale, { fallback: es ? "No se pudieron generar las etiquetas." : "Could not generate labels." }));
+    } finally {
+      setPrintingLabels(false);
+    }
+  };
+
   const saveProduct = async (values: ProductForm) => {
     setSaving(true);
     try {
@@ -511,9 +558,15 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
           ]} />
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{labels.create}</Button>
           <Button icon={<DownloadOutlined />} onClick={generateCatalog}>{locale === "es" ? "Generar Catálogo" : "Generate Catalog"}</Button>
+          <Button icon={<PrinterOutlined />} onClick={() => setLabelsOpen(true)}>
+            {locale === "es" ? "Imprimir etiquetas" : "Print labels"}{selectedIds.length ? ` (${selectedIds.length})` : ""}
+          </Button>
         </Space>
         <Spin spinning={loading}>
-          {products.length ? <Table rowKey="id" columns={columns} dataSource={products} scroll={{ x: 1360 }} onChange={(pagination, _filters, sorter) => {
+          {products.length ? <Table rowKey="id" columns={columns} dataSource={products} scroll={{ x: 1360 }} rowSelection={{
+            selectedRowKeys: selectedIds,
+            onChange: (keys) => setSelectedIds(keys.map(String)),
+          }} onChange={(pagination, _filters, sorter) => {
             const activeSorter = Array.isArray(sorter) ? sorter[0] : sorter;
             const nextSortBy = activeSorter?.order ? String(activeSorter.columnKey) : "updatedAt";
             const nextSortOrder = activeSorter?.order === "ascend" ? "asc" : "desc";
@@ -529,6 +582,30 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
           }} /> : <Empty description={labels.empty} />}
         </Spin>
       </Space>
+
+      <Modal open={labelsOpen} title={locale === "es" ? "Imprimir etiquetas de código de barras" : "Print barcode labels"}
+        onCancel={() => setLabelsOpen(false)} onOk={() => void printLabels()} confirmLoading={printingLabels}
+        okText={locale === "es" ? "Generar PDF" : "Generate PDF"} cancelText={labels.cancel}>
+        <Space orientation="vertical" size={16} className="slowfit-full-width">
+          <Typography.Text type="secondary">
+            {selectedIds.length
+              ? (locale === "es" ? `Se imprimirán las variantes de ${selectedIds.length} producto(s) seleccionado(s).` : `Variants of ${selectedIds.length} selected product(s) will be printed.`)
+              : (locale === "es" ? "Sin selección: se imprimen todos los productos. El código es el SKU de cada variante." : "Nothing selected: all products are printed. The code is each variant's SKU.")}
+          </Typography.Text>
+          <Radio.Group value={labelFormat} onChange={(event) => setLabelFormat(event.target.value)}>
+            <Radio.Button value="thermal">{locale === "es" ? "Rollo 50 × 25 mm" : "Roll 50 × 25 mm"}</Radio.Button>
+            <Radio.Button value="a4">{locale === "es" ? "Hoja A4 (3 × 7)" : "A4 sheet (3 × 7)"}</Radio.Button>
+          </Radio.Group>
+          <Radio.Group value={labelMode} onChange={(event) => setLabelMode(event.target.value)}>
+            <Radio.Button value="copies">{locale === "es" ? "Cantidad fija" : "Fixed copies"}</Radio.Button>
+            <Radio.Button value="stock">{locale === "es" ? "Una por unidad en existencia" : "One per unit in stock"}</Radio.Button>
+          </Radio.Group>
+          {labelMode === "copies" ? (
+            <InputNumber min={1} max={500} precision={0} value={labelCopies} onChange={(value) => setLabelCopies(value ?? 1)}
+              addonAfter={locale === "es" ? "por variante" : "per variant"} />
+          ) : null}
+        </Space>
+      </Modal>
 
       <Modal open={modalOpen} width={920} title={editing ? labels.edit : labels.create} footer={null}
         onCancel={() => setModalOpen(false)} forceRender>
