@@ -63,6 +63,7 @@ model Product {
   status      ProductStatus   @default(DRAFT)
   published   Boolean         @default(false)
   preorderEnabled Boolean     @default(false)
+  cabys           String?
   tags        String[]        @default([])
   minPrice    Decimal         @default(0) @db.Decimal(12, 2)
   inventoryTotal Int          @default(0)
@@ -216,9 +217,33 @@ model Order {
   customerId     String?
   customer       Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   delivery       Delivery?
+  invoiceRequest InvoiceRequest?
 
   @@index([email])
   @@index([customerId, updatedAt])
+}
+
+enum InvoiceRequestStatus {
+  REQUESTED
+  ISSUED
+  FAILED
+  CANCELLED
+}
+
+model InvoiceRequest {
+  id               String               @id @default(uuid())
+  orderId          String               @unique
+  status           InvoiceRequestStatus @default(REQUESTED)
+  idType           String
+  idNumber         String
+  name             String
+  email            String
+  economicActivity String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  order            Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
 }
 
 model Delivery {

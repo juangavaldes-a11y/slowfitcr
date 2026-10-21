@@ -839,6 +839,55 @@ function normalizeCustomerContactInput(input) {
   return { email, marketingConsent: input?.marketingConsent === true };
 }
 
+// Hacienda identification types and the digit counts of their numbers.
+const INVOICE_ID_TYPES = { "01": [9], "02": [10], "03": [11, 12], "04": [10] };
+
+function normalizeInvoiceRequestInput(input) {
+  if (!input || input.requested === false || !input.idType) return {};
+  const idType = String(input.idType).trim();
+  const idNumber = String(input.idNumber || "").replace(/\D/g, "");
+  const name = String(input.name || "").trim();
+  const economicActivity = String(input.economicActivity || "").replace(/\D/g, "") || null;
+  if (!INVOICE_ID_TYPES[idType] || !INVOICE_ID_TYPES[idType].includes(idNumber.length) || !name || name.length > 100
+    || (economicActivity && (economicActivity.length < 4 || economicActivity.length > 6))) {
+    throw new Error("INVALID_DELIVERY_INVOICE");
+  }
+  return { invoice: { idType, idNumber, name, economicActivity } };
+}
+
+async function recordInvoiceRequest(externalPaymentId, contact) {
+  if (!contact?.invoice) return;
+  const order = await prisma.order.findUnique({ where: { externalPaymentId }, select: { id: true, email: true } });
+  if (!order) return;
+  const { idType, idNumber, name, economicActivity } = contact.invoice;
+  const email = String(contact.email || order.email);
+  await prisma.invoiceRequest.upsert({
+    where: { orderId: order.id },
+    create: { orderId: order.id, idType, idNumber, name, email, economicActivity },
+    update: {},
+  });
+}
+
+async function handleAdminInvoiceRequests(request) {
+  if (!(await isModeratorAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
+  const url = parseUrl(request);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 20, 100);
+  const status = getTrimmedParam(url, "status");
+  const where = status && status !== "all" ? { status } : {};
+  const [total, invoiceRequests] = await Promise.all([
+    prisma.invoiceRequest.count({ where }),
+    prisma.invoiceRequest.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { order: { select: { orderNumber: true, name: true, total: true, currency: true, externalPaymentId: true } } },
+    }),
+  ]);
+  return jsonResponse({ total, invoiceRequests });
+}
+
 async function recordCustomerContact({ email, name, phone, marketingConsent }) {
   const ordersCount = await prisma.order.count({ where: { email } });
   const now = new Date();
@@ -900,7 +949,7 @@ async function handleDeliveryQuotes(request) {
     if (!providers.length) return jsonResponse({ error: "Delivery providers are not configured" }, 503);
     const [items, pickup] = await Promise.all([resolveCartItems(lines), Promise.resolve(configuredPickup())]);
     const destination = normalizeDeliveryDestination(payload.destination);
-    const customerContact = normalizeCustomerContactInput(payload.destination);
+    const customerContact = { ...normalizeCustomerContactInput(payload.destination), ...normalizeInvoiceRequestInput(payload.destination?.invoice) };
     const manifest = items.map((item) => ({ name: item.name, quantity: item.quantity }));
     const results = await Promise.allSettled(providers.map(({ id }) => quoteProvider(id, {
       pickup,
@@ -1224,6 +1273,7 @@ function normalizeCatalogProduct(payload) {
   const status = String(payload.status || "DRAFT").toUpperCase();
   const published = payload.published === true;
   const preorderEnabled = payload.preorderEnabled === true;
+  const cabys = payload.cabys === undefined ? undefined : String(payload.cabys ?? "").replace(/\s/g, "") || null;
   const tags = Array.from(new Set((Array.isArray(payload.tags) ? payload.tags : [])
     .map((tag) => String(tag).trim().toLowerCase())
     .filter(Boolean)));
@@ -1232,6 +1282,9 @@ function normalizeCatalogProduct(payload) {
 
   if (!title || title.length > 120 || !handle || handle.length > 160 || description.length > 5000) {
     throw new Error("Invalid product details");
+  }
+  if (cabys && !/^\d{13}$/.test(cabys)) {
+    throw new Error("Invalid CABYS code");
   }
   if (!["DRAFT", "ACTIVE", "ARCHIVED"].includes(status) || tags.length > 20 || tags.some((tag) => tag.length > 40)) {
     throw new Error("Invalid product status or tags");
@@ -1281,7 +1334,7 @@ function normalizeCatalogProduct(payload) {
     return { id, url, altText, color, position };
   });
 
-  return { title, handle, description, status, published, preorderEnabled, tags, variants, images };
+  return { title, handle, description, status, published, preorderEnabled, cabys, tags, variants, images };
 }
 
 function paymentInventoryLines(items) {
@@ -1488,6 +1541,9 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
         marketingConsent: delivery?.contact?.marketingConsent,
       }).catch((error) => {
         log("error", "customer.contact.record_failed", { error: String(error?.message || "unknown_error") });
+      });
+      await recordInvoiceRequest(externalPaymentId, delivery?.contact).catch((error) => {
+        log("error", "invoice.request.record_failed", { error: String(error?.message || "unknown_error") });
       });
     }
   }
@@ -2438,6 +2494,7 @@ async function handleCreateCatalogProduct(request) {
         status: input.status,
         published: input.published,
         preorderEnabled: input.preorderEnabled,
+        cabys: input.cabys,
         tags: input.tags,
         minPrice: Math.min(...input.variants.map((variant) => variant.price)),
         inventoryTotal: input.variants.reduce((total, variant) => total + variant.inventoryQuantity, 0),
@@ -2526,6 +2583,7 @@ async function handleUpdateCatalogProduct(request, productId) {
           status: input.status,
           published: input.published,
           preorderEnabled: input.preorderEnabled,
+          cabys: input.cabys,
           tags: input.tags,
           minPrice: Math.min(...input.variants.map((variant) => variant.price)),
           inventoryTotal: input.variants.reduce((total, variant) => total + variant.inventoryQuantity, 0),
@@ -3167,6 +3225,10 @@ export async function route(request) {
 
   if (pathname === "/api/admin/deliveries" && method === "GET") {
     return handleAdminDeliveries(request);
+  }
+
+  if (pathname === "/api/admin/invoice-requests" && method === "GET") {
+    return handleAdminInvoiceRequests(request);
   }
 
   if (pathname === "/api/admin/customers" && method === "GET") {

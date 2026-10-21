@@ -1,11 +1,12 @@
 "use client";
 
 import { DeleteOutlined, MinusOutlined, PlusOutlined, ShoppingOutlined } from "@ant-design/icons";
-import { Alert, Button, Checkbox, Drawer, Form, Input, Modal, Radio, Space, Typography, message } from "antd";
+import { Alert, Button, Checkbox, Drawer, Form, Input, Modal, Radio, Select, Space, Typography, message } from "antd";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { trackEvent } from "../lib/analytics";
 import { apiRequest, formatApiError } from "../lib/api-client";
+import { crProvinces, findCanton, findDistrict, findProvince } from "../lib/cr-locations";
 
 export type CartLine = {
   productId: string;
@@ -192,6 +193,10 @@ export function CartDock() {
   const [unavailableProviders, setUnavailableProviders] = useState<string[]>([]);
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string>();
   const [deliveryForm] = Form.useForm<DeliveryFormValues>();
+  const provinceCode = Form.useWatch("provinceCode", deliveryForm);
+  const cantonCode = Form.useWatch("cantonCode", deliveryForm);
+  const wantsInvoice = Form.useWatch("wantsInvoice", deliveryForm);
+  const invoiceIdType = Form.useWatch("invoiceIdType", deliveryForm);
   const pathname = usePathname();
   const [api, contextHolder] = message.useMessage();
   const { lines, cartId, setCartId, totalItems, subtotal, updateLineQuantity, removeLine, clearCart } = useCart();
@@ -209,9 +214,22 @@ export function CartDock() {
           email: "Correo electronico",
           emailInvalid: "Ingresa un correo valido.",
           consent: "Acepto que Slow Fit guarde mis datos de contacto y me envie novedades.",
+          wantsInvoice: "Quiero factura electronica",
+          invoiceIdType: "Tipo de identificacion",
+          invoiceIdNumber: "Numero de identificacion",
+          invoiceIdNumberHint: "Solo numeros, sin guiones.",
+          invoiceIdInvalid: "El numero no coincide con el tipo de identificacion.",
+          invoiceName: "Nombre o razon social",
+          invoiceActivity: "Actividad economica (opcional)",
+          invoiceActivityInvalid: "Usa el codigo de 4 a 6 digitos.",
+          idPhysical: "Cedula fisica",
+          idLegal: "Cedula juridica",
+          idDimex: "DIMEX",
+          idNite: "NITE",
           province: "Provincia",
           canton: "Canton",
-          address: "Distrito y direccion exacta",
+          district: "Distrito",
+          address: "Direccion exacta (senas)",
           addressExtra: "Apartamento, local o referencia adicional",
           notes: "Instrucciones para el repartidor",
           quote: "Cotizar entrega",
@@ -233,9 +251,22 @@ export function CartDock() {
           email: "Email",
           emailInvalid: "Enter a valid email.",
           consent: "I agree that Slow Fit stores my contact details and sends me updates.",
+          wantsInvoice: "I want an electronic invoice",
+          invoiceIdType: "ID type",
+          invoiceIdNumber: "ID number",
+          invoiceIdNumberHint: "Digits only, no dashes.",
+          invoiceIdInvalid: "The number does not match the ID type.",
+          invoiceName: "Name or company name",
+          invoiceActivity: "Economic activity (optional)",
+          invoiceActivityInvalid: "Use the 4 to 6 digit code.",
+          idPhysical: "Individual ID (cedula fisica)",
+          idLegal: "Company ID (cedula juridica)",
+          idDimex: "DIMEX",
+          idNite: "NITE",
           province: "Province",
           canton: "Canton",
-          address: "District and exact address",
+          district: "District",
+          address: "Exact address",
           addressExtra: "Apartment, suite, or additional reference",
           notes: "Courier instructions",
           quote: "Get delivery quotes",
@@ -260,7 +291,26 @@ export function CartDock() {
           method: "POST",
           body: JSON.stringify({
             lines: lines.map((line) => ({ variantId: line.variantId, quantity: line.quantity })),
-            destination: { ...values, country: "CR" },
+            destination: {
+              name: values.name,
+              phone: values.phone,
+              email: values.email,
+              marketingConsent: values.marketingConsent,
+              invoice: values.wantsInvoice ? {
+                idType: values.invoiceIdType,
+                idNumber: values.invoiceIdNumber,
+                name: values.invoiceName,
+                economicActivity: values.invoiceActivity,
+              } : undefined,
+              state: findProvince(values.provinceCode)?.name,
+              city: findCanton(values.provinceCode, values.cantonCode)?.name,
+              district: findDistrict(values.provinceCode, values.cantonCode, values.districtCode)?.name,
+              postalCode: values.districtCode,
+              streetAddress: values.streetAddress,
+              addressLine2: values.addressLine2,
+              notes: values.notes,
+              country: "CR",
+            },
           }),
         },
       );
@@ -466,12 +516,77 @@ export function CartDock() {
               <Form.Item name="marketingConsent" valuePropName="checked">
                 <Checkbox>{labels.consent}</Checkbox>
               </Form.Item>
+              <Form.Item name="wantsInvoice" valuePropName="checked">
+                <Checkbox>{labels.wantsInvoice}</Checkbox>
+              </Form.Item>
+              {wantsInvoice ? (
+                <>
+                  <div className="slowfit-delivery-location-row">
+                    <Form.Item name="invoiceIdType" label={labels.invoiceIdType} rules={[{ required: true, message: labels.required }]}>
+                      <Select options={[
+                        { value: "01", label: labels.idPhysical },
+                        { value: "02", label: labels.idLegal },
+                        { value: "03", label: labels.idDimex },
+                        { value: "04", label: labels.idNite },
+                      ]} />
+                    </Form.Item>
+                    <Form.Item
+                      name="invoiceIdNumber"
+                      label={labels.invoiceIdNumber}
+                      extra={labels.invoiceIdNumberHint}
+                      rules={[
+                        { required: true, message: labels.required },
+                        {
+                          validator: (_rule, value?: string) => {
+                            const digits = String(value ?? "").replace(/\D/g, "");
+                            const allowed = invoiceIdType ? INVOICE_ID_LENGTHS[invoiceIdType] : undefined;
+                            return !digits || !allowed || allowed.includes(digits.length)
+                              ? Promise.resolve()
+                              : Promise.reject(new Error(labels.invoiceIdInvalid));
+                          },
+                        },
+                      ]}
+                    >
+                      <Input inputMode="numeric" maxLength={14} />
+                    </Form.Item>
+                  </div>
+                  <Form.Item name="invoiceName" label={labels.invoiceName} rules={[{ required: true, message: labels.required }]}>
+                    <Input maxLength={100} />
+                  </Form.Item>
+                  <Form.Item
+                    name="invoiceActivity"
+                    label={labels.invoiceActivity}
+                    rules={[{ pattern: /^\s*\d{4,6}\s*$/, message: labels.invoiceActivityInvalid }]}
+                  >
+                    <Input inputMode="numeric" maxLength={6} />
+                  </Form.Item>
+                </>
+              ) : null}
+              <Form.Item name="provinceCode" label={labels.province} rules={[{ required: true, message: labels.required }]}>
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  options={crProvinces.map((province) => ({ value: province.code, label: province.name }))}
+                  onChange={() => deliveryForm.setFieldsValue({ cantonCode: undefined, districtCode: undefined })}
+                />
+              </Form.Item>
               <div className="slowfit-delivery-location-row">
-                <Form.Item name="state" label={labels.province} rules={[{ required: true, message: labels.required }]}>
-                  <Input autoComplete="address-level1" maxLength={100} />
+                <Form.Item name="cantonCode" label={labels.canton} rules={[{ required: true, message: labels.required }]}>
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    disabled={!provinceCode}
+                    options={(findProvince(provinceCode)?.cantons ?? []).map((canton) => ({ value: canton.code, label: canton.name }))}
+                    onChange={() => deliveryForm.setFieldsValue({ districtCode: undefined })}
+                  />
                 </Form.Item>
-                <Form.Item name="city" label={labels.canton} rules={[{ required: true, message: labels.required }]}>
-                  <Input autoComplete="address-level2" maxLength={100} />
+                <Form.Item name="districtCode" label={labels.district} rules={[{ required: true, message: labels.required }]}>
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    disabled={!cantonCode}
+                    options={(findCanton(provinceCode, cantonCode)?.districts ?? []).map((district) => ({ value: district.code, label: district.name }))}
+                  />
                 </Form.Item>
               </div>
               <Form.Item name="streetAddress" label={labels.address} rules={[{ required: true, message: labels.required }]}>
@@ -507,13 +622,22 @@ export function CartDock() {
   );
 }
 
+// Digit counts per Hacienda identification type; the backend enforces the same table.
+const INVOICE_ID_LENGTHS: Record<string, number[]> = { "01": [9], "02": [10], "03": [11, 12], "04": [10] };
+
 type DeliveryFormValues = {
   name: string;
   phone: string;
   email: string;
   marketingConsent?: boolean;
-  state: string;
-  city: string;
+  wantsInvoice?: boolean;
+  invoiceIdType?: string;
+  invoiceIdNumber?: string;
+  invoiceName?: string;
+  invoiceActivity?: string;
+  provinceCode: string;
+  cantonCode: string;
+  districtCode: string;
   streetAddress: string;
   addressLine2?: string;
   notes?: string;

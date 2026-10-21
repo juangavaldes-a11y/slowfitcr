@@ -60,6 +60,7 @@ type CatalogProduct = {
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   published: boolean;
   preorderEnabled: boolean;
+  cabys?: string | null;
   tags: string[];
   minPrice: number;
   inventoryTotal: number;
@@ -68,6 +69,9 @@ type CatalogProduct = {
   variants: CatalogVariant[];
   updatedAt: string;
 };
+// An empty value is allowed (the product simply cannot be invoiced yet); otherwise it must be exactly 13 digits.
+const CABYS_PATTERN = /^(\d{13})?$/;
+
 type ProductForm = Omit<CatalogProduct, "id" | "updatedAt">;
 
 export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
@@ -129,6 +133,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     details: "Datos del producto",
     name: "Nombre",
     handle: "Identificador URL",
+    cabys: "Codigo CABYS (13 digitos, para factura electronica)",
+    cabysInvalid: "El codigo CABYS tiene 13 digitos.",
     description: "Descripcion",
     tags: "Etiquetas",
     tagsHint: "Escribe una etiqueta y presiona Enter",
@@ -189,6 +195,8 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     details: "Product details",
     name: "Name",
     handle: "URL handle",
+    cabys: "CABYS code (13 digits, for electronic invoices)",
+    cabysInvalid: "The CABYS code has 13 digits.",
     description: "Description",
     tags: "Tags",
     tagsHint: "Type a tag and press Enter",
@@ -290,6 +298,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       status: "DRAFT",
       published: false,
       preorderEnabled: false,
+      cabys: "",
       tags: [],
       images: [],
       variants: [{ title: "Default", size: "One Size", color: null, colorHex: null, sku: "", price: 0, compareAtPrice: null, inventoryQuantity: 0 }],
@@ -306,6 +315,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
       status: product.status,
       published: product.published,
       preorderEnabled: product.preorderEnabled,
+      cabys: product.cabys ?? "",
       tags: product.tags,
       images: product.images.map(({ id, url, altText, color }) => ({ id, url, altText, color: color ?? "" })),
       variants: product.variants.map(({ id, title, size, color, colorHex, sku, price, compareAtPrice, inventoryQuantity }) => ({
@@ -618,6 +628,7 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
             ]} /></Form.Item></Col>
           </Row>
           <Form.Item name="handle" label={labels.handle}><Input /></Form.Item>
+          <Form.Item name="cabys" label={labels.cabys} rules={[{ pattern: CABYS_PATTERN, message: labels.cabysInvalid }]}><Input inputMode="numeric" maxLength={13} /></Form.Item>
           <Form.Item name="description" label={labels.description}><Input.TextArea rows={4} /></Form.Item>
           <Form.Item name="tags" label={labels.tags}><Select mode="tags" tokenSeparators={[","]} placeholder={labels.tagsHint} /></Form.Item>
           <Space wrap size="large">

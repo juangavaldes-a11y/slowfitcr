@@ -44,6 +44,7 @@ export function normalizeDeliveryDestination(payload) {
         String(payload?.addressLine2 || "").trim().slice(0, 120),
       ].filter(Boolean),
       city: requiredString(payload?.city, "city", 100),
+      district: String(payload?.district || "").trim().slice(0, 100),
       state: requiredString(payload?.state, "state", 100),
       postalCode: String(payload?.postalCode || "").trim().slice(0, 20),
       country,
@@ -72,7 +73,7 @@ export function configuredPickup() {
 
 function providerAddress(location) {
   return JSON.stringify({
-    street_address: location.address.streetAddress,
+    street_address: [...location.address.streetAddress, location.address.district].filter(Boolean),
     city: location.address.city,
     state: location.address.state,
     zip_code: location.address.postalCode,

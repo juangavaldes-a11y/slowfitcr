@@ -30,6 +30,7 @@ export type Copy = {
     inventoryAnalytics: string;
     customers: string;
     pos: string;
+    invoices: string;
     adminAccessTitle: string;
     adminAccessCopy: string;
     adminToken: string;
@@ -159,6 +160,7 @@ const copyByLocale: Record<Locale, Copy> = {
       inventoryAnalytics: "Ventas y proyecciones",
       customers: "Clientes",
       pos: "Punto de venta",
+      invoices: "Facturas",
       adminAccessTitle: "Acceso de administración",
       adminAccessCopy: "Ingresa el token de administración para continuar.",
       adminToken: "Token de administración",
@@ -334,6 +336,7 @@ const copyByLocale: Record<Locale, Copy> = {
       inventoryAnalytics: "Sales & projections",
       customers: "Customers",
       pos: "Point of sale",
+      invoices: "Invoices",
       adminAccessTitle: "Administration access",
       adminAccessCopy: "Enter the administration token to continue.",
       adminToken: "Administration token",
