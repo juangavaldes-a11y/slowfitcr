@@ -28,6 +28,7 @@ export type Copy = {
     operations: string;
     inventory: string;
     inventoryAnalytics: string;
+    customers: string;
     adminAccessTitle: string;
     adminAccessCopy: string;
     adminToken: string;
@@ -155,6 +156,7 @@ const copyByLocale: Record<Locale, Copy> = {
       operations: "Operaciones",
       inventory: "Inventario y costos",
       inventoryAnalytics: "Ventas y proyecciones",
+      customers: "Clientes",
       adminAccessTitle: "Acceso de administración",
       adminAccessCopy: "Ingresa el token de administración para continuar.",
       adminToken: "Token de administración",
@@ -328,6 +330,7 @@ const copyByLocale: Record<Locale, Copy> = {
       operations: "Operations",
       inventory: "Inventory & costs",
       inventoryAnalytics: "Sales & projections",
+      customers: "Customers",
       adminAccessTitle: "Administration access",
       adminAccessCopy: "Enter the administration token to continue.",
       adminToken: "Administration token",

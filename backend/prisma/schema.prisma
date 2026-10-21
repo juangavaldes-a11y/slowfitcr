@@ -143,6 +143,21 @@ model Customer {
   cart                CustomerCart?
 }
 
+model CustomerContact {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  phone            String?
+  name             String?
+  marketingConsent Boolean   @default(false)
+  ordersCount      Int       @default(0)
+  firstOrderAt     DateTime  @default(now())
+  lastOrderAt      DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([lastOrderAt])
+}
+
 model CustomerFavorite {
   id         String   @id @default(uuid())
   customerId String

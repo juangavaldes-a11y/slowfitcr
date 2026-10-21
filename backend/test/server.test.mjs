@@ -73,6 +73,7 @@ beforeEach(async () => {
   await prisma.product.deleteMany();
   await prisma.paymentWebhookEvent.deleteMany();
   await prisma.order.deleteMany();
+  await prisma.customerContact.deleteMany();
   await prisma.passwordResetToken.deleteMany();
   await prisma.customer.deleteMany();
   await prisma.auditLog.deleteMany();
@@ -756,6 +757,141 @@ test("payment webhooks expose order status to the matching customer", async () =
   assert.equal(secondDelivery.status, 200);
   assert.equal((await prisma.productVariant.findUnique({ where: { id: variantId } })).inventoryQuantity, 1);
   assert.equal((await prisma.productMetric.findUnique({ where: { productId: product.id } })).unitsSold, 1);
+});
+
+test("paid orders save the buyer contact and admins can search it", async () => {
+  const product = await prisma.product.create({
+    data: {
+      title: "Contact Tee",
+      handle: "contact-tee",
+      status: "ACTIVE",
+      inventoryTotal: 5,
+      minPrice: 30,
+      variants: { create: { title: "M", price: 30, inventoryQuantity: 5 } },
+    },
+    include: { variants: true },
+  });
+  const variantId = product.variants[0].id;
+  await prisma.delivery.create({
+    data: {
+      provider: "uber",
+      status: "PAYMENT_PENDING",
+      paymentReference: "pay-contact-1",
+      externalQuoteId: "quote-1",
+      feeMinor: 1000,
+      currency: "CRC",
+      quoteExpiresAt: new Date(Date.now() + 60_000),
+      pickup: {},
+      dropoff: {},
+      contact: { name: "Ana Mora", phone: "+50688887777", email: "ana@example.com", marketingConsent: true },
+      manifest: [],
+    },
+  });
+  const paidBody = (reference) => JSON.stringify({
+    reference,
+    email: "Ana@Example.com",
+    status: "paid",
+    amount: "30.00",
+    currency: "CRC",
+    items: [{ variantId, name: "Contact Tee", quantity: 1 }],
+  });
+  const send = (body) => route(request("/api/webhooks/payments", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-slowfit-signature": createHmac("sha256", process.env.PAYMENT_WEBHOOK_SECRET).update(body, "utf8").digest("base64"),
+      "x-payment-topic": "payment.paid",
+      "x-payment-provider": "test-bank",
+    },
+    body,
+  }));
+
+  assert.equal((await send(paidBody("pay-contact-1"))).status, 200);
+  let contact = await prisma.customerContact.findUnique({ where: { email: "ana@example.com" } });
+  assert.equal(contact.name, "Ana Mora");
+  assert.equal(contact.phone, "+50688887777");
+  assert.equal(contact.marketingConsent, true);
+  assert.equal(contact.ordersCount, 1);
+
+  // A later order with no stored delivery contact keeps the phone and the consent, and counts the new order.
+  assert.equal((await send(paidBody("pay-contact-2"))).status, 200);
+  contact = await prisma.customerContact.findUnique({ where: { email: "ana@example.com" } });
+  assert.equal(contact.phone, "+50688887777");
+  assert.equal(contact.marketingConsent, true);
+  assert.equal(contact.ordersCount, 2);
+
+  const anonymous = await route(request("/api/admin/customers"));
+  assert.equal(anonymous.status, 401);
+  const cookie = await loginCookie();
+  const listed = await json(await route(request("/api/admin/customers?q=ANA", { headers: { Cookie: cookie } })));
+  assert.equal(listed.total, 1);
+  assert.equal(listed.customers[0].email, "ana@example.com");
+  const none = await json(await route(request("/api/admin/customers?q=nobody", { headers: { Cookie: cookie } })));
+  assert.equal(none.total, 0);
+});
+
+test("delivery quotes keep the buyer email private from couriers and reject malformed emails", async () => {
+  const product = await prisma.product.create({
+    data: {
+      title: "Quote Tee",
+      handle: "quote-tee",
+      status: "ACTIVE",
+      published: true,
+      variants: { create: { title: "M", price: 30, inventoryQuantity: 5 } },
+    },
+    include: { variants: true },
+  });
+  const environment = {
+    DELIVERY_PICKUP_NAME: "Slow Fit",
+    DELIVERY_PICKUP_PHONE: "+50688880000",
+    DELIVERY_PICKUP_ADDRESS: "Barva centro",
+    DELIVERY_PICKUP_CITY: "Barva",
+    DELIVERY_PICKUP_STATE: "Heredia",
+    DIDI_DELIVERY_GATEWAY_URL: "https://didi.example.com/",
+    DIDI_DELIVERY_GATEWAY_TOKEN: "didi-token",
+  };
+  const previous = Object.fromEntries(Object.keys(environment).map((key) => [key, process.env[key]]));
+  Object.assign(process.env, environment);
+  const originalFetch = globalThis.fetch;
+  const gatewayBodies = [];
+  globalThis.fetch = async (_url, init) => {
+    gatewayBodies.push(init.body);
+    return new Response(JSON.stringify({ id: "didi-quote-1", feeMinor: 150000, currency: "CRC", expiresAt: new Date(Date.now() + 600_000).toISOString() }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  const quote = (email) => route(request("/api/delivery/quotes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      lines: [{ variantId: product.variants[0].id, quantity: 1 }],
+      destination: {
+        name: "Ana Mora", phone: "88887777", email, marketingConsent: true,
+        state: "Heredia", city: "Barva", streetAddress: "Casa 1",
+      },
+    }),
+  }));
+
+  try {
+    const invalid = await quote("not-an-email");
+    assert.equal(invalid.status, 400);
+    assert.equal(await prisma.delivery.count(), 0);
+
+    const valid = await quote(" Ana@Example.com ");
+    assert.equal(valid.status, 200);
+    const delivery = await prisma.delivery.findFirst();
+    assert.equal(delivery.contact.email, "ana@example.com");
+    assert.equal(delivery.contact.marketingConsent, true);
+    assert.equal(gatewayBodies.length, 1);
+    assert.equal(gatewayBodies[0].includes("ana@example.com"), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 });
 
 test("paid payment rolls back the order when inventory is no longer available", async () => {

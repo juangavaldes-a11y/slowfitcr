@@ -829,6 +829,63 @@ async function createPaymentSession(lines, locale, deliveryId) {
   }
 }
 
+const CONTACT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// The email and consent stay out of the destination object because that object is forwarded to courier providers.
+function normalizeCustomerContactInput(input) {
+  const email = String(input?.email || "").trim().toLowerCase();
+  if (!email) return {};
+  if (email.length > 254 || !CONTACT_EMAIL_PATTERN.test(email)) throw new Error("INVALID_DELIVERY_EMAIL");
+  return { email, marketingConsent: input?.marketingConsent === true };
+}
+
+async function recordCustomerContact({ email, name, phone, marketingConsent }) {
+  const ordersCount = await prisma.order.count({ where: { email } });
+  const now = new Date();
+  const details = {
+    ...(name ? { name: String(name).slice(0, 100) } : {}),
+    ...(phone ? { phone: String(phone).slice(0, 20) } : {}),
+  };
+  await prisma.customerContact.upsert({
+    where: { email },
+    create: { email, ...details, marketingConsent: marketingConsent === true, ordersCount, firstOrderAt: now, lastOrderAt: now },
+    update: {
+      ...details,
+      ordersCount,
+      lastOrderAt: now,
+      // Consent is only ever raised by an explicit opt-in; a later order without it never revokes it.
+      ...(marketingConsent === true ? { marketingConsent: true } : {}),
+    },
+  });
+}
+
+async function handleAdminCustomers(request) {
+  if (!(await isModeratorAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
+  const url = parseUrl(request);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 20, 500);
+  const query = getTrimmedParam(url, "q");
+  const where = query
+    ? {
+      OR: [
+        { email: { contains: query, mode: "insensitive" } },
+        { name: { contains: query, mode: "insensitive" } },
+        { phone: { contains: query } },
+      ],
+    }
+    : {};
+  const [total, customers] = await Promise.all([
+    prisma.customerContact.count({ where }),
+    prisma.customerContact.findMany({
+      where,
+      orderBy: { lastOrderAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+  return jsonResponse({ total, customers });
+}
+
 async function handleDeliveryProviders() {
   return jsonResponse({ providers: configuredDeliveryProviders() });
 }
@@ -843,6 +900,7 @@ async function handleDeliveryQuotes(request) {
     if (!providers.length) return jsonResponse({ error: "Delivery providers are not configured" }, 503);
     const [items, pickup] = await Promise.all([resolveCartItems(lines), Promise.resolve(configuredPickup())]);
     const destination = normalizeDeliveryDestination(payload.destination);
+    const customerContact = normalizeCustomerContactInput(payload.destination);
     const manifest = items.map((item) => ({ name: item.name, quantity: item.quantity }));
     const results = await Promise.allSettled(providers.map(({ id }) => quoteProvider(id, {
       pickup,
@@ -873,7 +931,7 @@ async function handleDeliveryQuotes(request) {
           quoteExpiresAt: new Date(quote.expiresAt),
           pickup,
           dropoff: { address: destination.address, notes: destination.notes },
-          contact: { name: destination.name, phone: destination.phone },
+          contact: { name: destination.name, phone: destination.phone, ...customerContact },
           manifest,
           dropoffEta: quote.dropoffEta ? new Date(quote.dropoffEta) : null,
           rawQuote: quote.raw,
@@ -1417,6 +1475,20 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
     }, { isolationLevel: "Serializable" });
     if (topic === "payment.failed") {
       await releaseInventoryReservation(externalPaymentId);
+    }
+    if (topic === "payment.paid" && !isPreorderFinalPayment) {
+      const delivery = await prisma.delivery.findFirst({
+        where: { paymentReference: externalPaymentId },
+        select: { contact: true },
+      });
+      await recordCustomerContact({
+        email,
+        name: delivery?.contact?.name || payload.customerName || payload.name,
+        phone: delivery?.contact?.phone,
+        marketingConsent: delivery?.contact?.marketingConsent,
+      }).catch((error) => {
+        log("error", "customer.contact.record_failed", { error: String(error?.message || "unknown_error") });
+      });
     }
   }
 
@@ -3095,6 +3167,10 @@ export async function route(request) {
 
   if (pathname === "/api/admin/deliveries" && method === "GET") {
     return handleAdminDeliveries(request);
+  }
+
+  if (pathname === "/api/admin/customers" && method === "GET") {
+    return handleAdminCustomers(request);
   }
 
   if (pathname === "/api/admin/orders" && method === "GET") {

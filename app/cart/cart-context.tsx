@@ -1,7 +1,7 @@
 "use client";
 
 import { DeleteOutlined, MinusOutlined, PlusOutlined, ShoppingOutlined } from "@ant-design/icons";
-import { Alert, Button, Drawer, Form, Input, Modal, Radio, Space, Typography, message } from "antd";
+import { Alert, Button, Checkbox, Drawer, Form, Input, Modal, Radio, Space, Typography, message } from "antd";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
 import { trackEvent } from "../lib/analytics";
@@ -206,6 +206,9 @@ export function CartDock() {
           deliveryCopy: "Ingresa una direccion precisa para consultar precio y tiempo con cada proveedor.",
           name: "Nombre de quien recibe",
           phone: "Telefono",
+          email: "Correo electronico",
+          emailInvalid: "Ingresa un correo valido.",
+          consent: "Acepto que Slow Fit guarde mis datos de contacto y me envie novedades.",
           province: "Provincia",
           canton: "Canton",
           address: "Distrito y direccion exacta",
@@ -227,6 +230,9 @@ export function CartDock() {
           deliveryCopy: "Enter a precise address to request price and timing from each provider.",
           name: "Recipient name",
           phone: "Phone",
+          email: "Email",
+          emailInvalid: "Enter a valid email.",
+          consent: "I agree that Slow Fit stores my contact details and sends me updates.",
           province: "Province",
           canton: "Canton",
           address: "District and exact address",
@@ -447,6 +453,19 @@ export function CartDock() {
               <Form.Item name="phone" label={labels.phone} rules={[{ required: true, message: labels.required }]}>
                 <Input type="tel" autoComplete="tel" placeholder="+506 8888 8888" maxLength={20} />
               </Form.Item>
+              <Form.Item
+                name="email"
+                label={labels.email}
+                rules={[
+                  { required: true, message: labels.required },
+                  { type: "email", message: labels.emailInvalid },
+                ]}
+              >
+                <Input type="email" autoComplete="email" maxLength={254} />
+              </Form.Item>
+              <Form.Item name="marketingConsent" valuePropName="checked">
+                <Checkbox>{labels.consent}</Checkbox>
+              </Form.Item>
               <div className="slowfit-delivery-location-row">
                 <Form.Item name="state" label={labels.province} rules={[{ required: true, message: labels.required }]}>
                   <Input autoComplete="address-level1" maxLength={100} />
@@ -491,6 +510,8 @@ export function CartDock() {
 type DeliveryFormValues = {
   name: string;
   phone: string;
+  email: string;
+  marketingConsent?: boolean;
   state: string;
   city: string;
   streetAddress: string;
