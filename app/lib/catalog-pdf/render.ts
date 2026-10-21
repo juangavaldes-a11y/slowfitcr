@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
-import type { CatalogEntry, CatalogSize } from "./data";
+import type { CatalogColor, CatalogEntry, CatalogSize } from "./data";
 import { fitCatalogImage, loadCatalogImage } from "./images";
 import { catalogTemplate as T } from "./template";
 
@@ -10,14 +10,12 @@ const PAGE_W = T.page.width;
 const PAGE_H = T.page.height;
 const LEFT = T.page.marginX;
 const RIGHT = PAGE_W - T.page.marginX;
+const CONTENT_W = RIGHT - LEFT;
 const ASSET_DIR = path.join(process.cwd(), "public", "slowfit", "catalog-template");
 
-const SIZE_LABEL: Record<CatalogSize, string> = { S: "S", M: "M", L: "L", XL: "XL", OS: "Única" };
-const SIZE_RING: Record<CatalogSize, string> = { S: "S", M: "M", L: "L", XL: "XL", OS: "U" };
 
 type Fonts = { light: PDFFont; regular: PDFFont; medium: PDFFont; serif: PDFFont; serifItalic: PDFFont; currency: PDFFont };
 type Align = "left" | "center" | "right";
-type PageRecord = { page: PDFPage; number: number; footer: boolean };
 
 const color = (hex: string) => rgb(parseInt(hex.slice(1, 3), 16) / 255, parseInt(hex.slice(3, 5), 16) / 255, parseInt(hex.slice(5, 7), 16) / 255);
 const byName = (name: keyof typeof T.colors) => color(T.colors[name]);
@@ -95,210 +93,199 @@ async function loadAssets(pdf: PDFDocument) {
 
 type Assets = Awaited<ReturnType<typeof loadAssets>>;
 
-function wavePath(points: ReadonlyArray<ReadonlyArray<number>>, mapY: (y: number) => number) {
+function wavePath(points: ReadonlyArray<ReadonlyArray<number>>) {
+  const { scaleX: sx, scaleY: sy } = T.cover;
   const [[startX, startY], ...curves] = points;
-  const curve = (c: ReadonlyArray<number>) => `C${c[0]} ${mapY(c[1])} ${c[2]} ${mapY(c[3])} ${c[4]} ${mapY(c[5])}`;
-  const bottom = mapY(PAGE_H + 0.3);
-  return `M${startX} ${mapY(startY)} ${curves.map(curve).join(" ")} L${PAGE_W} ${bottom} L0 ${bottom} Z`;
+  const curve = (c: ReadonlyArray<number>) => `C${c[0] * sx} ${c[1] * sy} ${c[2] * sx} ${c[3] * sy} ${c[4] * sx} ${c[5] * sy}`;
+  return `M${startX * sx} ${startY * sy} ${curves.map(curve).join(" ")} L${PAGE_W} ${PAGE_H + 1} L0 ${PAGE_H + 1} Z`;
 }
 
-function drawWaves(page: PDFPage, mapY: (y: number) => number) {
-  for (const wave of T.cover.waves) page.drawSvgPath(wavePath(wave.points, mapY), { x: 0, y: PAGE_H, color: byName(wave.color) });
-}
-
-function drawCover(page: PDFPage, { fonts, logoWhite }: Assets) {
-  page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: byName("cover") });
+// The closing page is the cover without its "Catálogo" label.
+function drawCoverPage(page: PDFPage, { fonts, logoWhite }: Assets, label: boolean) {
   const c = T.cover;
-  drawText(page, T.copy.coverLabel, { x: PAGE_W / 2, baseline: c.labelBaseline, font: fonts.light, size: c.labelSize, color: T.colors.coverText, spacing: c.labelSpacing, align: "center" });
+  page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: byName("cover") });
+  if (label) drawText(page, T.copy.coverLabel.toUpperCase(), { x: PAGE_W / 2, baseline: c.labelBaseline, font: fonts.light, size: c.labelSize, color: T.colors.coverText, spacing: c.labelSpacing, align: "center" });
   const logoHeight = (c.logo.width * logoWhite.height) / logoWhite.width;
   page.drawImage(logoWhite, { x: (PAGE_W - c.logo.width) / 2, y: PAGE_H - c.logo.y - logoHeight, width: c.logo.width, height: logoHeight });
   drawText(page, T.copy.tagline, { x: PAGE_W / 2, baseline: c.taglineBaseline, font: fonts.serifItalic, size: c.taglineSize, color: T.colors.coverText, align: "center" });
-  drawWaves(page, (y) => y);
+  for (const wave of c.waves) page.drawSvgPath(wavePath(wave.points), { x: 0, y: PAGE_H, color: byName(wave.color) });
   drawText(page, T.copy.brandUrl, { x: PAGE_W / 2, baseline: c.urlBaseline, font: fonts.light, size: c.urlSize, color: T.colors.white, spacing: c.urlSpacing, align: "center" });
 }
 
-function drawClosing(page: PDFPage, { fonts, logoWhite }: Assets) {
-  const c = T.closing;
-  const top = PAGE_H - c.height;
-  page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: c.height, color: byName("cover") });
-  const logoHeight = (c.logoWidth * logoWhite.height) / logoWhite.width;
-  page.drawImage(logoWhite, { x: (PAGE_W - c.logoWidth) / 2, y: PAGE_H - top - c.logoTop - logoHeight, width: c.logoWidth, height: logoHeight });
-  drawText(page, T.copy.tagline, { x: PAGE_W / 2, baseline: top + c.taglineBaseline, font: fonts.serifItalic, size: T.cover.taglineSize, color: T.colors.coverText, align: "center" });
-  drawWaves(page, (y) => PAGE_H + 0.3 - (PAGE_H + 0.3 - y) * c.waveScale);
-  drawText(page, T.copy.brandUrl, { x: PAGE_W / 2, baseline: top + c.urlBaseline, font: fonts.light, size: T.cover.urlSize, color: T.colors.white, spacing: T.cover.urlSpacing, align: "center" });
-}
-
-function newContentPage(pdf: PDFDocument, pages: PageRecord[], assets: Assets) {
+function newProductPage(pdf: PDFDocument, { logoDark }: Assets) {
   const page = pdf.addPage([PAGE_W, PAGE_H]);
-  pages.push({ page, number: pages.length + 2, footer: true });
   page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: byName("page") });
-  const h = T.header;
-  const logo = assets.logoDark;
-  const logoHeight = (h.logoWidth * logo.height) / logo.width;
-  page.drawImage(logo, { x: h.logoX, y: PAGE_H - h.logoY - logoHeight, width: h.logoWidth, height: logoHeight });
-  drawText(page, T.copy.headerLabel, { x: RIGHT, baseline: h.labelBaseline, font: assets.fonts.light, size: h.labelSize, color: T.colors.muted, spacing: h.labelSpacing, align: "right" });
-  rect(page, LEFT, h.ruleY, RIGHT - LEFT, h.ruleHeight, T.colors.headerRule);
+  const l = T.logo;
+  const height = (l.width * logoDark.height) / logoDark.width;
+  page.drawImage(logoDark, { x: l.right - l.width, y: PAGE_H - l.top - height, width: l.width, height });
   return page;
 }
 
-function drawFooter(record: PageRecord, fonts: Fonts) {
-  const f = T.footer;
-  drawText(record.page, T.copy.brandUrl, { x: LEFT, baseline: f.baseline, font: fonts.light, size: f.size, color: T.colors.muted, spacing: f.spacing });
-  drawText(record.page, String(record.number), { x: RIGHT, baseline: f.baseline, font: fonts.light, size: f.size, color: T.colors.muted, align: "right" });
-}
+// ---- photos ------------------------------------------------------------------------------------------------------
 
-// ---- index -------------------------------------------------------------------------------------------------------
+type Photo = PDFImage | null;
 
-type IndexRow = { entry: CatalogEntry; lines: string[]; height: number };
+const sizesText = (sizes: CatalogSize[]) => (sizes.length === 1 && sizes[0] === "OS" ? T.copy.singleSizeLabel : `${T.copy.sizesLabel}${sizes.join(", ")}`);
 
-function drawIndex(pdf: PDFDocument, pages: PageRecord[], assets: Assets, entries: CatalogEntry[]) {
-  const { fonts } = assets;
-  const ix = T.index;
-  const rows: IndexRow[] = entries.map((entry) => {
-    const lines = wrap(entry.name, fonts.light, ix.nameSize, ix.nameWrapWidth);
-    return { entry, lines, height: ix.rowPadding + lines.length * ix.lineHeight };
-  });
-
-  // Fill column by column, page by page; the last page is rebalanced so its two columns end at about the same height.
-  const pageColumns: IndexRow[][][] = [];
-  let startTop: number = ix.firstRowTop;
-  let columns: IndexRow[][] = [[]];
-  let used = 0;
-  for (const row of rows) {
-    if (used + row.height > ix.bottomLimit - startTop) {
-      if (columns.length < ix.columns.length) {
-        columns.push([]);
-      } else {
-        pageColumns.push(columns);
-        columns = [[]];
-        startTop = ix.continuationRowTop;
-      }
-      used = 0;
-    }
-    columns[columns.length - 1].push(row);
-    used += row.height;
-  }
-  const last = columns.flat();
-  const left = last.slice(0, Math.ceil(last.length / 2));
-  pageColumns.push(left.length === last.length ? [left] : [left, last.slice(left.length)]);
-
-  pageColumns.forEach((cols, pageIndex) => {
-    const page = newContentPage(pdf, pages, assets);
-    const firstTop = pageIndex === 0 ? ix.firstRowTop : ix.continuationRowTop;
-    if (pageIndex === 0) {
-      drawText(page, T.copy.indexTitle, { x: LEFT, baseline: ix.titleBaseline, font: fonts.serif, size: ix.titleSize, color: T.colors.ink });
-      drawText(page, T.copy.indexSubtitle, { x: LEFT, baseline: ix.subtitleBaseline, font: fonts.light, size: ix.subtitleSize, color: T.colors.muted });
-    }
-    cols.forEach((column, columnIndex) => {
-      const { x, width } = ix.columns[columnIndex];
-      let top = firstTop;
-      for (const row of column) {
-        const baseline = top + ix.rowBaseline;
-        drawText(page, row.entry.code, { x, baseline, font: fonts.medium, size: ix.codeSize, color: T.colors.accent, spacing: ix.codeSpacing });
-        row.lines.forEach((line, lineIndex) => drawText(page, line, { x: x + ix.nameX, baseline: baseline + lineIndex * ix.wrapLineHeight, font: fonts.light, size: ix.nameSize, color: T.colors.ink }));
-        if (row.entry.priceCrc !== null) drawPrice(page, fonts, row.entry.priceCrc, { x: x + width, baseline, size: ix.priceSize, align: "right" });
-        top += row.height;
-        rect(page, x, top, width, 0.75, T.colors.rowRule);
-      }
-    });
-  });
-}
-
-// ---- product blocks ----------------------------------------------------------------------------------------------
-
-type LoadedEntry = { entry: CatalogEntry; images: Buffer[] };
-
-async function loadEntryImages(entries: CatalogEntry[]): Promise<LoadedEntry[]> {
-  const wanted = 1 + T.product.gallery.maxThumbs;
-  const result: LoadedEntry[] = [];
-  for (let index = 0; index < entries.length; index += 4) {
-    const batch = entries.slice(index, index + 4);
-    result.push(...(await Promise.all(batch.map(async (entry) => {
-      const loaded = await Promise.all(entry.imageUrls.slice(0, wanted).map(loadCatalogImage));
-      return { entry, images: loaded.filter((image): image is Buffer => image !== null) };
-    }))));
-  }
-  return result;
-}
-
-async function embedFitted(pdf: PDFDocument, bytes: Buffer, width: number, height: number): Promise<PDFImage | null> {
-  const fitted = await fitCatalogImage(bytes, width, height);
+async function embedPhoto(pdf: PDFDocument, url: string | undefined, width: number, height: number): Promise<Photo> {
+  const bytes = url ? await loadCatalogImage(url) : null;
+  const fitted = bytes && (await fitCatalogImage(bytes, width, height));
   return fitted ? pdf.embedJpg(fitted) : null;
 }
 
-async function drawProduct(pdf: PDFDocument, page: PDFPage, assets: Assets, { entry, images }: LoadedEntry, top: number, layout: ReturnType<typeof measureProduct>) {
-  const { fonts } = assets;
-  const p = T.product;
-  const gallery = layout.gallery;
-  const box = gallery ? p.gallery : p.single;
-
-  rect(page, LEFT, top, box.imageWidth, box.imageHeight, T.colors.imageBackdrop);
-  const main = images[0] ? await embedFitted(pdf, images[0], box.imageWidth, box.imageHeight) : null;
-  if (main) page.drawImage(main, { x: LEFT, y: PAGE_H - top - box.imageHeight, width: box.imageWidth, height: box.imageHeight });
-  if (gallery) {
-    for (const [index, bytes] of images.slice(1, 1 + p.gallery.maxThumbs).entries()) {
-      const thumbTop = top + 1.2 + index * (p.gallery.thumbHeight + p.gallery.thumbGap);
-      rect(page, p.gallery.thumbX, thumbTop, p.gallery.thumbWidth, p.gallery.thumbHeight, T.colors.imageBackdrop);
-      const thumb = await embedFitted(pdf, bytes, p.gallery.thumbWidth, p.gallery.thumbHeight);
-      if (thumb) page.drawImage(thumb, { x: p.gallery.thumbX, y: PAGE_H - thumbTop - p.gallery.thumbHeight, width: p.gallery.thumbWidth, height: p.gallery.thumbHeight });
-    }
-  }
-
-  const x = box.infoX;
-  const o = p.offsets;
-  const y0 = top + (layout.height - layout.infoHeight) / 2;
-  const extraTitle = (layout.titleLines.length - 1) * p.titleLineHeight;
-  const setShift = entry.pieces > 1 ? o.setExtra : 0;
-
-  drawText(page, entry.code, { x, baseline: y0 + o.codeBaseline, font: fonts.medium, size: p.codeSize, color: T.colors.accent, spacing: p.codeSpacing });
-  layout.titleLines.forEach((line, index) => drawText(page, line, { x, baseline: y0 + o.titleBaseline + index * p.titleLineHeight, font: fonts.serif, size: p.titleSize, color: T.colors.ink }));
-  if (entry.pieces > 1) drawText(page, `Conjunto de ${entry.pieces} piezas`, { x, baseline: y0 + o.subtitleBaseline + extraTitle, font: fonts.light, size: p.subtitleSize, color: T.colors.muted });
-
-  const priceBaseline = y0 + o.priceBaseline + extraTitle + setShift;
-  if (entry.priceCrc !== null) {
-    const width = drawPrice(page, fonts, entry.priceCrc, { x, baseline: priceBaseline, size: p.priceSize });
-    if (entry.pieces > 1) drawText(page, T.copy.setSuffix, { x: x + width + 3, baseline: priceBaseline, font: fonts.light, size: 7.5, color: T.colors.muted });
-  } else {
-    drawText(page, T.copy.noPrice, { x, baseline: priceBaseline, font: fonts.light, size: p.subtitleSize, color: T.colors.muted });
-  }
-
-  const sizesText = entry.sizes.length === 1 && entry.sizes[0] === "OS" ? T.copy.singleSizeLabel : `${T.copy.sizesLabel}${entry.sizes.map((size) => SIZE_LABEL[size]).join(", ")}`;
-  drawText(page, sizesText, { x, baseline: y0 + o.sizesBaseline + extraTitle + setShift, font: fonts.light, size: p.sizesSize, color: T.colors.body });
-
-  const headRule = y0 + o.headRule + extraTitle + setShift;
-  const columnWidth = (gallery ? p.sizeColumnWidth.gallery : p.sizeColumnWidth.single)[Math.min(entry.sizes.length, 5) - 1];
-  const tableRight = p.infoRight;
-  const labelWidth = tableRight - x - columnWidth * entry.sizes.length;
-  const centerOf = (index: number) => x + labelWidth + columnWidth * index + columnWidth / 2;
-
-  drawText(page, T.copy.colorColumn, { x, baseline: headRule - 7.7, font: fonts.regular, size: p.headSize, color: T.colors.muted });
-  entry.sizes.forEach((size, index) => drawText(page, SIZE_LABEL[size], { x: centerOf(index), baseline: headRule - 7.7, font: fonts.regular, size: p.headSize, color: T.colors.muted, align: "center" }));
-  rect(page, x, headRule, tableRight - x, 0.7, T.colors.headRule);
-
-  entry.colors.forEach((row, rowIndex) => {
-    const ruleAbove = headRule + 0.7 + rowIndex * p.rowHeight;
-    const fitted = fitText(row.name, fonts.light, p.rowSize, labelWidth - 8);
-    drawText(page, fitted.text, { x, baseline: ruleAbove + 15, font: fonts.light, size: fitted.size, color: T.colors.ink });
-    entry.sizes.forEach((size, index) => {
-      const cx = centerOf(index);
-      if (row.sizes.includes(size)) {
-        page.drawCircle({ x: cx, y: PAGE_H - (ruleAbove + 12), size: p.ringDiameter / 2, borderColor: byName("sizeRing"), borderWidth: 0.75 });
-        drawText(page, SIZE_RING[size], { x: cx, baseline: ruleAbove + 13.9, font: fonts.regular, size: p.ringSize, color: T.colors.ink, align: "center" });
-      } else {
-        drawText(page, "–", { x: cx, baseline: ruleAbove + 15, font: fonts.light, size: p.rowSize, color: T.colors.sizeMissing, align: "center" });
-      }
-    });
-    rect(page, x, ruleAbove + p.rowHeight, tableRight - x, 0.75, T.colors.rowRule);
-  });
+function drawPhoto(page: PDFPage, photo: Photo, x: number, top: number, width: number, height: number) {
+  if (photo) page.drawImage(photo, { x, y: PAGE_H - top - height, width, height });
+  else rect(page, x, top, width, height, T.colors.imageBackdrop);
 }
 
-function measureProduct(fonts: Fonts, { entry, images }: LoadedEntry) {
+// ---- labels ------------------------------------------------------------------------------------------------------
+
+function drawDot(page: PDFPage, hex: string, cx: number, cy: number) {
+  page.drawCircle({ x: cx, y: PAGE_H - cy, size: T.product.label.dot / 2, color: color(hex), borderColor: byName("headerRule"), borderWidth: 0.8 });
+}
+
+const ringWidth = (size: CatalogSize) => (size === "OS" ? T.product.ring.pillWidth : T.product.ring.diameter);
+const ringsRowWidth = (sizes: CatalogSize[]) => sizes.reduce((total, size) => total + ringWidth(size), 0) + Math.max(0, sizes.length - 1) * T.product.ring.gap;
+
+function drawRings(page: PDFPage, fonts: Fonts, sizes: CatalogSize[], available: CatalogSize[], o: { left: number; centerY: number }) {
+  const r = T.product.ring;
+  let x = o.left;
+  for (const size of sizes) {
+    const on = available.includes(size);
+    const ink = on ? T.colors.ink : T.colors.sizeMissing;
+    const border = on ? byName("sizeRing") : byName("sizeMissing");
+    const width = ringWidth(size);
+    if (size === "OS") {
+      const h = r.pillHeight;
+      const top = o.centerY - h / 2;
+      page.drawSvgPath(`M${x + h / 2} ${top} H${x + width - h / 2} A${h / 2} ${h / 2} 0 0 1 ${x + width - h / 2} ${top + h} H${x + h / 2} A${h / 2} ${h / 2} 0 0 1 ${x + h / 2} ${top} Z`, { x: 0, y: PAGE_H, borderColor: border, borderWidth: 1 });
+      drawText(page, "Única", { x: x + width / 2, baseline: o.centerY + 4, font: fonts.regular, size: r.pillSize, color: ink, align: "center" });
+    } else {
+      page.drawCircle({ x: x + width / 2, y: PAGE_H - o.centerY, size: width / 2, borderColor: border, borderWidth: 1 });
+      drawText(page, size, { x: x + width / 2, baseline: o.centerY + 4, font: fonts.regular, size: r.size, color: ink, align: "center" });
+    }
+    x += width + r.gap;
+  }
+}
+
+type LabelOptions = { x: number; top: number; width: number; inline: boolean; size?: number };
+
+// Dot + color name, with the size rings on the same line (wide cells) or on the next one (narrow cells).
+function drawColorLabel(page: PDFPage, fonts: Fonts, entry: CatalogEntry, c: CatalogColor, o: LabelOptions) {
+  const l = T.product.label;
+  const size = o.size ?? l.size;
+  const baseline = o.top + size * 0.85;
+  const textX = o.x + l.dot + l.dotGap;
+  const rings = ringsRowWidth(entry.sizes);
+  drawDot(page, c.hex, o.x + l.dot / 2, baseline - size * 0.3);
+  const room = (o.inline ? o.width - rings - 14 : o.width) - l.dot - l.dotGap;
+  const fitted = fitText(c.name, fonts.serif, size, room);
+  drawText(page, fitted.text, { x: textX, baseline, font: fonts.serif, size: fitted.size, color: T.colors.ink });
+  const centerY = o.inline ? baseline - size * 0.3 : baseline + l.ringRow - 6;
+  const left = o.inline ? o.x + o.width - rings : o.x;
+  if (c.sizes.length) drawRings(page, fonts, entry.sizes, c.sizes, { left, centerY });
+  else drawText(page, T.copy.soldOut.toUpperCase(), { x: left, baseline: centerY + 4, font: fonts.regular, size: 11, color: T.colors.sizeRing, spacing: 1.4 });
+}
+
+// ---- product page ------------------------------------------------------------------------------------------------
+
+type HeaderOptions = { x: number; maxWidth: number; titleSizes: readonly number[]; codeBaseline: number };
+
+// Returns the price baseline, which is where the content below starts.
+function drawHeader(page: PDFPage, fonts: Fonts, entry: CatalogEntry, o: HeaderOptions) {
   const p = T.product;
-  const gallery = images.length > 1;
-  const box = gallery ? p.gallery : p.single;
-  const titleLines = wrap(entry.name, fonts.serif, p.titleSize, p.infoRight - box.infoX);
-  const infoHeight = p.offsets.headRule + (titleLines.length - 1) * p.titleLineHeight + (entry.pieces > 1 ? p.offsets.setExtra : 0) + entry.colors.length * p.rowHeight + 0.7;
-  return { gallery, titleLines, infoHeight, height: Math.max(box.imageHeight, infoHeight) };
+  drawText(page, entry.code, { x: o.x, baseline: o.codeBaseline, font: fonts.medium, size: p.codeSize, color: T.colors.accent, spacing: p.codeSpacing });
+  const single = o.titleSizes.find((size) => fonts.serif.widthOfTextAtSize(entry.name, size) <= o.maxWidth);
+  const size = single ?? o.titleSizes[o.titleSizes.length - 1];
+  const lines = single ? [entry.name] : wrap(entry.name, fonts.serif, size, o.maxWidth);
+  const lineHeight = p.titleLineHeight * (size / p.titleSizes[0] + 0.2);
+  let baseline = o.codeBaseline + (p.titleBaseline - p.codeBaseline);
+  lines.forEach((line, index) => drawText(page, line, { x: o.x, baseline: baseline + index * lineHeight, font: fonts.serif, size, color: T.colors.ink }));
+  baseline += (lines.length - 1) * lineHeight;
+  if (entry.pieces > 1) {
+    baseline += 32;
+    drawText(page, T.copy.setLabel(entry.pieces), { x: o.x, baseline, font: fonts.light, size: p.subtitleSize, color: T.colors.muted });
+    baseline += 44;
+  } else {
+    baseline += 62;
+  }
+  if (entry.priceCrc === null) {
+    drawText(page, T.copy.noPrice, { x: o.x, baseline, font: fonts.light, size: 20, color: T.colors.muted });
+  } else {
+    const width = drawPrice(page, fonts, entry.priceCrc, { x: o.x, baseline, size: p.priceSize });
+    if (entry.pieces > 1) drawText(page, T.copy.setSuffix, { x: o.x + width + 8, baseline, font: fonts.light, size: p.priceSuffixSize, color: T.colors.muted });
+  }
+  return baseline;
+}
+
+function footerSizes(entry: CatalogEntry, colors: CatalogColor[]) {
+  const sets = new Set(colors.map((c) => c.sizes.join(",")));
+  if (sets.size !== 1) return T.copy.sizesPerColor;
+  return sizesText(colors[0].sizes.length ? colors[0].sizes : entry.sizes);
+}
+
+function drawFooter(page: PDFPage, fonts: Fonts, o: { left: number; right: number | null; text: string }) {
+  const f = T.footer;
+  drawText(page, T.copy.brandUrl, { x: o.left, baseline: f.baseline, font: fonts.light, size: f.size, color: T.colors.muted, spacing: f.spacing });
+  if (o.right !== null) drawText(page, o.text, { x: o.right, baseline: f.baseline, font: fonts.light, size: f.size, color: T.colors.muted, spacing: f.spacing, align: "right" });
+}
+
+// One page per product. Colors without a photo are left out unless none has one (then every color gets a backdrop tile).
+async function drawProductPage(pdf: PDFDocument, assets: Assets, entry: CatalogEntry) {
+  const { fonts } = assets;
+  const p = T.product;
+  const shown = entry.colors.some((c) => c.photos.length) ? entry.colors.filter((c) => c.photos.length) : entry.colors;
+  const perColor = Math.min(3, Math.max(1, ...shown.map((c) => c.photos.length)));
+  const page = newProductPage(pdf, assets);
+
+  if (shown.length === 1 && perColor === 1) {
+    const h = p.hero;
+    drawPhoto(page, await embedPhoto(pdf, shown[0].photos[0], h.width, h.height), h.x, h.y, h.width, h.height);
+    const baseline = drawHeader(page, fonts, entry, { x: h.infoX, maxWidth: h.infoWidth, titleSizes: [40], codeBaseline: 560 });
+    drawColorLabel(page, fonts, entry, shown[0], { x: h.infoX, top: baseline + 22, width: h.infoWidth, inline: false, size: 28 });
+    drawFooter(page, fonts, { left: h.infoX, right: null, text: "" });
+    return;
+  }
+
+  const priceBaseline = drawHeader(page, fonts, entry, { x: LEFT, maxWidth: p.titleMaxWidth, titleSizes: p.titleSizes, codeBaseline: p.codeBaseline });
+  const top = priceBaseline + 36;
+  const available = p.bodyBottom - top;
+
+  // Few colors with several photos each: photos in rows on the left, one label per row on the right.
+  if (perColor >= 2 && shown.length <= 3) {
+    const photoW = (p.side.photosWidth - (perColor - 1) * p.photoGap) / perColor;
+    const rowH = Math.min((available - (shown.length - 1) * p.side.rowGap) / shown.length, photoW * (perColor === 2 ? p.side.maxRatioPair : p.side.maxRatioTriple));
+    for (const [row, color] of shown.entries()) {
+      const y = top + row * (rowH + p.side.rowGap);
+      for (let i = 0; i < perColor; i++) {
+        drawPhoto(page, await embedPhoto(pdf, color.photos[i], photoW, rowH), LEFT + i * (photoW + p.photoGap), y, photoW, rowH);
+      }
+      drawColorLabel(page, fonts, entry, color, { x: p.side.labelX, top: y + rowH / 2 - p.side.labelSize, width: RIGHT - p.side.labelX, inline: false, size: p.side.labelSize });
+    }
+    drawFooter(page, fonts, { left: LEFT, right: RIGHT, text: footerSizes(entry, shown) });
+    return;
+  }
+
+  // Grid of color cells; each cell holds that color's photos side by side. Sets are shown full-length, so they get one narrow column per color.
+  const count = shown.length;
+  const cols = count <= 3 ? count : count === 4 && perColor === 1 && entry.pieces > 1 ? 4 : count === 4 ? 2 : 3;
+  const rows = Math.ceil(count / cols);
+  const cellW = (CONTENT_W - (cols - 1) * p.tilesGap) / cols;
+  const inline = cellW >= 400;
+  const labelH = inline ? p.label.inlineHeight : p.label.stackedHeight;
+  const maxRatio = cols <= 2 ? p.maxRatio.two : cols === 3 ? p.maxRatio.three : p.maxRatio.four;
+  const tileH = Math.min((available - rows * labelH - (rows - 1) * p.rowGap) / rows, cellW * maxRatio);
+  for (const [i, color] of shown.entries()) {
+    const x = LEFT + (i % cols) * (cellW + p.tilesGap);
+    const y = top + Math.floor(i / cols) * (tileH + labelH + p.rowGap);
+    const k = Math.max(1, Math.min(perColor, color.photos.length));
+    const photoW = (cellW - (k - 1) * p.photoGap) / k;
+    for (let n = 0; n < k; n++) {
+      drawPhoto(page, await embedPhoto(pdf, color.photos[n], photoW, tileH), x + n * (photoW + p.photoGap), y, photoW, tileH);
+    }
+    drawColorLabel(page, fonts, entry, color, { x, top: y + tileH + 14, width: cellW, inline });
+  }
+  drawFooter(page, fonts, { left: LEFT, right: RIGHT, text: footerSizes(entry, shown) });
 }
 
 // ---- entry point -------------------------------------------------------------------------------------------------
@@ -309,35 +296,10 @@ export async function renderCatalogPdf(entries: CatalogEntry[]): Promise<Uint8Ar
   pdf.setTitle("Catálogo Slow");
   pdf.setAuthor("Slow");
   const assets = await loadAssets(pdf);
-  const pages: PageRecord[] = [];
 
-  drawCover(pdf.addPage([PAGE_W, PAGE_H]), assets);
-  if (entries.length) drawIndex(pdf, pages, assets, entries);
-
-  const p = T.product;
-  const loaded = await loadEntryImages(entries);
-  let page: PDFPage | null = null;
-  let bottom = 0;
-  for (const item of loaded) {
-    const layout = measureProduct(assets.fonts, item);
-    let top = bottom + p.blockGap;
-    if (!page || top + layout.height > p.bodyBottom) {
-      page = newContentPage(pdf, pages, assets);
-      top = p.bodyTop;
-    } else {
-      rect(page, LEFT, bottom + p.dividerOffset, RIGHT - LEFT, p.dividerHeight, T.colors.headerRule);
-    }
-    await drawProduct(pdf, page, assets, item, top, layout);
-    bottom = top + layout.height;
-  }
-
-  const closingTop = PAGE_H - T.closing.height;
-  if (!page || bottom + T.closing.minGapAbove > closingTop) {
-    page = newContentPage(pdf, pages, assets);
-  }
-  pages[pages.length - 1].footer = false;
-  drawClosing(page, assets);
-  for (const record of pages) if (record.footer) drawFooter(record, assets.fonts);
+  drawCoverPage(pdf.addPage([PAGE_W, PAGE_H]), assets, true);
+  for (const entry of entries) await drawProductPage(pdf, assets, entry);
+  drawCoverPage(pdf.addPage([PAGE_W, PAGE_H]), assets, false);
 
   return pdf.save();
 }

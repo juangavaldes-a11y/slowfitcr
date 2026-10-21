@@ -1,0 +1,756 @@
+{
+ "SLW-001": {
+  "colors": [
+   {
+    "raw": "Sky blue",
+    "label": "Celeste",
+    "hex": "#a7c7ee",
+    "photos": [
+     "SLW-001/sky-blue-1.jpg"
+    ]
+   },
+   {
+    "raw": "Cherry",
+    "label": "Cereza",
+    "hex": "#a5173d",
+    "photos": [
+     "SLW-001/cherry-1.jpg"
+    ]
+   },
+   {
+    "raw": "White",
+    "label": "Blanco",
+    "hex": "#ffffff",
+    "photos": [
+     "SLW-001/white-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-001/black-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-002": {
+  "colors": [
+   {
+    "raw": "Dark blue & Stripe",
+    "label": "Azul oscuro y rayas",
+    "hex": "#26325f",
+    "photos": [
+     "SLW-002/dark-blue-stripe-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black & Stripe",
+    "label": "Negro y rayas",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-002/black-stripe-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black & Polka dot",
+    "label": "Negro y lunares",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-002/black-polka-dot-1.jpg"
+    ]
+   },
+   {
+    "raw": "Cream & Polka dot",
+    "label": "Crema y lunares",
+    "hex": "#efe6cf",
+    "photos": [
+     "SLW-002/cream-polka-dot-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-003": {
+  "colors": [
+   {
+    "raw": "Raspberry",
+    "label": "Frambuesa",
+    "hex": "#ae1253",
+    "photos": [
+     "SLW-003/raspberry-1.jpg"
+    ]
+   },
+   {
+    "raw": "Navy",
+    "label": "Azul marino",
+    "hex": "#2b4868",
+    "photos": [
+     "SLW-003/navy-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-003/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Army green",
+    "label": "Verde militar",
+    "hex": "#8da478",
+    "photos": [
+     "SLW-003/army-green-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-004": {
+  "colors": [
+   {
+    "raw": "Raspberry",
+    "label": "Frambuesa",
+    "hex": "#ae1253",
+    "photos": [
+     "SLW-004/raspberry-1.jpg"
+    ]
+   },
+   {
+    "raw": "Navy",
+    "label": "Azul marino",
+    "hex": "#2b4868",
+    "photos": [
+     "SLW-004/navy-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-004/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Army green",
+    "label": "Verde militar",
+    "hex": "#8da478",
+    "photos": [
+     "SLW-004/army-green-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-005": {
+  "colors": [
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-005/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Navy",
+    "label": "Azul marino",
+    "hex": "#24326e",
+    "photos": [
+     "SLW-005/navy-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-006": {
+  "colors": [
+   {
+    "raw": "Cobalt blue",
+    "label": "Azul cobalto",
+    "hex": "#2d4da2",
+    "photos": [
+     "SLW-006/cobalt-blue-1.jpg"
+    ]
+   },
+   {
+    "raw": "Khaki",
+    "label": "Caqui",
+    "hex": "#b5a283",
+    "photos": [
+     "SLW-006/khaki-1.jpg",
+     "SLW-006/khaki-2.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-006/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Green",
+    "label": "Verde",
+    "hex": "#a3bd8e",
+    "photos": [
+     "SLW-006/green-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-007": {
+  "colors": [
+   {
+    "raw": "Off white",
+    "label": "Off white",
+    "hex": "#efe9dc",
+    "photos": [
+     "SLW-007/off-white-1.jpg"
+    ]
+   },
+   {
+    "raw": "Pink",
+    "label": "Rosado",
+    "hex": "#f3b9cf",
+    "photos": [
+     "SLW-007/pink-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-008": {
+  "colors": [
+   {
+    "raw": "31.SHL",
+    "label": "Azul oscuro",
+    "hex": "#1e264b",
+    "photos": [
+     "SLW-008/31-shl-1.jpg"
+    ]
+   },
+   {
+    "raw": "35.HS",
+    "label": "Celeste",
+    "hex": "#5f99de",
+    "photos": [
+     "SLW-008/35-hs-1.jpg"
+    ]
+   },
+   {
+    "raw": "12.XNTLL",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-008/12-xntll-1.jpg"
+    ]
+   },
+   {
+    "raw": "16.SMZ",
+    "label": "Fucsia",
+    "hex": "#d260bf",
+    "photos": [
+     "SLW-008/16-smz-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-009": {
+  "colors": [
+   {
+    "raw": "White",
+    "label": "Blanco",
+    "hex": "#ffffff",
+    "photos": [
+     "SLW-009/white-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-009/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Red",
+    "label": "Rojo",
+    "hex": "#d4202a",
+    "photos": [
+     "SLW-009/red-1.jpg"
+    ]
+   },
+   {
+    "raw": "Navy",
+    "label": "Azul marino",
+    "hex": "#1d2a55",
+    "photos": [
+     "SLW-009/navy-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-010": {
+  "colors": [
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-010/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Olive",
+    "label": "Oliva",
+    "hex": "#5f6c41",
+    "photos": [
+     "SLW-010/olive-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-011": {
+  "colors": [
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-011/black-1.jpg",
+     "SLW-011/black-2.jpg"
+    ]
+   },
+   {
+    "raw": "Violet",
+    "label": "Violeta",
+    "hex": "#a48be0",
+    "photos": [
+     "SLW-011/violet-1.jpg",
+     "SLW-011/violet-2.jpg"
+    ]
+   },
+   {
+    "raw": "White",
+    "label": "Blanco",
+    "hex": "#ffffff",
+    "photos": [
+     "SLW-011/white-1.jpg",
+     "SLW-011/white-2.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-012": {
+  "colors": [
+   {
+    "raw": "Dark purple",
+    "label": "Morado oscuro",
+    "hex": "#4b3a66",
+    "photos": [
+     "SLW-012/dark-purple-1.jpg",
+     "SLW-012/dark-purple-2.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1e1e1e",
+    "photos": [
+     "SLW-012/black-1.jpg",
+     "SLW-012/black-2.jpg"
+    ]
+   },
+   {
+    "raw": "Grey",
+    "label": "Gris",
+    "hex": "#515862",
+    "photos": [
+     "SLW-012/grey-1.jpg",
+     "SLW-012/grey-2.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-013": {
+  "colors": [
+   {
+    "raw": "Dark red",
+    "label": "Vino",
+    "hex": "#6d1e3d",
+    "photos": [
+     "SLW-013/dark-red-1.jpg",
+     "SLW-013/dark-red-2.jpg"
+    ]
+   },
+   {
+    "raw": "Light purple",
+    "label": "Rosado lila",
+    "hex": "#cc9eb8",
+    "photos": [
+     "SLW-013/light-purple-1.jpg",
+     "SLW-013/light-purple-2.jpg"
+    ]
+   },
+   {
+    "raw": "Dark blue",
+    "label": "Azul marino",
+    "hex": "#2f3f66",
+    "photos": [
+     "SLW-013/dark-blue-1.jpg",
+     "SLW-013/dark-blue-2.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-013/black-1.jpg",
+     "SLW-013/black-2.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-014": {
+  "colors": [
+   {
+    "raw": "Purple",
+    "label": "Morado",
+    "hex": "#bba2e8",
+    "photos": [
+     "SLW-014/purple-1.jpg",
+     "SLW-014/purple-2.jpg",
+     "SLW-014/purple-3.jpg"
+    ]
+   },
+   {
+    "raw": "Pink",
+    "label": "Rosado",
+    "hex": "#e7a7b8",
+    "photos": [
+     "SLW-014/pink-1.jpg",
+     "SLW-014/pink-2.jpg",
+     "SLW-014/pink-3.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-015": {
+  "colors": [
+   {
+    "raw": "Dark blue",
+    "label": "Azul oscuro",
+    "hex": "#3f5373",
+    "photos": [
+     "SLW-015/dark-blue-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1e1e1e",
+    "photos": [
+     "SLW-015/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Grape",
+    "label": "Uva",
+    "hex": "#4e2a57",
+    "photos": [
+     "SLW-015/grape-1.jpg"
+    ]
+   },
+   {
+    "raw": "Red",
+    "label": "Rojo",
+    "hex": "#b3112c",
+    "photos": [
+     "SLW-015/red-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-016": {
+  "colors": [
+   {
+    "raw": "Red",
+    "label": "Rojo",
+    "hex": "#b2122c",
+    "photos": [
+     "SLW-016/red-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1e1e1e",
+    "photos": [
+     "SLW-016/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Cherry",
+    "label": "Cereza",
+    "hex": "#660f3a",
+    "photos": [
+     "SLW-016/cherry-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-017": {
+  "colors": [
+   {
+    "raw": "Burgundy",
+    "label": "Vino",
+    "hex": "#7b152d",
+    "photos": [
+     "SLW-017/burgundy-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1e1e1e",
+    "photos": [
+     "SLW-017/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Navy",
+    "label": "Azul marino",
+    "hex": "#1a284d",
+    "photos": [
+     "SLW-017/navy-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-018": {
+  "colors": [
+   {
+    "raw": "Purple",
+    "label": "Morado",
+    "hex": "#511d58",
+    "photos": [
+     "SLW-018/purple-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-018/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Angolan red",
+    "label": "Rojo Angola",
+    "hex": "#6f2b2d",
+    "photos": [
+     "SLW-018/angolan-red-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-019": {
+  "colors": [
+   {
+    "raw": "Midnight",
+    "label": "Azul medianoche",
+    "hex": "#1a2448",
+    "photos": [
+     "SLW-019/midnight-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-019/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Blue",
+    "label": "Azul",
+    "hex": "#2197d2",
+    "photos": [
+     "SLW-019/blue-1.jpg"
+    ]
+   },
+   {
+    "raw": "Pink",
+    "label": "Rosado",
+    "hex": "#f07dcb",
+    "photos": [
+     "SLW-019/pink-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-020": {
+  "colors": [
+   {
+    "raw": "Wine",
+    "label": "Vino",
+    "hex": "#5f1631",
+    "photos": [
+     "SLW-020/wine-1.jpg"
+    ]
+   },
+   {
+    "raw": "Navy",
+    "label": "Azul marino",
+    "hex": "#182b6d",
+    "photos": [
+     "SLW-020/navy-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-020/black-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-022": {
+  "colors": [
+   {
+    "raw": "Red",
+    "label": "Rojo",
+    "hex": "#da2026",
+    "photos": [
+     "SLW-022/red-1.jpg"
+    ]
+   },
+   {
+    "raw": "Navy",
+    "label": "Azul marino",
+    "hex": "#1b2a5f",
+    "photos": [
+     "SLW-022/navy-1.jpg"
+    ]
+   },
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1e1e1e",
+    "photos": [
+     "SLW-022/black-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-023": {
+  "colors": [
+   {
+    "raw": "Red",
+    "label": "Rojo",
+    "hex": "#8e1a1d",
+    "photos": [
+     "SLW-023/red-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-024": {
+  "colors": [
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-024/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Grey",
+    "label": "Gris",
+    "hex": "#9a9a9a",
+    "photos": [
+     "SLW-024/grey-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-025": {
+  "colors": [
+   {
+    "raw": "Green",
+    "label": "Verde",
+    "hex": "#99c89a",
+    "photos": [
+     "SLW-025/green-1.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-026": {
+  "colors": [
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-026/black-1.jpg",
+     "SLW-026/black-2.jpg"
+    ]
+   },
+   {
+    "raw": "Grey",
+    "label": "Gris",
+    "hex": "#8f8f8f",
+    "photos": [
+     "SLW-026/grey-1.jpg",
+     "SLW-026/grey-2.jpg"
+    ]
+   },
+   {
+    "raw": "Blue",
+    "label": "Azul",
+    "hex": "#2b2f98",
+    "photos": [
+     "SLW-026/blue-1.jpg",
+     "SLW-026/blue-2.jpg"
+    ]
+   }
+  ]
+ },
+ "SLW-027": {
+  "colors": [
+   {
+    "raw": "Black",
+    "label": "Negro",
+    "hex": "#1f1e1c",
+    "photos": [
+     "SLW-027/black-1.jpg"
+    ]
+   },
+   {
+    "raw": "Grey",
+    "label": "Gris",
+    "hex": "#999faa",
+    "photos": [
+     "SLW-027/grey-1.jpg"
+    ]
+   },
+   {
+    "raw": "Blue",
+    "label": "Azul",
+    "hex": "#292e44",
+    "photos": [
+     "SLW-027/blue-1.jpg"
+    ]
+   }
+  ]
+ }
+}

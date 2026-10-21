@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { buildCatalogEntries, type CatalogProductImages, type InventoryViewLine } from "../../../../lib/catalog-pdf/data";
+import { loadPhotoManifest } from "../../../../lib/catalog-pdf/images";
 import { renderCatalogPdf } from "../../../../lib/catalog-pdf/render";
 
 export const runtime = "nodejs";
@@ -37,11 +38,12 @@ async function loadProductImages(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const [inventory, products] = await Promise.all([
+    const [inventory, products, photos] = await Promise.all([
       backendJson<{ lines: InventoryViewLine[] }>(request, "/api/admin/inventory"),
       loadProductImages(request),
+      loadPhotoManifest(),
     ]);
-    const entries = buildCatalogEntries(inventory.lines, products);
+    const entries = buildCatalogEntries(inventory.lines, products, { photos });
     if (!entries.length) return NextResponse.json({ success: false, message: "No hay inventario disponible para el catálogo." }, { status: 409 });
 
     const pdf = await renderCatalogPdf(entries);

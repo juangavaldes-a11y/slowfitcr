@@ -7,6 +7,8 @@
     "catalog:apply-image-colors": "node scripts/apply-image-colors.mjs",
     "catalog:upload-images": "node --env-file-if-exists=../.env.docker scripts/upload-catalog-images.mjs",
     "inventory:seed": "node scripts/seed-inventory.mjs",
+    "catalog:upload-designed-photos": "node --env-file-if-exists=../.env.docker scripts/designed-photos.mjs upload",
+    "catalog:apply-designed-photos": "node --env-file-if-exists=../.env.docker scripts/designed-photos.mjs apply",
     "catalog:tag-gender": "node scripts/tag-catalog-gender.mjs",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate deploy",
