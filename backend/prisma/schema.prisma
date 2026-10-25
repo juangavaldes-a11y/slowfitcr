@@ -142,6 +142,8 @@ model Customer {
   passwordResetTokens PasswordResetToken[]
   favorites           CustomerFavorite[]
   cart                CustomerCart?
+  layaways            Layaway[]
+  notifications       Notification[]
 }
 
 model CustomerContact {
@@ -408,6 +410,7 @@ model InventoryLine {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   sales             InventorySale[]
+  layaways          Layaway[]
 
   @@unique([code, color])
   @@index([productHandle])
@@ -459,4 +462,64 @@ model LoyverseStockLedger {
   sku       String
   quantity  Int
   updatedAt DateTime @updatedAt
+}
+
+enum LayawayStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  RELEASED
+  COMPLETED
+}
+
+enum NotificationAudience {
+  ADMIN
+  CUSTOMER
+}
+
+model Layaway {
+  id                String        @id @default(uuid())
+  lineId            String
+  size              String
+  unitPriceCrc      Decimal       @db.Decimal(14, 2)
+  depositCrc        Decimal       @db.Decimal(14, 2)
+  status            LayawayStatus @default(PENDING_PAYMENT)
+  source            String
+  paymentReference  String?       @unique
+  customerId        String?
+  customerEmail     String?
+  customerName      String?
+  note              String        @default("")
+  holdExpiresAt     DateTime?
+  startedAt         DateTime?
+  expiresAt         DateTime?
+  warnedAt          DateTime?
+  expiredNotifiedAt DateTime?
+  releasedAt        DateTime?
+  completedAt       DateTime?
+  saleId            String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  line              InventoryLine @relation(fields: [lineId], references: [id], onDelete: Restrict)
+  customer          Customer?     @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  notifications     Notification[]
+
+  @@index([status, expiresAt])
+  @@index([lineId, status])
+  @@index([customerId, createdAt])
+}
+
+model Notification {
+  id         String               @id @default(uuid())
+  audience   NotificationAudience
+  customerId String?
+  kind       String
+  layawayId  String?
+  params     Json
+  readAt     DateTime?
+  createdAt  DateTime             @default(now())
+  layaway    Layaway?             @relation(fields: [layawayId], references: [id], onDelete: Cascade)
+  customer   Customer?            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@unique([layawayId, kind, audience])
+  @@index([audience, customerId, readAt, createdAt])
 }

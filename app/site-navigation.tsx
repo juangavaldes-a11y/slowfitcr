@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import type { Copy, Locale } from "./i18n";
 import { apiRequest } from "./lib/api-client";
 import LocaleSwitcher from "./locale-switcher";
+import NotificationBell from "./notification-bell";
 
 type SiteNavigationProps = {
   copy: Copy;
@@ -206,6 +207,12 @@ export default function SiteNavigation({ copy, locale, modules }: SiteNavigation
             </Space>
             <LocaleSwitcher locale={locale} />
           </div>
+          {(adminAuthorized && modules.admin) || (customerAuthenticated && modules.customerAccount) ? (
+            <div className="slowfit-nav-bells">
+              {adminAuthorized && modules.admin ? <NotificationBell audience="admin" locale={locale} /> : null}
+              {customerAuthenticated && modules.customerAccount ? <NotificationBell audience="customer" locale={locale} /> : null}
+            </div>
+          ) : null}
           <Button
             type="text"
             className="slowfit-menu-trigger"

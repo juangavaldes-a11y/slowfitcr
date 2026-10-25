@@ -2,6 +2,7 @@ import { buildAnalytics } from "./inventory-analytics.mjs";
 import { buildRestock } from "./inventory-restock.mjs";
 import { fetchBccrRate } from "./inventory-fx.mjs";
 import { computeInventoryCosts, SIZE_KEYS, sumSizes } from "./inventory-costing.mjs";
+import { HOLDING_STATUSES, heldBySize, serializeLayaway, worstPhase } from "./layaways.mjs";
 
 const VARIANT_SIZE = { OS: "One Size" };
 
@@ -111,7 +112,7 @@ function soldBySize(sales) {
   return map;
 }
 
-export function buildInventoryView(settingsRow, lineRows, sales) {
+export function buildInventoryView(settingsRow, lineRows, sales, layaways = [], now = new Date()) {
   const settings = Object.fromEntries(SETTING_FIELDS.map((key) => [key, num(settingsRow?.[key])]));
   const costs = computeInventoryCosts(
     lineRows.map((line) => ({
@@ -123,9 +124,14 @@ export function buildInventoryView(settingsRow, lineRows, sales) {
     settings,
   );
   const sold = soldBySize(sales);
+  const held = heldBySize(layaways);
   const lines = lineRows.map((line, index) => {
     const soldSizes = sold.get(line.id) ?? {};
-    const remaining = Object.fromEntries(SIZE_KEYS.map((key) => [key, (line.sizes[key] ?? 0) - (soldSizes[key] ?? 0)]));
+    const heldSizes = held.get(line.id) ?? {};
+    const remaining = Object.fromEntries(SIZE_KEYS.map((key) => [key, (line.sizes[key] ?? 0) - (soldSizes[key] ?? 0) - (heldSizes[key] ?? 0)]));
+    const lineLayaways = layaways
+      .filter((layaway) => layaway.lineId === line.id && HOLDING_STATUSES.includes(layaway.status))
+      .map((layaway) => serializeLayaway(layaway, now));
     const soldQuantity = sumSizes(soldSizes);
     return {
       id: line.id,
@@ -139,12 +145,30 @@ export function buildInventoryView(settingsRow, lineRows, sales) {
       supplierEquivalence: line.supplierEquivalence,
       soldSizes,
       remaining,
+      heldSizes,
+      layaways: lineLayaways,
+      layawayPhase: worstPhase(lineLayaways.map((layaway) => layaway.phase)),
       soldQuantity,
       remainingQuantity: sumSizes(remaining),
       cost: costs.lines[index],
     };
   });
   return { settings: costs.settings, crReady: costs.crReady, lines, totals: costs.totals };
+}
+
+// Mirrors a stock change onto the storefront variant and returns the SKU delta to push to Loyverse.
+export async function syncStorefrontStock(transaction, line, size, delta) {
+  if (!line.productHandle || !line.color || !delta) return null;
+  const variant = await transaction.productVariant.findFirst({
+    where: { product: { handle: line.productHandle }, color: line.color, size: VARIANT_SIZE[size] ?? size },
+  });
+  if (!variant) return null;
+  const current = variant.inventoryQuantity;
+  const quantity = Math.max(0, current + delta);
+  await transaction.productVariant.update({ where: { id: variant.id }, data: { inventoryQuantity: quantity } });
+  const aggregate = await transaction.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { inventoryQuantity: true } });
+  await transaction.product.update({ where: { id: variant.productId }, data: { inventoryTotal: aggregate._sum.inventoryQuantity ?? 0 } });
+  return variant.sku ? { sku: variant.sku, delta: quantity - current } : null;
 }
 
 const IMPORT_FIELDS = ["productName", "sizes", "piecesPerGarment", "unitPriceUsd", "salePriceCrc", "supplierEquivalence"];
@@ -264,13 +288,14 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
 
   const loadView = async () => {
     const websiteSync = await syncWebsiteOrders().catch(() => ({ imported: 0, unmatched: 0, failed: true }));
-    const [settings, lines, sales, paymentMethods] = await Promise.all([
+    const [settings, lines, sales, paymentMethods, layaways] = await Promise.all([
       prisma.inventorySettings.findUnique({ where: { id: "default" } }),
       prisma.inventoryLine.findMany({ orderBy: [{ position: "asc" }, { code: "asc" }, { color: "asc" }] }),
       prisma.inventorySale.findMany({ where: { voidedAt: null }, select: { lineId: true, size: true, quantity: true, restockedQuantity: true, voidedAt: true } }),
       prisma.paymentMethod.findMany({ orderBy: { position: "asc" } }),
+      prisma.layaway.findMany({ where: { status: { in: HOLDING_STATUSES } }, orderBy: { createdAt: "asc" } }),
     ]);
-    return { ...buildInventoryView(settings, lines, sales), paymentMethods, websiteSync };
+    return { ...buildInventoryView(settings, lines, sales, layaways), paymentMethods, websiteSync };
   };
 
   const getInventory = guard(async () => jsonResponse(await loadView()));
@@ -301,7 +326,8 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     const data = parseLineInput(await readJson(request), { partial: true });
     if (data.sizes) {
       const sold = soldBySize(await prisma.inventorySale.findMany({ where: { lineId, voidedAt: null } })).get(lineId) ?? {};
-      if (SIZE_KEYS.some((key) => data.sizes[key] < (sold[key] ?? 0))) throw new Error("SOLD_EXCEEDS_STOCK");
+      const held = heldBySize(await prisma.layaway.findMany({ where: { lineId, status: { in: HOLDING_STATUSES } } })).get(lineId) ?? {};
+      if (SIZE_KEYS.some((key) => data.sizes[key] < (sold[key] ?? 0) + (held[key] ?? 0))) throw new Error("SOLD_EXCEEDS_STOCK");
     }
     const changes = [];
     await prisma.$transaction(async (transaction) => {
@@ -325,20 +351,6 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     return jsonResponse(await loadView());
   });
 
-  const syncStorefrontStock = async (transaction, line, size, delta) => {
-    if (!line.productHandle || !line.color || !delta) return null;
-    const variant = await transaction.productVariant.findFirst({
-      where: { product: { handle: line.productHandle }, color: line.color, size: VARIANT_SIZE[size] ?? size },
-    });
-    if (!variant) return null;
-    const current = variant.inventoryQuantity;
-    const quantity = Math.max(0, current + delta);
-    await transaction.productVariant.update({ where: { id: variant.id }, data: { inventoryQuantity: quantity } });
-    const aggregate = await transaction.productVariant.aggregate({ where: { productId: variant.productId }, _sum: { inventoryQuantity: true } });
-    await transaction.product.update({ where: { id: variant.productId }, data: { inventoryTotal: aggregate._sum.inventoryQuantity ?? 0 } });
-    return variant.sku ? { sku: variant.sku, delta: quantity - current } : null;
-  };
-
   const createSale = guard(async (request) => {
     const input = parseSaleInput(await readJson(request));
     const changes = [];
@@ -346,7 +358,8 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
       const line = await transaction.inventoryLine.findUnique({ where: { id: input.lineId } });
       if (!line) throw new Error("NOT_FOUND");
       const active = await transaction.inventorySale.findMany({ where: { lineId: line.id, size: input.size, voidedAt: null } });
-      const available = (line.sizes[input.size] ?? 0) - active.reduce((total, row) => total + row.quantity - row.restockedQuantity, 0);
+      const heldUnits = await transaction.layaway.count({ where: { lineId: line.id, size: input.size, status: { in: HOLDING_STATUSES } } });
+      const available = (line.sizes[input.size] ?? 0) - active.reduce((total, row) => total + row.quantity - row.restockedQuantity, 0) - heldUnits;
       if (input.quantity > available) throw new Error("INVALID_QUANTITY_EXCEEDS_STOCK");
       const created = await transaction.inventorySale.create({ data: input });
       changes.push(await syncStorefrontStock(transaction, line, input.size, -input.quantity));
@@ -414,7 +427,8 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
         where: { lineId: line.id, size: input.size, voidedAt: null, id: { not: sale.id } },
       });
       const committed = others.reduce((total, row) => total + row.quantity - row.restockedQuantity, 0);
-      if (input.quantity > (line.sizes[input.size] ?? 0) - committed) throw new Error("INVALID_QUANTITY_EXCEEDS_STOCK");
+      const heldUnits = await transaction.layaway.count({ where: { lineId: line.id, size: input.size, status: { in: HOLDING_STATUSES } } });
+      if (input.quantity > (line.sizes[input.size] ?? 0) - committed - heldUnits) throw new Error("INVALID_QUANTITY_EXCEEDS_STOCK");
       await transaction.inventorySale.update({
         where: { id: sale.id },
         data: {
@@ -562,5 +576,5 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     });
   });
 
-  return { getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, updateSale, voidSale, refundSale, listSales, syncCatalogToLoyverse };
+  return { loadView, getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, updateSale, voidSale, refundSale, listSales, syncCatalogToLoyverse };
 }

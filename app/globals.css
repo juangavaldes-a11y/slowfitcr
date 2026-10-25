@@ -1749,3 +1749,101 @@ a {
     display: inline-flex;
   }
 }
+
+.slowfit-nav-bells {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.slowfit-bell.ant-btn {
+  color: var(--foreground);
+  font-size: 1.15rem;
+}
+
+.slowfit-notification-panel {
+  width: min(360px, calc(100vw - 48px));
+}
+
+.slowfit-notification-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(47, 42, 40, 0.12);
+}
+
+.slowfit-notification-list {
+  max-height: 360px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.slowfit-notification-item a {
+  display: grid;
+  gap: 2px;
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(47, 42, 40, 0.08);
+  border-left: 3px solid transparent;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.slowfit-notification-item a:hover {
+  background: rgba(47, 42, 40, 0.04);
+}
+
+.slowfit-notification-item.is-unread a {
+  color: var(--foreground);
+  border-left-color: #d4a017;
+}
+
+.slowfit-notification-item.is-unread.is-urgent a {
+  border-left-color: #c0392b;
+}
+
+.slowfit-notification-item time {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr.slowfit-row-layaway-warning > td {
+  background: #fff4b8;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr.slowfit-row-layaway-expired > td {
+  background: #ffd6d2;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr.slowfit-row-layaway-warning:hover > td {
+  background: #ffec8f;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr.slowfit-row-layaway-expired:hover > td {
+  background: #ffbdb7;
+}
+
+.slowfit-layaway-cta {
+  display: grid;
+  gap: 6px;
+}
+
+.slowfit-layaway-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr.slowfit-row-layaway-warning > td.ant-table-cell-fix-right,
+.ant-table-wrapper .ant-table-tbody > tr.slowfit-row-layaway-warning > td.ant-table-cell-fix-left {
+  background: #fff4b8;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr.slowfit-row-layaway-expired > td.ant-table-cell-fix-right,
+.ant-table-wrapper .ant-table-tbody > tr.slowfit-row-layaway-expired > td.ant-table-cell-fix-left {
+  background: #ffd6d2;
+}

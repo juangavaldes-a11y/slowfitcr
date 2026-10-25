@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import CustomerLayaways from "./customer-layaways";
 import type { Locale } from "./i18n";
 import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
 import { getPublicProductTitle } from "./lib/product-presentation";
@@ -363,7 +364,12 @@ export default function AccountPanel({ locale, resetToken, paymentStatus, refere
             <Typography.Text strong>{[customer.firstName, customer.lastName].filter(Boolean).join(" ")}</Typography.Text>
             <Typography.Text>{customer.email}</Typography.Text>
           </aside>
-          <Tabs items={[
+          <Tabs defaultActiveKey="orders" items={[
+            {
+              key: "layaways",
+              label: locale === "es" ? "Mis apartados" : "My layaways",
+              children: <CustomerLayaways locale={locale} />,
+            },
             {
               key: "orders",
               label: `${labels.orders} (${orders.length})`,

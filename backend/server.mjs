@@ -15,7 +15,8 @@ import {
   quoteProvider,
   verifyProviderWebhook,
 } from "./delivery-providers.mjs";
-import { createInventoryHandlers } from "./inventory-admin.mjs";
+import { createInventoryHandlers, syncStorefrontStock } from "./inventory-admin.mjs";
+import { createLayawayHandlers, DEPOSIT_PERCENT } from "./layaways.mjs";
 import { createLoyverseStockHandler } from "./loyverse-stock.mjs";
 import { createOrderAdminHandlers } from "./order-admin.mjs";
 
@@ -619,6 +620,47 @@ const inventory = createInventoryHandlers({
   appendAudit,
   pushInventory: pushInventoryToLoyverse,
   pushCatalog: pushCatalogToLoyverse,
+});
+
+async function createLayawayCheckout({ layaway, variant, customer, locale }) {
+  const providerUrl = process.env.PAYMENT_PROVIDER_URL;
+  const providerToken = process.env.PAYMENT_PROVIDER_TOKEN;
+  if (!providerUrl || !providerToken) throw new Error("PAYMENT_NOT_CONFIGURED");
+  const origin = process.env.APP_ORIGIN || "https://slowfitcr.com";
+  const checkoutLocale = normalizeLocale(locale);
+  const deposit = Number(layaway.depositCrc);
+  const response = await fetch(providerUrl, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${providerToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      reference: layaway.paymentReference,
+      currency: process.env.STORE_CURRENCY || "CRC",
+      amount: deposit,
+      fullAmount: Number(layaway.unitPriceCrc),
+      orderType: "LAYAWAY_DEPOSIT",
+      depositPercent: DEPOSIT_PERCENT,
+      customerEmail: customer.email,
+      items: [{ variantId: variant.id, sku: variant.sku, name: variant.title, quantity: 1, unitPrice: deposit, lineTotal: deposit, layaway: true }],
+      returnUrl: `${origin}/${checkoutLocale}/account?payment=success&reference=${layaway.paymentReference}`,
+      cancelUrl: `${origin}/${checkoutLocale}/shop?payment=cancelled`,
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.checkoutUrl) throw new Error("PAYMENT_PROVIDER_ERROR");
+  return result.checkoutUrl;
+}
+
+const layaways = createLayawayHandlers({
+  prisma,
+  jsonResponse,
+  readJson,
+  isAdmin: (request) => isModeratorAuthorized(request),
+  getCustomerSession: getCustomerSessionFromRequest,
+  appendAudit,
+  syncStorefrontStock,
+  pushInventory: pushInventoryToLoyverse,
+  loadInventoryView: () => inventory.loadView(),
+  createCheckout: createLayawayCheckout,
 });
 
 const orderAdmin = createOrderAdminHandlers({
@@ -1354,6 +1396,10 @@ function paymentInventoryLines(items) {
 }
 
 async function processOrderEvent({ topic, provider, payload }, options = { replay: false }) {
+  if (payload.orderType === "LAYAWAY_DEPOSIT") {
+    await layaways.handlePaymentEvent(topic, String(payload.reference || payload.id || "").trim());
+    return;
+  }
   const email = String(payload.email || "").trim().toLowerCase();
   const externalPaymentId = String(payload.reference || payload.id || "").trim();
   const linkedPreorderId = String(payload.linkedPreorderId || "").trim();
@@ -3161,6 +3207,11 @@ export async function route(request) {
     return handleUpdateCustomerFavorite(request, decodeURIComponent(favoriteMatch[1]), method === "PUT");
   }
 
+  if (pathname === "/api/account/layaways" && method === "GET") return layaways.listCustomerLayaways(request);
+  if (pathname === "/api/account/layaways" && method === "POST") return layaways.createCustomerLayaway(request);
+  if (pathname === "/api/account/notifications" && method === "GET") return layaways.listCustomerNotifications(request);
+  if (pathname === "/api/account/notifications/read" && method === "POST") return layaways.markCustomerNotificationsRead(request);
+
   if (pathname === "/api/account/cart" && method === "GET") {
     return handleCustomerCart(request);
   }
@@ -3251,6 +3302,16 @@ export async function route(request) {
   if (pathname === "/api/admin/inventory/import" && method === "POST") return inventory.importLines(request);
   if (pathname === "/api/admin/inventory/sync-catalog" && method === "POST") return inventory.syncCatalogToLoyverse(request);
   if (pathname === "/api/admin/inventory/lines" && method === "POST") return inventory.createLine(request);
+  if (pathname === "/api/admin/layaways" && method === "GET") return layaways.listAdminLayaways(request);
+  if (pathname === "/api/admin/layaways" && method === "POST") return layaways.createAdminLayaway(request);
+  const layawayConfirmMatch = pathname.match(/^\/api\/admin\/layaways\/([^/]+)\/confirm-deposit$/);
+  if (layawayConfirmMatch && method === "POST") return layaways.confirmDeposit(request, decodeURIComponent(layawayConfirmMatch[1]));
+  const layawayCompleteMatch = pathname.match(/^\/api\/admin\/layaways\/([^/]+)\/complete$/);
+  if (layawayCompleteMatch && method === "POST") return layaways.completeLayaway(request, decodeURIComponent(layawayCompleteMatch[1]));
+  const layawayReleaseMatch = pathname.match(/^\/api\/admin\/layaways\/([^/]+)\/release$/);
+  if (layawayReleaseMatch && method === "POST") return layaways.releaseLayaway(request, decodeURIComponent(layawayReleaseMatch[1]));
+  if (pathname === "/api/admin/notifications" && method === "GET") return layaways.listAdminNotifications(request);
+  if (pathname === "/api/admin/notifications/read" && method === "POST") return layaways.markAdminNotificationsRead(request);
   const inventoryLineMatch = pathname.match(/^\/api\/admin\/inventory\/lines\/([^/]+)$/);
   if (inventoryLineMatch && method === "PATCH") return inventory.updateLine(request, decodeURIComponent(inventoryLineMatch[1]));
   if (pathname === "/api/admin/inventory/sales" && method === "GET") return inventory.listSales(request);
@@ -3360,6 +3421,14 @@ export function createRequestListener() {
 export function startServer() {
   validateProductionConfiguration();
   void ensureBootstrapAdmin().catch((error) => log("error", "admin.bootstrap.failed", { error: String(error?.message || "unknown_error") }));
+  const layawayJob = (name, job) => () => void job().catch((error) => log("error", `layaway.${name}_failed`, { error: String(error?.message || "unknown_error") }));
+  // The 45-day deadline check runs once a day (it is idempotent, so a restart that repeats it is harmless).
+  const dailyDeadlines = layawayJob("deadlines", () => layaways.processDeadlines());
+  dailyDeadlines();
+  setInterval(dailyDeadlines, 24 * 60 * 60_000).unref?.();
+  const staleHolds = layawayJob("stale_holds", () => layaways.releaseStaleHolds());
+  staleHolds();
+  setInterval(staleHolds, 15 * 60_000).unref?.();
   const outboxInterval = setInterval(() => {
     void releaseExpiredReservations().catch((error) => log("error", "inventory.reservation.cleanup_failed", { error: String(error?.message || "unknown_error") }));
     void drainOutbox().catch((error) => log("error", "outbox.drain_failed", { error: String(error?.message || "unknown_error") }));
