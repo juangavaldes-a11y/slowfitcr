@@ -3,15 +3,19 @@ import { catalogTemplate } from "./template";
 export type CatalogSize = "S" | "M" | "L" | "XL" | "OS";
 export const CATALOG_SIZES: CatalogSize[] = ["S", "M", "L", "XL", "OS"];
 
+export type CatalogColor = { name: string; hex: string; sizes: CatalogSize[]; photos: string[] };
+
 export type CatalogEntry = {
   code: string;
   name: string;
   priceCrc: number | null;
   pieces: number;
   sizes: CatalogSize[];
-  colors: Array<{ name: string; sizes: CatalogSize[] }>;
-  imageUrls: string[];
+  colors: CatalogColor[];
 };
+
+// public/slowfit/catalog-photos/manifest.json, written by tools/catalog-import/extract_new_catalog.py.
+export type PhotoManifest = Record<string, { colors: Array<{ raw: string; label: string; hex: string | null; photos: string[] }> }>;
 
 // Subset of GET /api/admin/inventory and GET /api/admin/catalog/products that the catalog needs.
 export type InventoryViewLine = {
@@ -25,8 +29,6 @@ export type InventoryViewLine = {
 };
 export type CatalogProductImages = { handle: string; images: Array<{ url: string; color?: string | null }> };
 
-// Mirrors GENERAL_COLOR in backend/catalog-image-colors.mjs: photos that are not tied to one color.
-const GENERAL_IMAGE_COLOR = "general";
 const normalizeColorName = (color: string) => color.trim().toLowerCase();
 
 const productNamesEs: Record<string, string> = {
@@ -70,7 +72,17 @@ export function translateColor(color: string) {
 
 export const formatCatalogCode = (index: number) => `${catalogTemplate.copy.codePrefix}${String(index + 1).padStart(3, "0")}`;
 
-type BuildOptions = { includeSoldOut?: boolean };
+type BuildOptions = { includeSoldOut?: boolean; photos?: PhotoManifest };
+
+// Dot colors for products without a designed photo set; the designed manifest carries its own.
+const colorHexEs: Record<string, string> = {
+  negro: "#1f1e1c", blanco: "#ffffff", gris: "#9a9a9a", "azul marino": "#26395c", azul: "#2f6fc0", "azul oscuro": "#1e264b", celeste: "#a7c7ee",
+  cereza: "#a5173d", frambuesa: "#ae1253", "verde militar": "#8da478", verde: "#9db38a", "azul cobalto": "#2d4da2", caqui: "#b5a283",
+  "blanco hueso": "#efe9dc", rosa: "#f3b9cf", rojo: "#d4202a", "rojo oscuro": "#7b152d", oliva: "#5f6c41", violeta: "#a48be0", morado: "#7d5ba6",
+  "morado oscuro": "#4b3a66", "morado claro": "#bba2e8", uva: "#4e2a57", vino: "#6d1e3d", "azul medianoche": "#1a2448", crema: "#efe6cf",
+};
+
+const hexFor = (name: string) => colorHexEs[name.trim().toLowerCase()] ?? catalogTemplate.colors.dotFallback;
 
 // Products are numbered in inventory order over *all* codes so a product keeps its SLW code when it sells out.
 export function buildCatalogEntries(lines: InventoryViewLine[], products: CatalogProductImages[], options: BuildOptions = {}): CatalogEntry[] {
@@ -81,29 +93,37 @@ export function buildCatalogEntries(lines: InventoryViewLine[], products: Catalo
   const entries: CatalogEntry[] = [];
   [...groups.values()].forEach((group, index) => {
     const first = group[0];
+    const code = formatCatalogCode(index);
     const handle = group.find((line) => line.productHandle)?.productHandle;
-    const catalogLines = group
-      .map((line) => ({ raw: line.color, name: translateColor(line.color), sizes: CATALOG_SIZES.filter((size) => (line.remaining[size] ?? 0) > 0) }))
-      .filter((color) => options.includeSoldOut || color.sizes.length);
-    if (!catalogLines.length) return;
-    const colors = catalogLines.map(({ name, sizes }) => ({ name, sizes }));
-    // Unlabeled and general photos always stay; a photo tagged with a color only shows while that color is listed.
-    const shownColors = new Set(catalogLines.map((line) => normalizeColorName(line.raw)));
-    const imageUrls = ((handle && imagesByHandle.get(handle)) || [])
-      .filter((image) => {
-        // A photo showing several garments lists their colors separated by commas; one match is enough.
-        const tags = (image.color ?? "").split(",").map(normalizeColorName).filter(Boolean);
-        return !tags.length || tags.includes(GENERAL_IMAGE_COLOR) || tags.some((tag) => shownColors.has(tag));
+    const productImages = (handle && imagesByHandle.get(handle)) || [];
+    const designed = options.photos?.[code]?.colors ?? [];
+    const designedByRaw = new Map(designed.map((color) => [normalizeColorName(color.raw), color]));
+    // The designed photo set only applies when it really belongs to this product (its raw color names match the inventory).
+    const useDesigned = group.some((line) => designedByRaw.has(normalizeColorName(line.color)));
+
+    const colors = group
+      .map((line): CatalogColor => {
+        const tag = normalizeColorName(line.color);
+        const match = useDesigned ? designedByRaw.get(tag) : undefined;
+        const name = match?.label ?? translateColor(line.color);
+        // Fallback photo: the first product image tagged with this color (a photo may list several colors separated by commas).
+        const tagged = productImages.find((image) => (image.color ?? "").split(",").map(normalizeColorName).includes(tag));
+        return {
+          name,
+          hex: match?.hex ?? hexFor(name),
+          sizes: CATALOG_SIZES.filter((size) => (line.remaining[size] ?? 0) > 0),
+          photos: match ? match.photos : useDesigned || !tagged ? [] : [tagged.url],
+        };
       })
-      .map((image) => image.url);
+      .filter((color) => options.includeSoldOut || color.sizes.length);
+    if (!colors.length) return;
     entries.push({
-      code: formatCatalogCode(index),
+      code,
       name: translateProductName(first.productName),
       priceCrc: group.map((line) => line.cost.salePriceCrc).find((price) => price !== null && price !== undefined) ?? null,
       pieces: Math.max(1, first.piecesPerGarment || 1),
       sizes: CATALOG_SIZES.filter((size) => colors.some((color) => color.sizes.includes(size))),
       colors,
-      imageUrls,
     });
   });
   return entries;

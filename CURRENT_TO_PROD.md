@@ -178,6 +178,19 @@ Exit criteria:
 
 ## 6. Production observability and operations
 
+### Page speed and traffic telemetry (free tier)
+
+Code is in place: `app/web-vitals.tsx` sends TTFB, FCP, LCP, INP, and CLS to GA4 as events (value, `metric_rating`, `metric_id`, `page_path`). It does nothing until `NEXT_PUBLIC_GA_ID` is set. Still to do:
+
+- [ ] Create a GA4 property and set `NEXT_PUBLIC_GA_ID` in the Cloudflare build environment (read at build time, so redeploy after setting).
+- [ ] Verify in GA4 DebugView that `LCP`, `TTFB`, `INP`, `CLS` events and `page_view` arrive from staging.
+- [ ] Register `metric_rating` and `page_path` as GA4 custom dimensions so vitals can be broken down by page.
+- [ ] Enable Cloudflare Web Analytics (Cloudflare dashboard, Web Analytics) for cookieless visitor counts and per-page Core Web Vitals that are not affected by ad blockers or consent.
+- [ ] Review the Workers observability dashboard (already enabled in `wrangler.jsonc`) for request volume, errors, and server latency.
+- [ ] Decide on a cookie/consent notice for GA4 for Costa Rica and any EU visitors.
+- [ ] Optional: add a daily unique-visitor counter table in Postgres if first-party counts are needed. Do not send web vitals to `/api/events`; it writes an audit row per event.
+- [ ] Set performance targets after the first week of data (for example LCP under 2.5 s, INP under 200 ms, CLS under 0.1 at p75) and list the slowest pages.
+
 Before launch:
 
 - Centralize backend JSON logs with request ID, status, duration, and environment.
@@ -228,6 +241,7 @@ Within 24 hours:
 Within 7 days:
 
 - Review accessibility and mobile analytics.
+- Review the first week of Core Web Vitals and visitor counts (GA4 and Cloudflare Web Analytics) and prioritize the slowest pages.
 - Rotate any temporary launch credentials.
 - Prioritize production findings and add regression tests.
 - Reassess the coverage threshold and raise it as new modules receive direct tests.

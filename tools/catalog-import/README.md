@@ -32,3 +32,12 @@ npm --prefix backend run catalog:tag-gender -- --apply
 ```
 
 The first command is a dry run. The apply command updates only the `tags` field and preserves publication status, preorder settings, variants, prices, inventory, and images. Set `DATABASE_URL` to the intended environment before running either command.
+## Designed catalog photos
+
+`Catalogo_Slow_Completo.pdf` (repo parent folder) is the reference for the exported catalog and the default `public/slowfit/catalog.pdf`. To re-import its product photos and color dots after a new design:
+
+```bash
+python tools/catalog-import/extract_new_catalog.py ../Catalogo_Slow_Completo.pdf
+```
+
+This writes `public/slowfit/catalog-photos/<SLW code>/<color>-N.jpg` and `manifest.json`. The exporter (`app/lib/catalog-pdf`) uses those photos when a product's inventory colors match the manifest's `raw` names, and falls back to the color-tagged product images otherwise. Layout, colors and copy live in `app/lib/catalog-pdf/template.ts`.
