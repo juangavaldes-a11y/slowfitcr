@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import type { Copy, Locale } from "./i18n";
 import { apiRequest } from "./lib/api-client";
 import LocaleSwitcher from "./locale-switcher";
+import NotificationBell from "./notification-bell";
 
 type SiteNavigationProps = {
   copy: Copy;
@@ -51,6 +52,9 @@ export default function SiteNavigation({ copy, locale, modules }: SiteNavigation
     { href: `/${locale}/admin/ops`, label: copy.nav.operations },
     { href: `/${locale}/admin/inventory`, label: copy.nav.inventory },
     { href: `/${locale}/admin/inventory/analytics`, label: copy.nav.inventoryAnalytics },
+    { href: `/${locale}/admin/customers`, label: copy.nav.customers },
+    { href: `/${locale}/admin/pos`, label: copy.nav.pos },
+    { href: `/${locale}/admin/invoices`, label: copy.nav.invoices },
   ] : [];
   const sectionHashes = new Set(["#collections", "#why-slow", "#contacto"]);
   const active = {
@@ -203,6 +207,12 @@ export default function SiteNavigation({ copy, locale, modules }: SiteNavigation
             </Space>
             <LocaleSwitcher locale={locale} />
           </div>
+          {(adminAuthorized && modules.admin) || (customerAuthenticated && modules.customerAccount) ? (
+            <div className="slowfit-nav-bells">
+              {adminAuthorized && modules.admin ? <NotificationBell audience="admin" locale={locale} /> : null}
+              {customerAuthenticated && modules.customerAccount ? <NotificationBell audience="customer" locale={locale} /> : null}
+            </div>
+          ) : null}
           <Button
             type="text"
             className="slowfit-menu-trigger"

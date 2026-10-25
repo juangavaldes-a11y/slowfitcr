@@ -156,6 +156,7 @@ function makeLedger() {
     product: { update: async () => undefined },
     inventorySettings: { findUnique: async () => null },
     paymentMethod: { findMany: async () => [] },
+    layaway: { findMany: async () => [], count: async () => 0 },
     order: { findMany: async () => [] },
   };
   const prisma = { ...model, $transaction: async (fn) => fn(model) };
@@ -297,6 +298,7 @@ function makeImportLedger() {
     product: { update: async () => undefined },
     inventorySettings: { findUnique: async () => null, upsert: async () => undefined },
     paymentMethod: { findMany: async () => [] },
+    layaway: { findMany: async () => [], count: async () => 0 },
     order: { findMany: async () => [] },
   };
   const handlers = createInventoryHandlers({

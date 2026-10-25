@@ -149,6 +149,13 @@ test("validates destination fields, coordinates and country", () => {
   assert.equal(ok.address.country, "CR");
 });
 
+test("keeps the district separate from the street address", () => {
+  const withDistrict = normalizeDeliveryDestination({ ...validDestination, district: " San Pedro ", postalCode: "10301" });
+  assert.equal(withDistrict.address.district, "San Pedro");
+  assert.equal(withDistrict.address.postalCode, "10301");
+  assert.equal(normalizeDeliveryDestination(validDestination).address.district, "");
+});
+
 test("builds the configured pickup from the environment", () => {
   const keys = ["NAME", "PHONE", "ADDRESS", "CITY", "STATE"];
   keys.forEach((key) => { process.env[`DELIVERY_PICKUP_${key}`] = { NAME: "Slow Fit", PHONE: "88919417", ADDRESS: "Barva", CITY: "Barva", STATE: "Heredia" }[key]; });

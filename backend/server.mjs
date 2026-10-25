@@ -15,7 +15,8 @@ import {
   quoteProvider,
   verifyProviderWebhook,
 } from "./delivery-providers.mjs";
-import { createInventoryHandlers } from "./inventory-admin.mjs";
+import { createInventoryHandlers, syncStorefrontStock } from "./inventory-admin.mjs";
+import { createLayawayHandlers, DEPOSIT_PERCENT } from "./layaways.mjs";
 import { createLoyverseStockHandler } from "./loyverse-stock.mjs";
 import { createOrderAdminHandlers } from "./order-admin.mjs";
 
@@ -621,6 +622,47 @@ const inventory = createInventoryHandlers({
   pushCatalog: pushCatalogToLoyverse,
 });
 
+async function createLayawayCheckout({ layaway, variant, customer, locale }) {
+  const providerUrl = process.env.PAYMENT_PROVIDER_URL;
+  const providerToken = process.env.PAYMENT_PROVIDER_TOKEN;
+  if (!providerUrl || !providerToken) throw new Error("PAYMENT_NOT_CONFIGURED");
+  const origin = process.env.APP_ORIGIN || "https://slowfitcr.com";
+  const checkoutLocale = normalizeLocale(locale);
+  const deposit = Number(layaway.depositCrc);
+  const response = await fetch(providerUrl, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${providerToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      reference: layaway.paymentReference,
+      currency: process.env.STORE_CURRENCY || "CRC",
+      amount: deposit,
+      fullAmount: Number(layaway.unitPriceCrc),
+      orderType: "LAYAWAY_DEPOSIT",
+      depositPercent: DEPOSIT_PERCENT,
+      customerEmail: customer.email,
+      items: [{ variantId: variant.id, sku: variant.sku, name: variant.title, quantity: 1, unitPrice: deposit, lineTotal: deposit, layaway: true }],
+      returnUrl: `${origin}/${checkoutLocale}/account?payment=success&reference=${layaway.paymentReference}`,
+      cancelUrl: `${origin}/${checkoutLocale}/shop?payment=cancelled`,
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || !result.checkoutUrl) throw new Error("PAYMENT_PROVIDER_ERROR");
+  return result.checkoutUrl;
+}
+
+const layaways = createLayawayHandlers({
+  prisma,
+  jsonResponse,
+  readJson,
+  isAdmin: (request) => isModeratorAuthorized(request),
+  getCustomerSession: getCustomerSessionFromRequest,
+  appendAudit,
+  syncStorefrontStock,
+  pushInventory: pushInventoryToLoyverse,
+  loadInventoryView: () => inventory.loadView(),
+  createCheckout: createLayawayCheckout,
+});
+
 const orderAdmin = createOrderAdminHandlers({
   prisma,
   jsonResponse,
@@ -829,6 +871,112 @@ async function createPaymentSession(lines, locale, deliveryId) {
   }
 }
 
+const CONTACT_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// The email and consent stay out of the destination object because that object is forwarded to courier providers.
+function normalizeCustomerContactInput(input) {
+  const email = String(input?.email || "").trim().toLowerCase();
+  if (!email) return {};
+  if (email.length > 254 || !CONTACT_EMAIL_PATTERN.test(email)) throw new Error("INVALID_DELIVERY_EMAIL");
+  return { email, marketingConsent: input?.marketingConsent === true };
+}
+
+// Hacienda identification types and the digit counts of their numbers.
+const INVOICE_ID_TYPES = { "01": [9], "02": [10], "03": [11, 12], "04": [10] };
+
+function normalizeInvoiceRequestInput(input) {
+  if (!input || input.requested === false || !input.idType) return {};
+  const idType = String(input.idType).trim();
+  const idNumber = String(input.idNumber || "").replace(/\D/g, "");
+  const name = String(input.name || "").trim();
+  const economicActivity = String(input.economicActivity || "").replace(/\D/g, "") || null;
+  if (!INVOICE_ID_TYPES[idType] || !INVOICE_ID_TYPES[idType].includes(idNumber.length) || !name || name.length > 100
+    || (economicActivity && (economicActivity.length < 4 || economicActivity.length > 6))) {
+    throw new Error("INVALID_DELIVERY_INVOICE");
+  }
+  return { invoice: { idType, idNumber, name, economicActivity } };
+}
+
+async function recordInvoiceRequest(externalPaymentId, contact) {
+  if (!contact?.invoice) return;
+  const order = await prisma.order.findUnique({ where: { externalPaymentId }, select: { id: true, email: true } });
+  if (!order) return;
+  const { idType, idNumber, name, economicActivity } = contact.invoice;
+  const email = String(contact.email || order.email);
+  await prisma.invoiceRequest.upsert({
+    where: { orderId: order.id },
+    create: { orderId: order.id, idType, idNumber, name, email, economicActivity },
+    update: {},
+  });
+}
+
+async function handleAdminInvoiceRequests(request) {
+  if (!(await isModeratorAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
+  const url = parseUrl(request);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 20, 100);
+  const status = getTrimmedParam(url, "status");
+  const where = status && status !== "all" ? { status } : {};
+  const [total, invoiceRequests] = await Promise.all([
+    prisma.invoiceRequest.count({ where }),
+    prisma.invoiceRequest.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      include: { order: { select: { orderNumber: true, name: true, total: true, currency: true, externalPaymentId: true } } },
+    }),
+  ]);
+  return jsonResponse({ total, invoiceRequests });
+}
+
+async function recordCustomerContact({ email, name, phone, marketingConsent }) {
+  const ordersCount = await prisma.order.count({ where: { email } });
+  const now = new Date();
+  const details = {
+    ...(name ? { name: String(name).slice(0, 100) } : {}),
+    ...(phone ? { phone: String(phone).slice(0, 20) } : {}),
+  };
+  await prisma.customerContact.upsert({
+    where: { email },
+    create: { email, ...details, marketingConsent: marketingConsent === true, ordersCount, firstOrderAt: now, lastOrderAt: now },
+    update: {
+      ...details,
+      ordersCount,
+      lastOrderAt: now,
+      // Consent is only ever raised by an explicit opt-in; a later order without it never revokes it.
+      ...(marketingConsent === true ? { marketingConsent: true } : {}),
+    },
+  });
+}
+
+async function handleAdminCustomers(request) {
+  if (!(await isModeratorAuthorized(request))) return jsonResponse({ error: "Unauthorized" }, 401);
+  const url = parseUrl(request);
+  const page = parsePageNumber(url.searchParams.get("page"), 1, 1000);
+  const pageSize = parsePageSize(url.searchParams.get("pageSize"), 20, 500);
+  const query = getTrimmedParam(url, "q");
+  const where = query
+    ? {
+      OR: [
+        { email: { contains: query, mode: "insensitive" } },
+        { name: { contains: query, mode: "insensitive" } },
+        { phone: { contains: query } },
+      ],
+    }
+    : {};
+  const [total, customers] = await Promise.all([
+    prisma.customerContact.count({ where }),
+    prisma.customerContact.findMany({
+      where,
+      orderBy: { lastOrderAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
+  return jsonResponse({ total, customers });
+}
+
 async function handleDeliveryProviders() {
   return jsonResponse({ providers: configuredDeliveryProviders() });
 }
@@ -843,6 +991,7 @@ async function handleDeliveryQuotes(request) {
     if (!providers.length) return jsonResponse({ error: "Delivery providers are not configured" }, 503);
     const [items, pickup] = await Promise.all([resolveCartItems(lines), Promise.resolve(configuredPickup())]);
     const destination = normalizeDeliveryDestination(payload.destination);
+    const customerContact = { ...normalizeCustomerContactInput(payload.destination), ...normalizeInvoiceRequestInput(payload.destination?.invoice) };
     const manifest = items.map((item) => ({ name: item.name, quantity: item.quantity }));
     const results = await Promise.allSettled(providers.map(({ id }) => quoteProvider(id, {
       pickup,
@@ -873,7 +1022,7 @@ async function handleDeliveryQuotes(request) {
           quoteExpiresAt: new Date(quote.expiresAt),
           pickup,
           dropoff: { address: destination.address, notes: destination.notes },
-          contact: { name: destination.name, phone: destination.phone },
+          contact: { name: destination.name, phone: destination.phone, ...customerContact },
           manifest,
           dropoffEta: quote.dropoffEta ? new Date(quote.dropoffEta) : null,
           rawQuote: quote.raw,
@@ -1166,6 +1315,7 @@ function normalizeCatalogProduct(payload) {
   const status = String(payload.status || "DRAFT").toUpperCase();
   const published = payload.published === true;
   const preorderEnabled = payload.preorderEnabled === true;
+  const cabys = payload.cabys === undefined ? undefined : String(payload.cabys ?? "").replace(/\s/g, "") || null;
   const tags = Array.from(new Set((Array.isArray(payload.tags) ? payload.tags : [])
     .map((tag) => String(tag).trim().toLowerCase())
     .filter(Boolean)));
@@ -1174,6 +1324,9 @@ function normalizeCatalogProduct(payload) {
 
   if (!title || title.length > 120 || !handle || handle.length > 160 || description.length > 5000) {
     throw new Error("Invalid product details");
+  }
+  if (cabys && !/^\d{13}$/.test(cabys)) {
+    throw new Error("Invalid CABYS code");
   }
   if (!["DRAFT", "ACTIVE", "ARCHIVED"].includes(status) || tags.length > 20 || tags.some((tag) => tag.length > 40)) {
     throw new Error("Invalid product status or tags");
@@ -1223,7 +1376,7 @@ function normalizeCatalogProduct(payload) {
     return { id, url, altText, color, position };
   });
 
-  return { title, handle, description, status, published, preorderEnabled, tags, variants, images };
+  return { title, handle, description, status, published, preorderEnabled, cabys, tags, variants, images };
 }
 
 function paymentInventoryLines(items) {
@@ -1243,6 +1396,10 @@ function paymentInventoryLines(items) {
 }
 
 async function processOrderEvent({ topic, provider, payload }, options = { replay: false }) {
+  if (payload.orderType === "LAYAWAY_DEPOSIT") {
+    await layaways.handlePaymentEvent(topic, String(payload.reference || payload.id || "").trim());
+    return;
+  }
   const email = String(payload.email || "").trim().toLowerCase();
   const externalPaymentId = String(payload.reference || payload.id || "").trim();
   const linkedPreorderId = String(payload.linkedPreorderId || "").trim();
@@ -1417,6 +1574,23 @@ async function processOrderEvent({ topic, provider, payload }, options = { repla
     }, { isolationLevel: "Serializable" });
     if (topic === "payment.failed") {
       await releaseInventoryReservation(externalPaymentId);
+    }
+    if (topic === "payment.paid" && !isPreorderFinalPayment) {
+      const delivery = await prisma.delivery.findFirst({
+        where: { paymentReference: externalPaymentId },
+        select: { contact: true },
+      });
+      await recordCustomerContact({
+        email,
+        name: delivery?.contact?.name || payload.customerName || payload.name,
+        phone: delivery?.contact?.phone,
+        marketingConsent: delivery?.contact?.marketingConsent,
+      }).catch((error) => {
+        log("error", "customer.contact.record_failed", { error: String(error?.message || "unknown_error") });
+      });
+      await recordInvoiceRequest(externalPaymentId, delivery?.contact).catch((error) => {
+        log("error", "invoice.request.record_failed", { error: String(error?.message || "unknown_error") });
+      });
     }
   }
 
@@ -2366,6 +2540,7 @@ async function handleCreateCatalogProduct(request) {
         status: input.status,
         published: input.published,
         preorderEnabled: input.preorderEnabled,
+        cabys: input.cabys,
         tags: input.tags,
         minPrice: Math.min(...input.variants.map((variant) => variant.price)),
         inventoryTotal: input.variants.reduce((total, variant) => total + variant.inventoryQuantity, 0),
@@ -2454,6 +2629,7 @@ async function handleUpdateCatalogProduct(request, productId) {
           status: input.status,
           published: input.published,
           preorderEnabled: input.preorderEnabled,
+          cabys: input.cabys,
           tags: input.tags,
           minPrice: Math.min(...input.variants.map((variant) => variant.price)),
           inventoryTotal: input.variants.reduce((total, variant) => total + variant.inventoryQuantity, 0),
@@ -3031,6 +3207,11 @@ export async function route(request) {
     return handleUpdateCustomerFavorite(request, decodeURIComponent(favoriteMatch[1]), method === "PUT");
   }
 
+  if (pathname === "/api/account/layaways" && method === "GET") return layaways.listCustomerLayaways(request);
+  if (pathname === "/api/account/layaways" && method === "POST") return layaways.createCustomerLayaway(request);
+  if (pathname === "/api/account/notifications" && method === "GET") return layaways.listCustomerNotifications(request);
+  if (pathname === "/api/account/notifications/read" && method === "POST") return layaways.markCustomerNotificationsRead(request);
+
   if (pathname === "/api/account/cart" && method === "GET") {
     return handleCustomerCart(request);
   }
@@ -3097,6 +3278,14 @@ export async function route(request) {
     return handleAdminDeliveries(request);
   }
 
+  if (pathname === "/api/admin/invoice-requests" && method === "GET") {
+    return handleAdminInvoiceRequests(request);
+  }
+
+  if (pathname === "/api/admin/customers" && method === "GET") {
+    return handleAdminCustomers(request);
+  }
+
   if (pathname === "/api/admin/orders" && method === "GET") {
     return orderAdmin.listOrders(request);
   }
@@ -3113,6 +3302,16 @@ export async function route(request) {
   if (pathname === "/api/admin/inventory/import" && method === "POST") return inventory.importLines(request);
   if (pathname === "/api/admin/inventory/sync-catalog" && method === "POST") return inventory.syncCatalogToLoyverse(request);
   if (pathname === "/api/admin/inventory/lines" && method === "POST") return inventory.createLine(request);
+  if (pathname === "/api/admin/layaways" && method === "GET") return layaways.listAdminLayaways(request);
+  if (pathname === "/api/admin/layaways" && method === "POST") return layaways.createAdminLayaway(request);
+  const layawayConfirmMatch = pathname.match(/^\/api\/admin\/layaways\/([^/]+)\/confirm-deposit$/);
+  if (layawayConfirmMatch && method === "POST") return layaways.confirmDeposit(request, decodeURIComponent(layawayConfirmMatch[1]));
+  const layawayCompleteMatch = pathname.match(/^\/api\/admin\/layaways\/([^/]+)\/complete$/);
+  if (layawayCompleteMatch && method === "POST") return layaways.completeLayaway(request, decodeURIComponent(layawayCompleteMatch[1]));
+  const layawayReleaseMatch = pathname.match(/^\/api\/admin\/layaways\/([^/]+)\/release$/);
+  if (layawayReleaseMatch && method === "POST") return layaways.releaseLayaway(request, decodeURIComponent(layawayReleaseMatch[1]));
+  if (pathname === "/api/admin/notifications" && method === "GET") return layaways.listAdminNotifications(request);
+  if (pathname === "/api/admin/notifications/read" && method === "POST") return layaways.markAdminNotificationsRead(request);
   const inventoryLineMatch = pathname.match(/^\/api\/admin\/inventory\/lines\/([^/]+)$/);
   if (inventoryLineMatch && method === "PATCH") return inventory.updateLine(request, decodeURIComponent(inventoryLineMatch[1]));
   if (pathname === "/api/admin/inventory/sales" && method === "GET") return inventory.listSales(request);
@@ -3222,6 +3421,14 @@ export function createRequestListener() {
 export function startServer() {
   validateProductionConfiguration();
   void ensureBootstrapAdmin().catch((error) => log("error", "admin.bootstrap.failed", { error: String(error?.message || "unknown_error") }));
+  const layawayJob = (name, job) => () => void job().catch((error) => log("error", `layaway.${name}_failed`, { error: String(error?.message || "unknown_error") }));
+  // The 45-day deadline check runs once a day (it is idempotent, so a restart that repeats it is harmless).
+  const dailyDeadlines = layawayJob("deadlines", () => layaways.processDeadlines());
+  dailyDeadlines();
+  setInterval(dailyDeadlines, 24 * 60 * 60_000).unref?.();
+  const staleHolds = layawayJob("stale_holds", () => layaways.releaseStaleHolds());
+  staleHolds();
+  setInterval(staleHolds, 15 * 60_000).unref?.();
   const outboxInterval = setInterval(() => {
     void releaseExpiredReservations().catch((error) => log("error", "inventory.reservation.cleanup_failed", { error: String(error?.message || "unknown_error") }));
     void drainOutbox().catch((error) => log("error", "outbox.drain_failed", { error: String(error?.message || "unknown_error") }));

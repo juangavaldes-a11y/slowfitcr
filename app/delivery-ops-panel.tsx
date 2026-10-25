@@ -14,7 +14,7 @@ type DeliveryRow = {
   feeMinor: number;
   currency: string;
   contact: { name?: string; phone?: string };
-  dropoff: { address?: { streetAddress?: string[]; city?: string; state?: string } };
+  dropoff: { address?: { streetAddress?: string[]; district?: string; city?: string; state?: string } };
   trackingUrl?: string | null;
   errorMessage?: string | null;
   createdAt: string;
@@ -143,6 +143,7 @@ export default function DeliveryOpsPanel({ locale, onUnauthorized }: {
       width: 260,
       render: (_value, row) => [
         ...(row.dropoff.address?.streetAddress ?? []),
+        row.dropoff.address?.district,
         row.dropoff.address?.city,
         row.dropoff.address?.state,
       ].filter(Boolean).join(", "),

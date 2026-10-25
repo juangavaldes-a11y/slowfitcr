@@ -7,6 +7,7 @@ import "./globals.css";
 import Analytics from "./analytics";
 import { getPreferredLocale, isLocale } from "./i18n";
 import Providers from "./providers";
+import WebVitals from "./web-vitals";
 import { projectConfig } from "../packages/core/config";
 
 const displayFont = Cormorant_Garamond({
@@ -49,6 +50,7 @@ export default async function RootLayout({
       <body>
         <AntdRegistry>
           <Analytics />
+          <WebVitals />
           <Providers>{children}</Providers>
         </AntdRegistry>
       </body>

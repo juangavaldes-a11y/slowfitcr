@@ -178,6 +178,19 @@ Exit criteria:
 
 ## 6. Production observability and operations
 
+### Page speed and traffic telemetry (free tier)
+
+Code is in place: `app/web-vitals.tsx` sends TTFB, FCP, LCP, INP, and CLS to GA4 as events (value, `metric_rating`, `metric_id`, `page_path`). It does nothing until `NEXT_PUBLIC_GA_ID` is set. Still to do:
+
+- [ ] Create a GA4 property and set `NEXT_PUBLIC_GA_ID` in the Cloudflare build environment (read at build time, so redeploy after setting).
+- [ ] Verify in GA4 DebugView that `LCP`, `TTFB`, `INP`, `CLS` events and `page_view` arrive from staging.
+- [ ] Register `metric_rating` and `page_path` as GA4 custom dimensions so vitals can be broken down by page.
+- [ ] Enable Cloudflare Web Analytics (Cloudflare dashboard, Web Analytics) for cookieless visitor counts and per-page Core Web Vitals that are not affected by ad blockers or consent.
+- [ ] Review the Workers observability dashboard (already enabled in `wrangler.jsonc`) for request volume, errors, and server latency.
+- [ ] Decide on a cookie/consent notice for GA4 for Costa Rica and any EU visitors.
+- [ ] Optional: add a daily unique-visitor counter table in Postgres if first-party counts are needed. Do not send web vitals to `/api/events`; it writes an audit row per event.
+- [ ] Set performance targets after the first week of data (for example LCP under 2.5 s, INP under 200 ms, CLS under 0.1 at p75) and list the slowest pages.
+
 Before launch:
 
 - Centralize backend JSON logs with request ID, status, duration, and environment.
@@ -228,6 +241,64 @@ Within 24 hours:
 Within 7 days:
 
 - Review accessibility and mobile analytics.
+- Review the first week of Core Web Vitals and visitor counts (GA4 and Cloudflare Web Analytics) and prioritize the slowest pages.
 - Rotate any temporary launch credentials.
 - Prioritize production findings and add regression tests.
 - Reassess the coverage threshold and raise it as new modules receive direct tests.
+
+## 9. Open feature work before launch
+
+Status of the customer database, barcode labels, POS link, shipping guides, and electronic invoicing. The first group is built and needs a database to verify; the second and third are blocked on third-party access.
+
+### Built, not yet verified against a database
+
+The new backend tests were written but never run: the machine used for development had no PostgreSQL. Do this on staging or in CI:
+
+- [ ] Apply the migrations `20261021120000_add_customer_contact` and `20261021140000_add_cabys_and_invoice_request` (see section 3) and run `npm run test:backend`.
+- [ ] Place a staging order with an email and the consent box checked. Confirm one `CustomerContact` row (name, phone, consent, orders count) and that a second order raises the count without clearing the phone or consent.
+- [ ] Confirm `/admin/customers` lists, searches, and exports the contact to CSV.
+- [ ] Print a sheet of barcode labels (roll 50 x 25 mm and A4 3 x 7) on the real printer and scan them with the real scanner. The Code 128 encoding was checked against a reference library, but print quality and label stock were not.
+- [ ] Confirm Uber Direct and DiDi still quote and dispatch with the new province, canton, and district fields (the district is now part of the courier street address).
+- [ ] Add a Playwright test for the delivery form (location selects, email, invoice block). There is none today.
+- [ ] Give every variant a SKU. Labels and the Loyverse sync skip variants without one.
+- [ ] Update the privacy policy for the stored contact data and consent, and confirm with a lawyer whether the customer database must be registered under Costa Rica's data protection law (Ley 8968).
+- [ ] Decide how consented contacts will be used. Consent is stored but nothing sends marketing email yet.
+
+### Loyverse point of sale
+
+- [ ] Loyverse cannot be embedded in an iframe (its login sends `X-Frame-Options: sameorigin`), so `/admin/pos` opens it in a new tab. Decide whether that is enough or whether an in-house POS screen is needed.
+
+### Correos de Costa Rica (Pymexpress) — not started
+
+Blocked on access. Needed from Correos:
+
+- [ ] Web service documentation, sandbox and production credentials, and the contract or account number.
+
+Then build:
+
+- [ ] A `correos` provider in `backend/delivery-providers.mjs` (quote, dispatch, cancel) and its tests. The district code from the location selects gives the province, canton, and district Correos requires.
+- [ ] Weight per product, or a default weight in settings, for the rate.
+- [ ] Migration for tracking number, label PDF, weight, and service on `Delivery`.
+- [ ] A "Generate guide" button and label print in `app/delivery-ops-panel.tsx`, and the tracking number shown to the customer.
+- [ ] Add `"correos"` to the provider types in `app/cart/cart-context.tsx` and `app/delivery-ops-panel.tsx`, and to the webhook route if Correos sends status updates.
+- [ ] Define the provider environment variables and add them to section 2.
+
+### Electronic invoicing with Hacienda (TRIBU-CR, v4.4) — requests captured, issuing not started
+
+Done: product `cabys` field, the checkout "I want an electronic invoice" block, the `InvoiceRequest` table, and `/admin/invoices`. Requests stay in status `REQUESTED`.
+
+Blocked on access. Needed from Hacienda and the business:
+
+- [ ] Registration as an invoice issuer in TRIBU-CR, with an API user, the cryptographic key (`.p12`) and its PIN, and sandbox credentials.
+- [ ] The current v4.4 technical annex. Confirm the API and authentication endpoints from official documentation; the portal domain is `ovitribucr.hacienda.go.cr`, not the one first mentioned.
+- [ ] A CABYS code on every product (the field is optional today) and the tax treatment for each, including 13% IVA.
+
+Then build:
+
+- [ ] `backend/hacienda-invoice.mjs`: build the v4.4 XML, sign it, send it through the outbox queue with retries, and poll for acceptance or rejection.
+- [ ] Consecutive numbering and the 50-digit key, with a safeguard against numbering gaps and duplicates.
+- [ ] Move `InvoiceRequest` through `ISSUED`, `FAILED`, and `CANCELLED`, and store the sent XML and Hacienda's response.
+- [ ] PDF representation, email delivery with Resend, and download of the XML and PDF from the customer account and the admin.
+- [ ] Credit notes for cancelled orders (`backend/order-admin.mjs` cancellation path).
+- [ ] Let preorders and logged-in customers request an invoice after payment. Preorders skip the delivery form today, so they cannot ask for one.
+- [ ] Keep the key, PIN, and API credentials only in backend secrets and validate them in `validateProductionConfiguration`. Test everything in the Hacienda sandbox before any production invoice.

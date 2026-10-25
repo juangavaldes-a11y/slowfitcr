@@ -35,6 +35,9 @@ export default function AdminShell({
         operations: "Operaciones",
         inventory: "Inventario y costos",
         inventoryAnalytics: "Ventas y proyecciones",
+        customers: "Clientes",
+        pos: "Punto de venta",
+        invoices: "Facturas",
         authTitle: "Acceso de moderacion",
         authCopy: "La sesion permanece activa hasta que expire o cierres sesion.",
         token: "Token de moderacion",
@@ -54,6 +57,9 @@ export default function AdminShell({
         operations: "Operations",
         inventory: "Inventory & costs",
         inventoryAnalytics: "Sales & projections",
+        customers: "Customers",
+        pos: "Point of sale",
+        invoices: "Invoices",
         authTitle: "Moderation access",
         authCopy: "Your session remains active until it expires or you sign out.",
         token: "Moderation token",
@@ -100,6 +106,15 @@ export default function AdminShell({
             </Link>
             <Link href={`/${locale}/admin/inventory/analytics`}>
               <Button>{labels.inventoryAnalytics}</Button>
+            </Link>
+            <Link href={`/${locale}/admin/customers`}>
+              <Button>{labels.customers}</Button>
+            </Link>
+            <Link href={`/${locale}/admin/pos`}>
+              <Button>{labels.pos}</Button>
+            </Link>
+            <Link href={`/${locale}/admin/invoices`}>
+              <Button>{labels.invoices}</Button>
             </Link>
           </Space>
         </Space> : null}

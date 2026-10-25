@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudUploadOutlined, DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, StopOutlined, UploadOutlined } from "@ant-design/icons";
+import { CloudUploadOutlined, ClockCircleOutlined, DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, StopOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Alert, Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Radio, Row, Select,
   Space, Statistic, Switch, Table, Tag, Typography, Upload, message,
@@ -26,6 +26,17 @@ type Cost = {
   contributionPerUnitCrc: number | null;
   contributionMargin: number | null;
 };
+type LayawaySummary = {
+  id: string;
+  size: Size;
+  status: "PENDING_PAYMENT" | "ACTIVE";
+  phase: "OK" | "WARNING" | "EXPIRED" | null;
+  customerName: string | null;
+  customerEmail: string | null;
+  depositCrc: number;
+  holdExpiresAt: string | null;
+  expiresAt: string | null;
+};
 type Line = {
   id: string;
   code: string;
@@ -33,6 +44,8 @@ type Line = {
   color: string;
   sizes: SizeMap;
   remaining: SizeMap;
+  layaways: LayawaySummary[];
+  layawayPhase: "WARNING" | "EXPIRED" | null;
   soldQuantity: number;
   remainingQuantity: number;
   unitPriceUsd: number;
@@ -83,6 +96,8 @@ type FxRate = { date: string; buyRate: number; sellRate: number; stale: boolean 
 type CatalogSync = { queued: boolean; products: number; variants: number; reason?: string };
 type SaleForm = { size: Size; quantity: number; unitPriceCrc: number; discountCrc: number; soldAt: dayjs.Dayjs; paymentMethod: string; note?: string };
 
+type LayawayForm = { size: Size; customerName: string; customerEmail?: string; unitPriceCrc: number; note?: string };
+
 type EditForm = { code: string; productName: string; color: string; unitPriceUsd: number; piecesPerGarment: number; salePriceCrc: number | null } & Record<Size, number>;
 
 const SETTING_FIELDS: Array<{ key: string; es: string; en: string }> = [
@@ -126,6 +141,11 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [editLine, setEditLine] = useState<Line | "new" | null>(null);
   const [editForm] = Form.useForm<EditForm>();
+  const [layawayLine, setLayawayLine] = useState<Line | null>(null);
+  const [layawayForm] = Form.useForm<LayawayForm>();
+  const [completeLayaway, setCompleteLayaway] = useState<LayawaySummary | null>(null);
+  const [completeForm] = Form.useForm<{ paymentMethod: string }>();
+  const layawayPrice = Form.useWatch("unitPriceCrc", layawayForm);
 
   const es = locale === "es";
   const labels = useMemo(() => es ? {
@@ -155,6 +175,13 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     importMode: "Modo de importacion", modeAdd: "Sumar al inventario", modeReplace: "Reemplazar inventario",
     modeAddHint: "Las cantidades del archivo se suman a las existencias actuales (ideal para un nuevo pedido).",
     modeReplaceHint: "Las cantidades iniciales se reemplazan por las del archivo; lo ya vendido sigue vendido.",
+    layaways: "Apartados", layaway: "Apartar", layawayTitle: "Apartar pieza", layawaySaved: "Apartado creado.",
+    layawayCustomer: "Nombre del cliente", layawayEmail: "Correo del cliente (opcional)", layawayDeposit: "Deposito del 20% (redondeado hacia arriba)",
+    layawayHint: "La pieza sale del inventario por mes y medio (45 dias) desde que se registra el deposito.",
+    layawayExpires: "vence", layawayPending: "deposito pendiente, se libera", layawayConfirm: "Confirmar deposito", layawayConfirmed: "Deposito confirmado.",
+    layawayComplete: "Convertir en venta", layawayCompleteTitle: "Convertir apartado en venta", layawayCompleted: "Apartado convertido en venta.",
+    layawayCompleteHint: "Se registra la venta al precio completo con el metodo de pago del saldo. La pieza ya estaba fuera del inventario.",
+    release: "Liberar", releaseConfirm: "Liberar este apartado y devolver la pieza al inventario?", released: "Apartado liberado.",
     syncLoyverse: "Sincronizar con Loyverse",
     syncLoyverseConfirm: "Esto envia todo el catalogo activo (precios, colores, tallas y existencias) a Loyverse. Usalo la primera vez, cuando Loyverse esta vacio. Continuar?",
     syncQueued: "Catalogo enviado a Loyverse", syncEmpty: "No hay productos activos para sincronizar.",
@@ -171,6 +198,8 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       INVALID_QUANTITY: "La cantidad debe ser un numero entero mayor a 0.", INVALID_QUANTITY_EXCEEDS_STOCK: "La cantidad supera las existencias disponibles de esa talla.",
       INVALID_SIZE: "Talla no valida.", INVALID_PAYMENT_METHOD: "Selecciona un metodo de pago.", INVALID_DISCOUNT: "El descuento no puede superar el total de la venta.",
       INVALID_DATE: "La fecha de la venta no es valida.", NOT_FOUND: "El registro ya no existe. Actualiza la pagina.", ALREADY_VOIDED: "Esta venta ya fue anulada.",
+      UNAVAILABLE: "Esa talla ya no tiene piezas disponibles.", INVALID_PRICE: "Indica un precio de venta mayor a 0.", INVALID_EMAIL: "El correo no es valido.",
+      ALREADY_ACTIVE: "Este apartado ya esta activo.", ALREADY_COMPLETED: "Este apartado ya fue convertido en venta.", INVALID_STATUS: "Solo se pueden convertir apartados con el deposito confirmado.", ALREADY_RELEASED: "Este apartado ya fue liberado.",
       INVALID_SOURCE: "No se pueden editar las ventas generadas por pedidos web.", ALREADY_REFUNDED: "No se puede editar una venta con devoluciones. Anulala y registrala de nuevo.",
     } as Record<string, string>,
   } : {
@@ -200,6 +229,13 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     importMode: "Import mode", modeAdd: "Add to inventory", modeReplace: "Replace inventory",
     modeAddHint: "File quantities are added to current stock (ideal for a new order).",
     modeReplaceHint: "Initial quantities are replaced with the file's; items already sold stay sold.",
+    layaways: "Layaways", layaway: "Reserve", layawayTitle: "Reserve piece", layawaySaved: "Layaway created.",
+    layawayCustomer: "Customer name", layawayEmail: "Customer email (optional)", layawayDeposit: "20% deposit (rounded up)",
+    layawayHint: "The piece leaves the inventory for a month and a half (45 days) from when the deposit is recorded.",
+    layawayExpires: "expires", layawayPending: "deposit pending, released", layawayConfirm: "Confirm deposit", layawayConfirmed: "Deposit confirmed.",
+    layawayComplete: "Convert to sale", layawayCompleteTitle: "Convert layaway to sale", layawayCompleted: "Layaway converted to a sale.",
+    layawayCompleteHint: "The sale is recorded at the full price with the payment method of the balance. The piece was already out of the inventory.",
+    release: "Release", releaseConfirm: "Release this layaway and return the piece to the inventory?", released: "Layaway released.",
     syncLoyverse: "Sync with Loyverse",
     syncLoyverseConfirm: "This sends the entire active catalog (prices, colors, sizes and stock) to Loyverse. Use it the first time, when Loyverse is empty. Continue?",
     syncQueued: "Catalog sent to Loyverse", syncEmpty: "There are no active products to sync.",
@@ -216,6 +252,8 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       INVALID_QUANTITY: "Quantity must be a whole number greater than 0.", INVALID_QUANTITY_EXCEEDS_STOCK: "Quantity exceeds the available stock for that size.",
       INVALID_SIZE: "Invalid size.", INVALID_PAYMENT_METHOD: "Select a payment method.", INVALID_DISCOUNT: "The discount cannot exceed the sale total.",
       INVALID_DATE: "The sale date is not valid.", NOT_FOUND: "The record no longer exists. Refresh the page.", ALREADY_VOIDED: "This sale was already voided.",
+      UNAVAILABLE: "That size has no pieces left.", INVALID_PRICE: "Enter a sale price above 0.", INVALID_EMAIL: "The email is not valid.",
+      ALREADY_ACTIVE: "This layaway is already active.", ALREADY_COMPLETED: "This layaway was already converted to a sale.", INVALID_STATUS: "Only layaways with a confirmed deposit can be converted.", ALREADY_RELEASED: "This layaway was already released.",
       INVALID_SOURCE: "Sales generated by website orders cannot be edited.", ALREADY_REFUNDED: "A sale with refunds cannot be edited. Void it and record it again.",
     } as Record<string, string>,
   }, [es]);
@@ -443,6 +481,26 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     }
   };
 
+  const openLayaway = (line: Line) => {
+    setLayawayLine(line);
+    layawayForm.setFieldsValue({
+      size: SIZES.find((size) => line.remaining[size] > 0) ?? "M",
+      customerName: "", customerEmail: "", unitPriceCrc: line.cost.salePriceCrc ?? 0, note: "",
+    });
+  };
+
+  const submitLayaway = async (values: LayawayForm) => {
+    if (!layawayLine) return;
+    if (await mutate("/api/admin/layaways", "POST", { ...values, lineId: layawayLine.id }, labels.layawaySaved)) setLayawayLine(null);
+  };
+
+  const confirmDeposit = (layawayId: string) => void mutate(`/api/admin/layaways/${layawayId}/confirm-deposit`, "POST", {}, labels.layawayConfirmed);
+  const submitComplete = async (values: { paymentMethod: string }) => {
+    if (!completeLayaway) return;
+    if (await mutate(`/api/admin/layaways/${completeLayaway.id}/complete`, "POST", values, labels.layawayCompleted)) setCompleteLayaway(null);
+  };
+  const releaseLayaway = (layawayId: string) => void mutate(`/api/admin/layaways/${layawayId}/release`, "POST", {}, labels.released);
+
   const openHistory = async () => {
     setHistoryOpen(true);
     try {
@@ -528,6 +586,31 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
         </Space>
       ),
     },
+    {
+      title: labels.layaways,
+      width: 300,
+      render: (_, line) => line.layaways.length === 0 ? null : (
+        <Space orientation="vertical" size={6}>
+          {line.layaways.map((layaway) => {
+            const pending = layaway.status === "PENDING_PAYMENT";
+            const color = pending ? "blue" : layaway.phase === "EXPIRED" ? "red" : layaway.phase === "WARNING" ? "gold" : "green";
+            const when = pending ? `${labels.layawayPending} ${dayjs(layaway.holdExpiresAt).format("DD/MM HH:mm")}` : `${labels.layawayExpires} ${dayjs(layaway.expiresAt).format("DD/MM/YYYY")}`;
+            return (
+              <Space key={layaway.id} size={4} wrap>
+                <Tag color={color} icon={<ClockCircleOutlined />} style={{ marginInlineEnd: 0 }}>
+                  {layaway.size} · {layaway.customerName || "-"} · {when}
+                </Tag>
+                {pending ? <Button size="small" type="primary" onClick={() => confirmDeposit(layaway.id)}>{labels.layawayConfirm}</Button> : null}
+                {!pending ? <Button size="small" icon={<ShoppingCartOutlined />} onClick={() => { setCompleteLayaway(layaway); completeForm.setFieldsValue({ paymentMethod: view?.paymentMethods.find((method) => method.active)?.name }); }}>{labels.layawayComplete}</Button> : null}
+                <Popconfirm title={labels.releaseConfirm} okText={labels.release} cancelText={labels.cancel} okButtonProps={{ danger: true }} onConfirm={() => releaseLayaway(layaway.id)}>
+                  <Button size="small" danger={layaway.phase === "EXPIRED"} type={layaway.phase === "EXPIRED" ? "primary" : "default"}>{labels.release}</Button>
+                </Popconfirm>
+              </Space>
+            );
+          })}
+        </Space>
+      ),
+    },
     { title: labels.left, dataIndex: "remainingQuantity", align: "right", sorter: (a, b) => a.remainingQuantity - b.remainingQuantity },
     { title: labels.sold, dataIndex: "soldQuantity", align: "right", sorter: (a, b) => a.soldQuantity - b.soldQuantity },
     { title: labels.unitUsd, dataIndex: "unitPriceUsd", align: "right", render: (value: number) => `$${value.toFixed(2)}` },
@@ -565,10 +648,11 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     {
       title: labels.actions,
       fixed: "right",
-      width: 190,
+      width: 280,
       render: (_, line) => (
         <Space size={4} wrap={false}>
           <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(line)}>{labels.edit}</Button>
+          <Button size="small" icon={<ClockCircleOutlined />} disabled={line.remainingQuantity < 1} onClick={() => openLayaway(line)}>{labels.layaway}</Button>
           <Button size="small" icon={<ShoppingCartOutlined />} disabled={line.remainingQuantity < 1} onClick={() => openSale(line)}>{labels.sell}</Button>
         </Space>
       ),
@@ -637,7 +721,8 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           ) : null}
         </Space>
         <Table<Line> rowKey="id" size="small" loading={loading} columns={columns} dataSource={lines}
-          pagination={{ pageSize: 25, showSizeChanger: false }} scroll={{ x: 1200 }} />
+          rowClassName={(line) => line.layawayPhase === "EXPIRED" ? "slowfit-row-layaway-expired" : line.layawayPhase === "WARNING" ? "slowfit-row-layaway-warning" : ""}
+          pagination={{ pageSize: 25, showSizeChanger: false }} scroll={{ x: 1500 }} />
 
         <Drawer title={labels.settings} open={settingsOpen} onClose={() => setSettingsOpen(false)} size="min(92vw, 420px)">
           <Form form={settingsForm} layout="vertical" onFinish={(values) => void saveSettings(values)}>
@@ -674,6 +759,31 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
             <Form.Item name="note" label={labels.note}>
               <Input.TextArea rows={2} maxLength={500} />
             </Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal title={labels.layawayCompleteTitle} open={Boolean(completeLayaway)} onCancel={() => setCompleteLayaway(null)}
+          okText={labels.layawayComplete} cancelText={labels.cancel} onOk={() => completeForm.submit()} destroyOnHidden forceRender>
+          <Form form={completeForm} layout="vertical" onFinish={(values) => void submitComplete(values)}>
+            <Typography.Paragraph type="secondary">{labels.layawayCompleteHint}</Typography.Paragraph>
+            <Form.Item name="paymentMethod" label={labels.method} rules={[{ required: true, message: labels.required }]}>
+              <Select options={(view?.paymentMethods ?? []).filter((method) => method.active).map((method) => ({ value: method.name, label: method.name }))} />
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        <Modal title={layawayLine ? `${labels.layawayTitle}: ${layawayLine.code} ${layawayLine.color}` : labels.layawayTitle} open={Boolean(layawayLine)}
+          onCancel={() => setLayawayLine(null)} okText={labels.layaway} cancelText={labels.cancel} onOk={() => layawayForm.submit()} destroyOnHidden forceRender>
+          <Form form={layawayForm} layout="vertical" onFinish={(values) => void submitLayaway(values)}>
+            <Typography.Paragraph type="secondary">{labels.layawayHint}</Typography.Paragraph>
+            <Form.Item name="size" label={labels.size} rules={[{ required: true, message: labels.required }]}>
+              <Select options={SIZES.map((size) => ({ value: size, label: `${size} (${layawayLine?.remaining[size] ?? 0})`, disabled: (layawayLine?.remaining[size] ?? 0) < 1 }))} />
+            </Form.Item>
+            <Form.Item name="customerName" label={labels.layawayCustomer} rules={[{ required: true, message: labels.required }]}><Input maxLength={160} /></Form.Item>
+            <Form.Item name="customerEmail" label={labels.layawayEmail}><Input maxLength={254} type="email" /></Form.Item>
+            <Form.Item name="unitPriceCrc" label={labels.price} rules={[{ required: true, message: labels.required }]}><InputNumber min={1} style={{ width: "100%" }} /></Form.Item>
+            <Statistic title={labels.layawayDeposit} value={money(Math.ceil(Number(((layawayPrice ?? 0) * 0.2).toFixed(6))))} />
+            <Form.Item name="note" label={labels.note} style={{ marginTop: 16 }}><Input.TextArea rows={2} maxLength={500} /></Form.Item>
           </Form>
         </Modal>
 
