@@ -1343,7 +1343,7 @@ function normalizeCatalogProduct(payload) {
     const variantTitle = [size, color].filter(Boolean).join(" / ");
     const sku = String(variant.sku || "").trim() || null;
     const price = Number(variant.price);
-    const compareAtPrice = variant.compareAtPrice === null || variant.compareAtPrice === ""
+    const compareAtPrice = variant.compareAtPrice === undefined || variant.compareAtPrice === null || variant.compareAtPrice === ""
       ? null
       : Number(variant.compareAtPrice);
     const inventoryQuantity = Number(variant.inventoryQuantity);
