@@ -17,6 +17,7 @@ import {
 } from "./delivery-providers.mjs";
 import { createInventoryHandlers, syncStorefrontStock } from "./inventory-admin.mjs";
 import { createLayawayHandlers, DEPOSIT_PERCENT } from "./layaways.mjs";
+import { createPettyCashHandlers } from "./petty-cash.mjs";
 import { createLoyverseStockHandler } from "./loyverse-stock.mjs";
 import { createOrderAdminHandlers } from "./order-admin.mjs";
 
@@ -661,6 +662,14 @@ const layaways = createLayawayHandlers({
   pushInventory: pushInventoryToLoyverse,
   loadInventoryView: () => inventory.loadView(),
   createCheckout: createLayawayCheckout,
+});
+
+const pettyCash = createPettyCashHandlers({
+  prisma,
+  jsonResponse,
+  readJson,
+  isAdmin: (request) => isModeratorAuthorized(request),
+  appendAudit,
 });
 
 const orderAdmin = createOrderAdminHandlers({
@@ -3310,6 +3319,13 @@ export async function route(request) {
   if (layawayCompleteMatch && method === "POST") return layaways.completeLayaway(request, decodeURIComponent(layawayCompleteMatch[1]));
   const layawayReleaseMatch = pathname.match(/^\/api\/admin\/layaways\/([^/]+)\/release$/);
   if (layawayReleaseMatch && method === "POST") return layaways.releaseLayaway(request, decodeURIComponent(layawayReleaseMatch[1]));
+  if (pathname === "/api/admin/petty-cash" && method === "GET") return pettyCash.listPettyCash(request);
+  if (pathname === "/api/admin/petty-cash" && method === "POST") return pettyCash.createPettyCashEntry(request);
+  if (pathname === "/api/admin/petty-cash/recurring" && method === "POST") return pettyCash.createRecurring(request);
+  const pettyRecurringMatch = pathname.match(/^\/api\/admin\/petty-cash\/recurring\/([^/]+)$/);
+  if (pettyRecurringMatch && method === "PATCH") return pettyCash.updateRecurring(request, decodeURIComponent(pettyRecurringMatch[1]));
+  const pettyVoidMatch = pathname.match(/^\/api\/admin\/petty-cash\/([^/]+)\/void$/);
+  if (pettyVoidMatch && method === "POST") return pettyCash.voidPettyCashEntry(request, decodeURIComponent(pettyVoidMatch[1]));
   if (pathname === "/api/admin/notifications" && method === "GET") return layaways.listAdminNotifications(request);
   if (pathname === "/api/admin/notifications/read" && method === "POST") return layaways.markAdminNotificationsRead(request);
   const inventoryLineMatch = pathname.match(/^\/api\/admin\/inventory\/lines\/([^/]+)$/);
@@ -3426,6 +3442,9 @@ export function startServer() {
   const dailyDeadlines = layawayJob("deadlines", () => layaways.processDeadlines());
   dailyDeadlines();
   setInterval(dailyDeadlines, 24 * 60 * 60_000).unref?.();
+  const monthlyExpenses = () => void pettyCash.generateRecurring().catch((error) => log("error", "petty_cash.recurring_failed", { error: String(error?.message || "unknown_error") }));
+  monthlyExpenses();
+  setInterval(monthlyExpenses, 6 * 60 * 60_000).unref?.();
   const staleHolds = layawayJob("stale_holds", () => layaways.releaseStaleHolds());
   staleHolds();
   setInterval(staleHolds, 15 * 60_000).unref?.();

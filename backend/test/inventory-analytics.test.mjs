@@ -54,3 +54,33 @@ test("refunds reduce revenue and units; restocked units also drop their cost", (
   assert.equal(result.totals.units, 2);
   assert.equal(result.totals.revenue, 18000);
 });
+
+test("petty cash expenses reduce profit and recovery; active layaway deposits are shown apart from sales", () => {
+  const expense = (date, amountCrc, category, extra = {}) => ({ type: "EXPENSE", date: new Date(date), amountCrc, category, voidedAt: null, ...extra });
+  const result = buildAnalytics({
+    lines,
+    commissionRate: 0,
+    invested: 100000,
+    now,
+    sales: [sale("2026-10-02", 2, 15000)],
+    expenses: [
+      expense("2026-10-02T10:00:00Z", 5000, "FIXED_SERVICE"),
+      expense("2026-10-05T10:00:00Z", 2000, "UNEXPECTED"),
+      expense("2026-10-06T10:00:00Z", 9999, "OTHER", { voidedAt: now }),
+    ],
+    layaways: [
+      { status: "ACTIVE", unitPriceCrc: 20000, depositCrc: 6000 },
+      { status: "COMPLETED", unitPriceCrc: 20000, depositCrc: 4000 },
+    ],
+  });
+  assert.equal(result.totals.expenses, 7000);
+  assert.equal(result.totals.profitAfterExpenses, 13000);
+  assert.equal(result.totals.recoveredPct, 0.23);
+  assert.equal(result.totals.depositsReceived, 6000);
+  assert.equal(result.totals.receivable, 14000);
+  assert.equal(result.daily[0].expenses, 5000);
+  assert.deepEqual(result.expensesByMonthCategory, [
+    { month: "2026-10", category: "FIXED_SERVICE", amountCrc: 5000 },
+    { month: "2026-10", category: "UNEXPECTED", amountCrc: 2000 },
+  ]);
+});

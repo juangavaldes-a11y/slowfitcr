@@ -12,7 +12,7 @@ type Notice = {
   kind: string;
   readAt: string | null;
   createdAt: string;
-  params: { code?: string | null; productName?: string | null; color?: string | null; size?: string; customerName?: string | null; expiresAt?: string | null };
+  params: { code?: string | null; productName?: string | null; color?: string | null; size?: string; customerName?: string | null; expiresAt?: string | null; depositCrc?: number; suggestedDepositCrc?: number | null; lowDepositReason?: string | null };
 };
 
 const POLL_MS = 60_000;
@@ -33,6 +33,12 @@ export function describeNotice(notice: Notice, audience: Audience, locale: "es" 
       return admin ? `${who}'s layaway (${piece}) expired on ${date}. You can release it from the inventory.` : `Your layaway (${piece}) expired on ${date}.`;
     case "LAYAWAY_REQUESTED":
       return es ? `${who} solicitó apartar ${piece}. Confirma el depósito en el inventario.` : `${who} requested a layaway for ${piece}. Confirm the deposit in the inventory.`;
+    case "LAYAWAY_LOW_DEPOSIT": {
+      const money = (value?: number | null) => new Intl.NumberFormat(es ? "es-CR" : "en-US", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }).format(value ?? 0);
+      return es
+        ? `${who} dejó un depósito menor al 20% en ${piece}: ${money(params.depositCrc)} de ${money(params.suggestedDepositCrc)} sugeridos.`
+        : `${who} left a deposit below 20% on ${piece}: ${money(params.depositCrc)} of ${money(params.suggestedDepositCrc)} suggested.`;
+    }
     case "LAYAWAY_PAID":
       return es ? `${who} pagó en línea el depósito de ${piece}.` : `${who} paid the deposit for ${piece} online.`;
     case "LAYAWAY_PAYMENT_CONFLICT":

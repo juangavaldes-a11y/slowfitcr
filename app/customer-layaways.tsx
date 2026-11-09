@@ -11,6 +11,7 @@ type CustomerLayaway = {
   phase: "OK" | "WARNING" | "EXPIRED" | null;
   unitPriceCrc: number;
   depositCrc: number;
+  suggestedDepositCrc?: number | null;
   holdExpiresAt: string | null;
   expiresAt: string | null;
   line?: { productName: string; color: string };
@@ -51,7 +52,7 @@ export default function CustomerLayaways({ locale }: { locale: "es" | "en" }) {
           <div>
             <Typography.Title level={4}>{layaway.line ? `${layaway.line.productName} · ${layaway.line.color}` : ""} ({layaway.size})</Typography.Title>
             <Typography.Text type="secondary">
-              {es ? "Depósito del 20%" : "20% deposit"}: {money.format(layaway.depositCrc)} · {es ? "Precio" : "Price"}: {money.format(layaway.unitPriceCrc)}
+              {layaway.suggestedDepositCrc != null && layaway.depositCrc !== layaway.suggestedDepositCrc ? (es ? "Depósito recibido" : "Deposit received") : (es ? "Depósito del 20%" : "20% deposit")}: {money.format(layaway.depositCrc)} · {es ? "Precio" : "Price"}: {money.format(layaway.unitPriceCrc)}
             </Typography.Text>
           </div>
           <div className="slowfit-order-status">{status(layaway)}</div>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildInventoryView } from "../inventory-admin.mjs";
-import { createLayawayHandlers, deadlineFrom, depositFor, heldBySize, layawayPhase, worstPhase } from "../layaways.mjs";
+import { createLayawayHandlers, deadlineFrom, depositFor, heldBySize, layawayPhase, resolveDeposit, worstPhase } from "../layaways.mjs";
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-11-01T12:00:00Z");
@@ -325,4 +325,54 @@ test("notification feeds are scoped by audience and can be marked as read", asyn
   assert.equal((await handlers.markAdminNotificationsRead({})).status, 400);
   state.admin = false;
   assert.equal((await handlers.listAdminNotifications({})).status, 401);
+});
+
+test("resolveDeposit defaults to 20% and demands a reason below it", () => {
+  assert.deepEqual(resolveDeposit(15001), { depositCrc: 3001, suggestedDepositCrc: 3001, lowDepositReason: null, lowDepositNote: "" });
+  assert.equal(resolveDeposit(15001, { depositCrc: 8000 }).lowDepositReason, null);
+  assert.equal(resolveDeposit(15001, { depositCrc: 15001 }).depositCrc, 15001);
+  assert.throws(() => resolveDeposit(15001, { depositCrc: 1000 }), /INVALID_REASON/);
+  assert.throws(() => resolveDeposit(15001, { depositCrc: 1000, lowDepositReason: "NOPE" }), /INVALID_REASON/);
+  assert.throws(() => resolveDeposit(15001, { depositCrc: 0 }), /INVALID_DEPOSIT/);
+  assert.throws(() => resolveDeposit(15001, { depositCrc: 15002 }), /INVALID_DEPOSIT/);
+  assert.throws(() => resolveDeposit(15001, { depositCrc: "abc" }), /INVALID_DEPOSIT/);
+  const low = resolveDeposit(15001, { depositCrc: 1000, lowDepositReason: "PAYS_LATER", lowDepositNote: " paga el viernes " });
+  assert.deepEqual([low.depositCrc, low.lowDepositReason, low.lowDepositNote], [1000, "PAYS_LATER", "paga el viernes"]);
+});
+
+test("admin layaway records the real deposit, the balance, and alerts the admin when it is low", async () => {
+  const { handlers, db, state } = setup();
+  state.body = { lineId: "l1", size: "M", customerName: "Ana", depositCrc: 1000 };
+  assert.equal((await handlers.createAdminLayaway({})).status, 400);
+  assert.equal(db.layaways.length, 0);
+  state.body = { lineId: "l1", size: "M", customerName: "Ana", depositCrc: 1000, lowDepositReason: "PROMO" };
+  assert.equal((await handlers.createAdminLayaway({})).status, 201);
+  assert.equal(db.layaways[0].depositCrc, 1000);
+  assert.equal(db.layaways[0].suggestedDepositCrc, 3001);
+  assert.deepEqual(db.notifications.map((n) => [n.audience, n.kind]), [["ADMIN", "LAYAWAY_LOW_DEPOSIT"]]);
+  const [listed] = (await handlers.listAdminLayaways({})).body.layaways;
+  assert.deepEqual([listed.lowDeposit, listed.balanceCrc, listed.lowDepositReason], [true, 14001, "PROMO"]);
+});
+
+test("a bigger deposit is accepted without a reason and lowers the balance", async () => {
+  const { handlers, db, state } = setup();
+  state.body = { lineId: "l1", size: "M", customerName: "Ana", depositCrc: 9000 };
+  assert.equal((await handlers.createAdminLayaway({})).status, 201);
+  assert.equal(db.notifications.length, 0);
+  assert.equal((await handlers.listAdminLayaways({})).body.layaways[0].balanceCrc, 6001);
+});
+
+test("confirming a requested deposit can record a different amount", async () => {
+  const variant = { id: "v1", size: "M", color: "Black", price: 15001, product: { handle: "top", status: "ACTIVE", published: true } };
+  const { handlers, db, state } = setup({ variants: [variant] });
+  state.body = { variantId: "v1", mode: "request" };
+  await handlers.createCustomerLayaway({});
+  state.body = { depositCrc: 500 };
+  assert.equal((await handlers.confirmDeposit({}, db.layaways[0].id)).status, 400);
+  assert.equal(db.layaways[0].status, "PENDING_PAYMENT");
+  state.body = { depositCrc: 500, lowDepositReason: "PAYS_LATER" };
+  assert.equal((await handlers.confirmDeposit({}, db.layaways[0].id)).status, 200);
+  assert.equal(db.layaways[0].status, "ACTIVE");
+  assert.equal(db.layaways[0].depositCrc, 500);
+  assert.ok(db.notifications.some((n) => n.kind === "LAYAWAY_LOW_DEPOSIT"));
 });

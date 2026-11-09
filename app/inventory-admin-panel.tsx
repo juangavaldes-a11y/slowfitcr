@@ -34,6 +34,12 @@ type LayawaySummary = {
   customerName: string | null;
   customerEmail: string | null;
   depositCrc: number;
+  unitPriceCrc: number;
+  suggestedDepositCrc: number | null;
+  balanceCrc: number;
+  lowDeposit: boolean;
+  lowDepositReason: string | null;
+  lowDepositNote: string;
   holdExpiresAt: string | null;
   expiresAt: string | null;
 };
@@ -96,7 +102,24 @@ type FxRate = { date: string; buyRate: number; sellRate: number; stale: boolean 
 type CatalogSync = { queued: boolean; products: number; variants: number; reason?: string };
 type SaleForm = { size: Size; quantity: number; unitPriceCrc: number; discountCrc: number; soldAt: dayjs.Dayjs; paymentMethod: string; note?: string };
 
-type LayawayForm = { size: Size; customerName: string; customerEmail?: string; unitPriceCrc: number; note?: string };
+type DepositFields = { depositCrc?: number | null; lowDepositReason?: string; lowDepositNote?: string };
+type LayawayForm = DepositFields & { size: Size; customerName: string; customerEmail?: string; unitPriceCrc: number; note?: string };
+const LOW_DEPOSIT_REASONS = ["PAYS_LATER", "PROMO", "FREQUENT_CUSTOMER", "OTHER"] as const;
+const suggestedDeposit = (price: number) => Math.ceil(Number(((price || 0) * 0.2).toFixed(6)));
+
+// Reason selector and note, shown only when the recorded deposit is below the suggested 20%.
+function LowDepositFields({ deposit, suggested, labels, reasons }: { deposit: number | null | undefined; suggested: number; labels: { required: string; lowDepositWarning: string; lowDepositReason: string; lowDepositNote: string }; reasons: Record<string, string> }) {
+  if (deposit == null || deposit >= suggested) return null;
+  return (
+    <>
+      <Alert type="warning" showIcon style={{ marginBottom: 12 }} message={labels.lowDepositWarning} />
+      <Form.Item name="lowDepositReason" label={labels.lowDepositReason} rules={[{ required: true, message: labels.required }]}>
+        <Select options={LOW_DEPOSIT_REASONS.map((reason) => ({ value: reason, label: reasons[reason] }))} />
+      </Form.Item>
+      <Form.Item name="lowDepositNote" label={labels.lowDepositNote}><Input.TextArea rows={2} maxLength={300} /></Form.Item>
+    </>
+  );
+}
 
 type EditForm = { code: string; productName: string; color: string; unitPriceUsd: number; piecesPerGarment: number; salePriceCrc: number | null } & Record<Size, number>;
 
@@ -146,6 +169,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [completeLayaway, setCompleteLayaway] = useState<LayawaySummary | null>(null);
   const [completeForm] = Form.useForm<{ paymentMethod: string }>();
   const layawayPrice = Form.useWatch("unitPriceCrc", layawayForm);
+  const layawayDeposit = Form.useWatch("depositCrc", layawayForm);
+  const [confirmLayaway, setConfirmLayaway] = useState<LayawaySummary | null>(null);
+  const [confirmForm] = Form.useForm<DepositFields>();
+  const confirmDepositValue = Form.useWatch("depositCrc", confirmForm);
 
   const es = locale === "es";
   const labels = useMemo(() => es ? {
@@ -178,6 +205,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     layaways: "Apartados", layaway: "Apartar", layawayTitle: "Apartar pieza", layawaySaved: "Apartado creado.",
     layawayCustomer: "Nombre del cliente", layawayEmail: "Correo del cliente (opcional)", layawayDeposit: "Deposito del 20% (redondeado hacia arriba)",
     layawayHint: "La pieza sale del inventario por mes y medio (45 dias) desde que se registra el deposito.",
+    layawayDepositReceived: "Deposito recibido (vacio = el 20%)", layawayBalance: "Saldo", layawayConfirmTitle: "Confirmar deposito",
+    lowDepositTag: "deposito bajo", lowDepositWarning: "El deposito es menor al 20% sugerido. Indica el motivo para dejar constancia.",
+    lowDepositReason: "Motivo", lowDepositNote: "Detalle (opcional)",
+    reason_PAYS_LATER: "El cliente pagara despues", reason_PROMO: "Promocion", reason_FREQUENT_CUSTOMER: "Cliente frecuente", reason_OTHER: "Otro",
     layawayExpires: "vence", layawayPending: "deposito pendiente, se libera", layawayConfirm: "Confirmar deposito", layawayConfirmed: "Deposito confirmado.",
     layawayComplete: "Convertir en venta", layawayCompleteTitle: "Convertir apartado en venta", layawayCompleted: "Apartado convertido en venta.",
     layawayCompleteHint: "Se registra la venta al precio completo con el metodo de pago del saldo. La pieza ya estaba fuera del inventario.",
@@ -199,6 +230,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       INVALID_SIZE: "Talla no valida.", INVALID_PAYMENT_METHOD: "Selecciona un metodo de pago.", INVALID_DISCOUNT: "El descuento no puede superar el total de la venta.",
       INVALID_DATE: "La fecha de la venta no es valida.", NOT_FOUND: "El registro ya no existe. Actualiza la pagina.", ALREADY_VOIDED: "Esta venta ya fue anulada.",
       UNAVAILABLE: "Esa talla ya no tiene piezas disponibles.", INVALID_PRICE: "Indica un precio de venta mayor a 0.", INVALID_EMAIL: "El correo no es valido.",
+      INVALID_DEPOSIT: "El deposito debe ser mayor a 0 y no superar el precio.", INVALID_REASON: "Indica el motivo del deposito menor al 20%.",
       ALREADY_ACTIVE: "Este apartado ya esta activo.", ALREADY_COMPLETED: "Este apartado ya fue convertido en venta.", INVALID_STATUS: "Solo se pueden convertir apartados con el deposito confirmado.", ALREADY_RELEASED: "Este apartado ya fue liberado.",
       INVALID_SOURCE: "No se pueden editar las ventas generadas por pedidos web.", ALREADY_REFUNDED: "No se puede editar una venta con devoluciones. Anulala y registrala de nuevo.",
     } as Record<string, string>,
@@ -232,6 +264,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     layaways: "Layaways", layaway: "Reserve", layawayTitle: "Reserve piece", layawaySaved: "Layaway created.",
     layawayCustomer: "Customer name", layawayEmail: "Customer email (optional)", layawayDeposit: "20% deposit (rounded up)",
     layawayHint: "The piece leaves the inventory for a month and a half (45 days) from when the deposit is recorded.",
+    layawayDepositReceived: "Deposit received (empty = 20%)", layawayBalance: "Balance", layawayConfirmTitle: "Confirm deposit",
+    lowDepositTag: "low deposit", lowDepositWarning: "The deposit is below the suggested 20%. Give the reason so it is on record.",
+    lowDepositReason: "Reason", lowDepositNote: "Details (optional)",
+    reason_PAYS_LATER: "Customer will pay later", reason_PROMO: "Promotion", reason_FREQUENT_CUSTOMER: "Frequent customer", reason_OTHER: "Other",
     layawayExpires: "expires", layawayPending: "deposit pending, released", layawayConfirm: "Confirm deposit", layawayConfirmed: "Deposit confirmed.",
     layawayComplete: "Convert to sale", layawayCompleteTitle: "Convert layaway to sale", layawayCompleted: "Layaway converted to a sale.",
     layawayCompleteHint: "The sale is recorded at the full price with the payment method of the balance. The piece was already out of the inventory.",
@@ -253,12 +289,16 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       INVALID_SIZE: "Invalid size.", INVALID_PAYMENT_METHOD: "Select a payment method.", INVALID_DISCOUNT: "The discount cannot exceed the sale total.",
       INVALID_DATE: "The sale date is not valid.", NOT_FOUND: "The record no longer exists. Refresh the page.", ALREADY_VOIDED: "This sale was already voided.",
       UNAVAILABLE: "That size has no pieces left.", INVALID_PRICE: "Enter a sale price above 0.", INVALID_EMAIL: "The email is not valid.",
+      INVALID_DEPOSIT: "The deposit must be above 0 and not exceed the price.", INVALID_REASON: "Give the reason for a deposit below 20%.",
       ALREADY_ACTIVE: "This layaway is already active.", ALREADY_COMPLETED: "This layaway was already converted to a sale.", INVALID_STATUS: "Only layaways with a confirmed deposit can be converted.", ALREADY_RELEASED: "This layaway was already released.",
       INVALID_SOURCE: "Sales generated by website orders cannot be edited.", ALREADY_REFUNDED: "A sale with refunds cannot be edited. Void it and record it again.",
     } as Record<string, string>,
   }, [es]);
 
   const crc = useMemo(() => new Intl.NumberFormat(es ? "es-CR" : "en-US", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }), [es]);
+  const reasonLabels: Record<string, string> = {
+    PAYS_LATER: labels.reason_PAYS_LATER, PROMO: labels.reason_PROMO, FREQUENT_CUSTOMER: labels.reason_FREQUENT_CUSTOMER, OTHER: labels.reason_OTHER,
+  };
   const money = (value: number | null | undefined) => (value === null || value === undefined ? "-" : crc.format(value));
 
   const handleError = (error: unknown, fallback: string) => {
@@ -485,7 +525,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     setLayawayLine(line);
     layawayForm.setFieldsValue({
       size: SIZES.find((size) => line.remaining[size] > 0) ?? "M",
-      customerName: "", customerEmail: "", unitPriceCrc: line.cost.salePriceCrc ?? 0, note: "",
+      customerName: "", customerEmail: "", unitPriceCrc: line.cost.salePriceCrc ?? 0, note: "", depositCrc: null, lowDepositReason: undefined, lowDepositNote: "",
     });
   };
 
@@ -494,7 +534,16 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     if (await mutate("/api/admin/layaways", "POST", { ...values, lineId: layawayLine.id }, labels.layawaySaved)) setLayawayLine(null);
   };
 
-  const confirmDeposit = (layawayId: string) => void mutate(`/api/admin/layaways/${layawayId}/confirm-deposit`, "POST", {}, labels.layawayConfirmed);
+  const openConfirmDeposit = (layaway: LayawaySummary) => {
+    setConfirmLayaway(layaway);
+    confirmForm.setFieldsValue({ depositCrc: layaway.depositCrc, lowDepositReason: undefined, lowDepositNote: "" });
+  };
+  const submitConfirmDeposit = async (values: DepositFields) => {
+    if (!confirmLayaway) return;
+    // Only send the amount when it differs from the one already recorded.
+    const body = values.depositCrc != null && values.depositCrc !== confirmLayaway.depositCrc ? values : {};
+    if (await mutate(`/api/admin/layaways/${confirmLayaway.id}/confirm-deposit`, "POST", body, labels.layawayConfirmed)) setConfirmLayaway(null);
+  };
   const submitComplete = async (values: { paymentMethod: string }) => {
     if (!completeLayaway) return;
     if (await mutate(`/api/admin/layaways/${completeLayaway.id}/complete`, "POST", values, labels.layawayCompleted)) setCompleteLayaway(null);
@@ -598,9 +647,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
             return (
               <Space key={layaway.id} size={4} wrap>
                 <Tag color={color} icon={<ClockCircleOutlined />} style={{ marginInlineEnd: 0 }}>
-                  {layaway.size} · {layaway.customerName || "-"} · {when}
+                  {layaway.size} · {layaway.customerName || "-"} · {when} · {money(layaway.depositCrc)} / {labels.layawayBalance} {money(layaway.balanceCrc)}
                 </Tag>
-                {pending ? <Button size="small" type="primary" onClick={() => confirmDeposit(layaway.id)}>{labels.layawayConfirm}</Button> : null}
+                {layaway.lowDeposit ? <Tag color="orange" style={{ marginInlineEnd: 0 }} title={layaway.lowDepositNote || undefined}>{labels.lowDepositTag}: {reasonLabels[layaway.lowDepositReason ?? ""] ?? layaway.lowDepositReason}</Tag> : null}
+                {pending ? <Button size="small" type="primary" onClick={() => openConfirmDeposit(layaway)}>{labels.layawayConfirm}</Button> : null}
                 {!pending ? <Button size="small" icon={<ShoppingCartOutlined />} onClick={() => { setCompleteLayaway(layaway); completeForm.setFieldsValue({ paymentMethod: view?.paymentMethods.find((method) => method.active)?.name }); }}>{labels.layawayComplete}</Button> : null}
                 <Popconfirm title={labels.releaseConfirm} okText={labels.release} cancelText={labels.cancel} okButtonProps={{ danger: true }} onConfirm={() => releaseLayaway(layaway.id)}>
                   <Button size="small" danger={layaway.phase === "EXPIRED"} type={layaway.phase === "EXPIRED" ? "primary" : "default"}>{labels.release}</Button>
@@ -772,6 +822,17 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           </Form>
         </Modal>
 
+        <Modal title={labels.layawayConfirmTitle} open={Boolean(confirmLayaway)} onCancel={() => setConfirmLayaway(null)}
+          okText={labels.layawayConfirm} cancelText={labels.cancel} onOk={() => confirmForm.submit()} destroyOnHidden forceRender>
+          <Form form={confirmForm} layout="vertical" onFinish={(values) => void submitConfirmDeposit(values)}>
+            <Statistic title={labels.layawayDeposit} value={money(confirmLayaway?.suggestedDepositCrc ?? suggestedDeposit(confirmLayaway?.unitPriceCrc ?? 0))} />
+            <Form.Item name="depositCrc" label={labels.layawayDepositReceived} style={{ marginTop: 16 }} rules={[{ required: true, message: labels.required }]}>
+              <InputNumber min={1} max={confirmLayaway?.unitPriceCrc} style={{ width: "100%" }} />
+            </Form.Item>
+            <LowDepositFields deposit={confirmDepositValue} suggested={confirmLayaway?.suggestedDepositCrc ?? suggestedDeposit(confirmLayaway?.unitPriceCrc ?? 0)} labels={labels} reasons={reasonLabels} />
+          </Form>
+        </Modal>
+
         <Modal title={layawayLine ? `${labels.layawayTitle}: ${layawayLine.code} ${layawayLine.color}` : labels.layawayTitle} open={Boolean(layawayLine)}
           onCancel={() => setLayawayLine(null)} okText={labels.layaway} cancelText={labels.cancel} onOk={() => layawayForm.submit()} destroyOnHidden forceRender>
           <Form form={layawayForm} layout="vertical" onFinish={(values) => void submitLayaway(values)}>
@@ -782,7 +843,11 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
             <Form.Item name="customerName" label={labels.layawayCustomer} rules={[{ required: true, message: labels.required }]}><Input maxLength={160} /></Form.Item>
             <Form.Item name="customerEmail" label={labels.layawayEmail}><Input maxLength={254} type="email" /></Form.Item>
             <Form.Item name="unitPriceCrc" label={labels.price} rules={[{ required: true, message: labels.required }]}><InputNumber min={1} style={{ width: "100%" }} /></Form.Item>
-            <Statistic title={labels.layawayDeposit} value={money(Math.ceil(Number(((layawayPrice ?? 0) * 0.2).toFixed(6))))} />
+            <Statistic title={labels.layawayDeposit} value={money(suggestedDeposit(layawayPrice ?? 0))} />
+            <Form.Item name="depositCrc" label={labels.layawayDepositReceived} style={{ marginTop: 16 }}>
+              <InputNumber min={1} max={layawayPrice || undefined} placeholder={String(suggestedDeposit(layawayPrice ?? 0))} style={{ width: "100%" }} />
+            </Form.Item>
+            <LowDepositFields deposit={layawayDeposit} suggested={suggestedDeposit(layawayPrice ?? 0)} labels={labels} reasons={reasonLabels} />
             <Form.Item name="note" label={labels.note} style={{ marginTop: 16 }}><Input.TextArea rows={2} maxLength={500} /></Form.Item>
           </Form>
         </Modal>

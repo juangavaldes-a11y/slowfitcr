@@ -35,6 +35,7 @@ export default function AdminShell({
         operations: "Operaciones",
         inventory: "Inventario y costos",
         inventoryAnalytics: "Ventas y proyecciones",
+        pettyCash: "Caja chica",
         customers: "Clientes",
         pos: "Punto de venta",
         invoices: "Facturas",
@@ -57,6 +58,7 @@ export default function AdminShell({
         operations: "Operations",
         inventory: "Inventory & costs",
         inventoryAnalytics: "Sales & projections",
+        pettyCash: "Petty cash",
         customers: "Customers",
         pos: "Point of sale",
         invoices: "Invoices",
@@ -106,6 +108,9 @@ export default function AdminShell({
             </Link>
             <Link href={`/${locale}/admin/inventory/analytics`}>
               <Button>{labels.inventoryAnalytics}</Button>
+            </Link>
+            <Link href={`/${locale}/admin/petty-cash`}>
+              <Button>{labels.pettyCash}</Button>
             </Link>
             <Link href={`/${locale}/admin/customers`}>
               <Button>{labels.customers}</Button>

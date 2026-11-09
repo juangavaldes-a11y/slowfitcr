@@ -563,7 +563,12 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
 
   const getAnalytics = guard(async (request) => {
     const params = new URL(request.url).searchParams;
-    const [view, sales] = await Promise.all([loadView(), prisma.inventorySale.findMany({ orderBy: { soldAt: "asc" } })]);
+    const [view, sales, expenses, layaways] = await Promise.all([
+      loadView(),
+      prisma.inventorySale.findMany({ orderBy: { soldAt: "asc" } }),
+      prisma.pettyCashEntry.findMany({ where: { type: "EXPENSE", voidedAt: null } }),
+      prisma.layaway.findMany({ where: { status: "ACTIVE" } }),
+    ]);
     return jsonResponse({
       restock: buildRestock({ lines: view.lines, sales, leadTimeDays: params.get("leadTimeDays"), coverageDays: params.get("coverageDays") }),
       crReady: view.crReady,
@@ -572,6 +577,8 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
         sales,
         commissionRate: view.settings.cardCommissionRate ?? 0,
         invested: view.totals.totalInventoryCostCrc ?? 0,
+        expenses,
+        layaways,
       }),
     });
   });

@@ -38,7 +38,9 @@ type Analytics = {
     units: number; revenue: number; commission: number; cost: number; profit: number; netRevenue: number;
     invested: number; recoveredPct: number | null; roi: number | null; remainingUnits: number;
     remainingCost: number; remainingNetRevenue: number;
+    expenses: number; profitAfterExpenses: number; depositsReceived: number; receivable: number;
   };
+  expensesByMonthCategory: Array<{ month: string; category: string; amountCrc: number }>;
   daily: Array<{ date: string; units: number; revenue: number; profit: number; cumulativeNetRevenue: number; cumulativeProfit: number }>;
   byMethod: Array<{ method: string; units: number; revenue: number }>;
   byProduct: Array<{ product: string; units: number; revenue: number; profit: number }>;
@@ -58,6 +60,8 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
 
   const labels = useMemo(() => es ? {
     title: "Ventas y proyecciones",
+    expensesLabel: "Gastos (caja chica)", profitAfter: "Utilidad despues de gastos", deposits: "Depositos de apartados recibidos", receivable: "Saldo por cobrar de apartados",
+    expensesChart: "Gastos por mes y categoria", FIXED_SERVICE: "Servicios fijos", UNEXPECTED: "Gastos inesperados", TECH_SERVICE: "Servicio tecnico", OTHER: "Otro",
     chartFail: "No pudimos mostrar esta grafica.",
     subtitle: "Ventas, margen, recuperacion de la inversion y proyecciones de retorno.",
     revenue: "Ingresos", profit: "Utilidad", units: "Prendas vendidas", invested: "Inversion", recovered: "Recuperado",
@@ -76,6 +80,8 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
     st_reorder_fast: "Pedir ya (alta rotacion)", st_reorder: "Pedir pronto", st_fast: "Alta rotacion", st_slow: "Baja rotacion", st_dead: "Sin ventas", st_normal: "Normal", st_none: "-",
   } : {
     title: "Sales & projections",
+    expensesLabel: "Expenses (petty cash)", profitAfter: "Profit after expenses", deposits: "Layaway deposits received", receivable: "Layaway balance receivable",
+    expensesChart: "Expenses by month and category", FIXED_SERVICE: "Fixed services", UNEXPECTED: "Unexpected costs", TECH_SERVICE: "Technical service", OTHER: "Other",
     chartFail: "We could not display this chart.",
     subtitle: "Sales, margin, investment recovery and return projections.",
     revenue: "Revenue", profit: "Profit", units: "Units sold", invested: "Investment", recovered: "Recovered",
@@ -152,6 +158,10 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
     return [...points, ...dates.map((date) => ({ date, value: data.totals.invested, series: labels.investedLine }))];
   }, [data, labels]);
 
+  const expenseSeries = useMemo(() => (data?.expensesByMonthCategory ?? []).map((row) => ({
+    ...row, category: (labels as Record<string, unknown>)[row.category] as string ?? row.category,
+  })), [data, labels]);
+
   const totals = data?.totals;
   const hasSales = (data?.daily?.length ?? 0) > 0;
   const axisMoney = { labelFormatter: (value: number) => `${Math.round(value / 1000)}k` };
@@ -178,6 +188,10 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
           <Col xs={12} md={6}><Card><Statistic title={labels.roi} value={percent(totals?.roi ?? null)} /></Card></Col>
           <Col xs={12} md={6}><Card><Statistic title={labels.revenue} value={crc.format(totals?.revenue ?? 0)} /></Card></Col>
           <Col xs={12} md={6}><Card><Statistic title={labels.units} value={totals?.units ?? 0} /></Card></Col>
+          <Col xs={12} md={6}><Card><Statistic title={labels.expensesLabel} value={crc.format(totals?.expenses ?? 0)} /></Card></Col>
+          <Col xs={12} md={6}><Card><Statistic title={labels.profitAfter} value={crc.format(totals?.profitAfterExpenses ?? 0)} /></Card></Col>
+          <Col xs={12} md={6}><Card><Statistic title={labels.deposits} value={crc.format(totals?.depositsReceived ?? 0)} /></Card></Col>
+          <Col xs={12} md={6}><Card><Statistic title={labels.receivable} value={crc.format(totals?.receivable ?? 0)} /></Card></Col>
           <Col xs={24} md={12}><Card><Statistic title={labels.remaining} value={crc.format(totals?.remainingNetRevenue ?? 0)} suffix={`/ ${totals?.remainingUnits ?? 0}`} /></Card></Col>
         </Row>
 
@@ -209,6 +223,12 @@ export default function InventoryAnalyticsPanel({ locale }: { locale: "es" | "en
             </Row>
           </Space>
         )}
+
+        {expenseSeries.length ? (
+          <Card title={labels.expensesChart} style={{ marginTop: 16 }}>
+            <ChartBoundary message={labels.chartFail} resetKey={expenseSeries}><Column data={expenseSeries} xField="month" yField="amountCrc" colorField="category" stack height={280} axis={{ y: axisMoney }} /></ChartBoundary>
+          </Card>
+        ) : null}
 
         <Card title={labels.projection} style={{ marginTop: 16 }}>
           {data?.projection && data.projection.weeksOfHistory < 4 ? <Alert type="info" showIcon title={labels.thinData} style={{ marginBottom: 12 }} /> : null}

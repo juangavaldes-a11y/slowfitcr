@@ -482,6 +482,9 @@ model Layaway {
   size              String
   unitPriceCrc      Decimal       @db.Decimal(14, 2)
   depositCrc        Decimal       @db.Decimal(14, 2)
+  suggestedDepositCrc Decimal?    @db.Decimal(14, 2)
+  lowDepositReason  String?
+  lowDepositNote    String        @default("")
   status            LayawayStatus @default(PENDING_PAYMENT)
   source            String
   paymentReference  String?       @unique
@@ -522,4 +525,33 @@ model Notification {
 
   @@unique([layawayId, kind, audience])
   @@index([audience, customerId, readAt, createdAt])
+}
+
+model PettyCashEntry {
+  id             String              @id @default(uuid())
+  date           DateTime
+  type           String
+  amountCrc      Decimal             @db.Decimal(14, 2)
+  category       String
+  description    String              @default("")
+  recurringId    String?
+  recurringMonth String?
+  voidedAt       DateTime?
+  createdAt      DateTime            @default(now())
+  recurring      PettyCashRecurring? @relation(fields: [recurringId], references: [id], onDelete: SetNull)
+
+  @@unique([recurringId, recurringMonth])
+  @@index([date])
+}
+
+model PettyCashRecurring {
+  id          String           @id @default(uuid())
+  amountCrc   Decimal          @db.Decimal(14, 2)
+  category    String
+  description String           @default("")
+  dayOfMonth  Int              @default(1)
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  entries     PettyCashEntry[]
 }

@@ -299,6 +299,7 @@ function makeImportLedger() {
     inventorySettings: { findUnique: async () => null, upsert: async () => undefined },
     paymentMethod: { findMany: async () => [] },
     layaway: { findMany: async () => [], count: async () => 0 },
+    pettyCashEntry: { findMany: async () => [] },
     order: { findMany: async () => [] },
   };
   const handlers = createInventoryHandlers({

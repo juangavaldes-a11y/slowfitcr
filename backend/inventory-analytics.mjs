@@ -1,3 +1,4 @@
+import { expenseBreakdown } from "./petty-cash.mjs";
 const DAY_MS = 86_400_000;
 const COMMISSION_METHODS = new Set(["card", "website checkout"]);
 
@@ -78,7 +79,7 @@ export function projectPayback({ invested, recovered, remainingNetRevenue, serie
   return result;
 }
 
-export function buildAnalytics({ lines, sales, commissionRate, invested, now = new Date() }) {
+export function buildAnalytics({ lines, sales, commissionRate, invested, expenses = [], layaways = [], now = new Date() }) {
   const lineById = new Map(lines.map((line) => [line.id, line]));
   const byDay = new Map();
   const byMethod = new Map();
@@ -117,6 +118,13 @@ export function buildAnalytics({ lines, sales, commissionRate, invested, now = n
     totals.profit += economics.profit;
   }
 
+  // Petty cash expenses reduce what has been recovered; layaway deposits are cash received but not yet a sale.
+  const spending = expenseBreakdown(expenses);
+  const totalExpenses = Object.values(spending.byDay).reduce((total, amount) => total + amount, 0);
+  const activeLayaways = layaways.filter((layaway) => layaway.status === "ACTIVE");
+  const depositsReceived = activeLayaways.reduce((total, layaway) => total + Number(layaway.depositCrc), 0);
+  const receivable = activeLayaways.reduce((total, layaway) => total + Math.max(0, Number(layaway.unitPriceCrc) - Number(layaway.depositCrc)), 0);
+
   const series = [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
   let cumulativeNet = 0;
   let cumulativeProfit = 0;
@@ -129,6 +137,7 @@ export function buildAnalytics({ lines, sales, commissionRate, invested, now = n
       revenue: round(day.revenue),
       netRevenue: round(day.netRevenue),
       profit: round(day.profit),
+      expenses: round(spending.byDay[day.date] ?? 0),
       cumulativeNetRevenue: round(cumulativeNet),
       cumulativeProfit: round(cumulativeProfit),
     };
@@ -142,15 +151,20 @@ export function buildAnalytics({ lines, sales, commissionRate, invested, now = n
   const remainingCost = lines.reduce((total, line) => total + (line.remainingQuantity ?? 0) * (line.cost?.costPerUnitCrc ?? 0), 0);
 
   const round2 = (entries) => entries.map((entry) => Object.fromEntries(Object.entries(entry).map(([key, value]) => [key, typeof value === "number" ? round(value) : value])));
-  const projection = projectPayback({ invested, recovered: cumulativeNet, remainingNetRevenue, series: daily, now });
+  const recovered = cumulativeNet - totalExpenses;
+  const projection = projectPayback({ invested, recovered, remainingNetRevenue, series: daily, now });
 
   return {
     totals: {
       ...Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, round(value)])),
       netRevenue: round(cumulativeNet),
+      expenses: round(totalExpenses),
+      profitAfterExpenses: round(totals.profit - totalExpenses),
+      depositsReceived: round(depositsReceived),
+      receivable: round(receivable),
       invested: round(invested),
-      recoveredPct: invested ? round(cumulativeNet / invested) : null,
-      roi: invested ? round((cumulativeNet - invested) / invested) : null,
+      recoveredPct: invested ? round(recovered / invested) : null,
+      roi: invested ? round((recovered - invested) / invested) : null,
       remainingUnits,
       remainingCost: round(remainingCost),
       remainingNetRevenue: round(remainingNetRevenue),
@@ -159,5 +173,6 @@ export function buildAnalytics({ lines, sales, commissionRate, invested, now = n
     byMethod: round2([...byMethod.values()].sort((a, b) => b.revenue - a.revenue)),
     byProduct: round2([...byProduct.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 15)),
     projection,
+    expensesByMonthCategory: spending.byMonthCategory,
   };
 }

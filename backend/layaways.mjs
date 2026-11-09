@@ -14,6 +14,22 @@ const HOUR_MS = 3_600_000;
 // The deposit is 20% of the price rounded up to the next whole colon.
 export const depositFor = (price) => Math.ceil(Number((Number(price) * DEPOSIT_PERCENT / 100).toFixed(6)));
 
+export const LOW_DEPOSIT_REASONS = ["PAYS_LATER", "PROMO", "FREQUENT_CUSTOMER", "OTHER"];
+
+// The recorded deposit defaults to the 20% suggestion; any other amount up to the full price is accepted.
+// Below the suggestion a reason is required so the administrator can follow it up.
+export function resolveDeposit(unitPriceCrc, body = {}) {
+  const suggestedDepositCrc = depositFor(unitPriceCrc);
+  const raw = body.depositCrc;
+  if (raw === undefined || raw === null || raw === "") return { depositCrc: suggestedDepositCrc, suggestedDepositCrc, lowDepositReason: null, lowDepositNote: "" };
+  const depositCrc = Math.round(Number(raw) * 100) / 100;
+  if (!Number.isFinite(depositCrc) || depositCrc <= 0 || depositCrc > Number(unitPriceCrc)) throw new Error("INVALID_DEPOSIT");
+  if (depositCrc >= suggestedDepositCrc) return { depositCrc, suggestedDepositCrc, lowDepositReason: null, lowDepositNote: "" };
+  const lowDepositReason = String(body.lowDepositReason || "").trim();
+  if (!LOW_DEPOSIT_REASONS.includes(lowDepositReason)) throw new Error("INVALID_REASON");
+  return { depositCrc, suggestedDepositCrc, lowDepositReason, lowDepositNote: String(body.lowDepositNote || "").trim().slice(0, 300) };
+}
+
 export const deadlineFrom = (start) => new Date(start.getTime() + LAYAWAY_DAYS * DAY_MS);
 
 // Phase of an active layaway: OK, WARNING (10 days or less left) or EXPIRED (past the deadline).
@@ -51,6 +67,11 @@ export function serializeLayaway(layaway, now = new Date()) {
     source: layaway.source,
     unitPriceCrc: Number(layaway.unitPriceCrc),
     depositCrc: Number(layaway.depositCrc),
+    suggestedDepositCrc: layaway.suggestedDepositCrc == null ? null : Number(layaway.suggestedDepositCrc),
+    balanceCrc: Math.max(0, Number(layaway.unitPriceCrc) - Number(layaway.depositCrc)),
+    lowDeposit: Boolean(layaway.lowDepositReason),
+    lowDepositReason: layaway.lowDepositReason ?? null,
+    lowDepositNote: layaway.lowDepositNote ?? "",
     customerName: layaway.customerName,
     customerEmail: layaway.customerEmail,
     note: layaway.note,
@@ -69,6 +90,9 @@ const notificationParams = (layaway) => ({
   color: layaway.line?.color ?? null,
   size: layaway.size,
   customerName: layaway.customerName,
+  depositCrc: Number(layaway.depositCrc),
+  suggestedDepositCrc: layaway.suggestedDepositCrc == null ? null : Number(layaway.suggestedDepositCrc),
+  lowDepositReason: layaway.lowDepositReason ?? null,
   expiresAt: layaway.expiresAt,
 });
 
@@ -197,6 +221,10 @@ export function createLayawayHandlers({
     return result;
   };
 
+  const notifyLowDeposit = (layaway) => layaway.lowDepositReason
+    ? notify([{ audience: "ADMIN", kind: "LAYAWAY_LOW_DEPOSIT", layawayId: layaway.id, params: notificationParams(layaway) }])
+    : null;
+
   const customerIdByEmail = async (email) => email
     ? (await prisma.customer.findUnique({ where: { email }, select: { id: true } }))?.id ?? null
     : null;
@@ -214,11 +242,13 @@ export function createLayawayHandlers({
     const unitPriceCrc = Number(body.unitPriceCrc ?? line.salePriceCrc);
     if (!Number.isFinite(unitPriceCrc) || unitPriceCrc <= 0) throw new Error("INVALID_PRICE");
     const startedAt = now();
+    const deposit = resolveDeposit(unitPriceCrc, body);
     const layaway = await holdPiece({
-      lineId: line.id, size, unitPriceCrc, depositCrc: depositFor(unitPriceCrc), status: "ACTIVE", source: "ADMIN",
+      lineId: line.id, size, unitPriceCrc, ...deposit, status: "ACTIVE", source: "ADMIN",
       customerName, customerEmail, customerId: await customerIdByEmail(customerEmail),
       note: String(body.note || "").slice(0, 500), startedAt, expiresAt: deadlineFrom(startedAt),
     });
+    await notifyLowDeposit(layaway);
     await appendAudit("layaway.created", { layawayId: layaway.id, lineId: line.id, size, depositCrc: Number(layaway.depositCrc) }, "admin");
     return jsonResponse(await loadInventoryView(), 201);
   });
@@ -233,6 +263,14 @@ export function createLayawayHandlers({
     if (!layaway) throw new Error("NOT_FOUND");
     if (layaway.status === "ACTIVE") throw new Error("ALREADY_ACTIVE");
     if (layaway.status === "RELEASED") throw new Error("ALREADY_RELEASED");
+    const body = await readJson(request);
+    const changed = body?.depositCrc !== undefined && body?.depositCrc !== null && body?.depositCrc !== "";
+    if (changed) {
+      const updated = await prisma.layaway.update({
+        where: { id: layawayId }, data: resolveDeposit(layaway.unitPriceCrc, body), include: { line: true },
+      });
+      await notifyLowDeposit(updated);
+    }
     await activate(layawayId, now());
     await appendAudit("layaway.deposit_confirmed", { layawayId }, "admin");
     return jsonResponse(await loadInventoryView());
@@ -260,7 +298,7 @@ export function createLayawayHandlers({
         data: {
           lineId: layaway.lineId, size: layaway.size, quantity: 1, unitPriceCrc: layaway.unitPriceCrc, discountCrc: 0,
           soldAt: now(), paymentMethod, source: SALE_SOURCE,
-          note: [`Apartado de ${layaway.customerName || "cliente"} (deposito ${Number(layaway.depositCrc)} CRC)`, layaway.note].filter(Boolean).join(" | ").slice(0, 500),
+          note: [`Apartado de ${layaway.customerName || "cliente"} (deposito ${Number(layaway.depositCrc)} CRC, saldo ${Math.max(0, Number(layaway.unitPriceCrc) - Number(layaway.depositCrc))} CRC)`, layaway.note].filter(Boolean).join(" | ").slice(0, 500),
         },
       });
       await transaction.layaway.update({ where: { id: layawayId }, data: { status: "COMPLETED", completedAt: now(), saleId: sale.id } });
@@ -290,7 +328,7 @@ export function createLayawayHandlers({
 
     const unitPriceCrc = Number(variant.price);
     const layaway = await holdPiece({
-      lineId: line.id, size, unitPriceCrc, depositCrc: depositFor(unitPriceCrc), status: "PENDING_PAYMENT",
+      lineId: line.id, size, unitPriceCrc, ...resolveDeposit(unitPriceCrc), status: "PENDING_PAYMENT",
       source: online ? "CUSTOMER_ONLINE" : "CUSTOMER_REQUEST", customerId: customer.id, customerEmail: customer.email,
       customerName: [customer.firstName, customer.lastName].filter(Boolean).join(" "),
       holdExpiresAt: new Date(now().getTime() + PENDING_HOLD_HOURS * HOUR_MS),
