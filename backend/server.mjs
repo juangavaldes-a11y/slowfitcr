@@ -3328,6 +3328,9 @@ export async function route(request) {
   if (pettyVoidMatch && method === "POST") return pettyCash.voidPettyCashEntry(request, decodeURIComponent(pettyVoidMatch[1]));
   if (pathname === "/api/admin/notifications" && method === "GET") return layaways.listAdminNotifications(request);
   if (pathname === "/api/admin/notifications/read" && method === "POST") return layaways.markAdminNotificationsRead(request);
+  if (pathname === "/api/admin/inventory/batches" && method === "POST") return inventory.createBatch(request);
+  const inventoryBatchMatch = pathname.match(/^\/api\/admin\/inventory\/batches\/([^/]+)$/);
+  if (inventoryBatchMatch && method === "PATCH") return inventory.updateBatch(request, decodeURIComponent(inventoryBatchMatch[1]));
   const inventoryLineMatch = pathname.match(/^\/api\/admin\/inventory\/lines\/([^/]+)$/);
   if (inventoryLineMatch && method === "PATCH") return inventory.updateLine(request, decodeURIComponent(inventoryLineMatch[1]));
   if (pathname === "/api/admin/inventory/sales" && method === "GET") return inventory.listSales(request);

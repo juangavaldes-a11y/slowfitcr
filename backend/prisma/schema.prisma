@@ -407,13 +407,36 @@ model InventoryLine {
   salePriceCrc      Decimal?        @db.Decimal(14, 2)
   supplierEquivalence String?
   position          Int             @default(0)
+  batchId           String?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
+  batch             InventoryBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
   sales             InventorySale[]
   layaways          Layaway[]
 
   @@unique([code, color])
   @@index([productHandle])
+  @@index([batchId])
+}
+
+// One supplier purchase. Shipping, printing and import costs belong to the purchase, so each one is spread only over its own lines.
+model InventoryBatch {
+  id                       String          @id @default(uuid())
+  name                     String
+  invoiceDate              DateTime?       @db.Date
+  hkShippingUsd            Decimal         @default(0) @db.Decimal(14, 2)
+  invoiceAdjustmentUsd     Decimal         @default(0) @db.Decimal(14, 2)
+  customizationPerPieceUsd Decimal         @default(0) @db.Decimal(10, 2)
+  logoPrintingUsd          Decimal         @default(0) @db.Decimal(14, 2)
+  sizePrintingUsd          Decimal         @default(0) @db.Decimal(14, 2)
+  packagingUsd             Decimal         @default(0) @db.Decimal(14, 2)
+  discountUsd              Decimal         @default(0) @db.Decimal(14, 2)
+  crShippingUsd            Decimal?        @db.Decimal(14, 2)
+  nationalizationCrc       Decimal?        @db.Decimal(14, 2)
+  otherImportCrc           Decimal?        @db.Decimal(14, 2)
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  lines                    InventoryLine[]
 }
 
 model InventorySale {

@@ -56,12 +56,18 @@ type Line = {
   remainingQuantity: number;
   unitPriceUsd: number;
   piecesPerGarment: number;
+  batchId: string | null;
   cost: Cost;
 };
 type Settings = Record<string, number | null>;
+// One supplier purchase with its own costs (shipping, printing, packaging, discount and the Costa Rica import costs).
+type BatchSummary = { crReady: boolean; lineCount: number; quantity: number; paidInvestmentUsd: number; totalInventoryCostCrc: number | null };
+type Batch = { id: string; name: string; invoiceDate: string | null; summary: BatchSummary } & Record<string, number | string | null | BatchSummary>;
+type BatchForm = { name: string; invoiceDate: dayjs.Dayjs | null } & Record<string, number | string | dayjs.Dayjs | null | undefined>;
 type View = {
   settings: Settings;
   crReady: boolean;
+  batches: Batch[];
   lines: Line[];
   totals: {
     quantity: number;
@@ -125,14 +131,22 @@ type EditForm = { code: string; productName: string; color: string; unitPriceUsd
 
 const SETTING_FIELDS: Array<{ key: string; es: string; en: string }> = [
   { key: "fxRate", es: "Tipo de cambio CRC/USD", en: "Exchange rate CRC/USD" },
-  { key: "hkShippingUsd", es: "Envio HK USD", en: "HK shipping USD" },
-  { key: "invoiceAdjustmentUsd", es: "Ajuste pago/factura USD", en: "Payment/invoice adjustment USD" },
-  { key: "crShippingUsd", es: "Envio CR USD", en: "CR shipping USD" },
-  { key: "nationalizationCrc", es: "Nacionalizacion CRC", en: "Customs clearance CRC" },
-  { key: "otherImportCrc", es: "Otros de importacion CRC", en: "Other import costs CRC" },
   { key: "extraUnitCrc", es: "Extra por prenda CRC", en: "Extra per unit CRC" },
   { key: "cardCommissionRate", es: "Comision tarjeta (0.0195 = 1.95%)", en: "Card commission (0.0195 = 1.95%)" },
-  { key: "customizationPerPieceUsd", es: "Personalizacion por pieza USD", en: "Customization per piece USD" },
+];
+
+// Costs of one purchase; only its own lines carry them.
+const BATCH_FIELDS: Array<{ key: string; es: string; en: string; unit: "USD" | "CRC"; optional?: boolean }> = [
+  { key: "hkShippingUsd", es: "Envio HK", en: "HK shipping", unit: "USD" },
+  { key: "logoPrintingUsd", es: "Impresion de logos", en: "Logo printing", unit: "USD" },
+  { key: "sizePrintingUsd", es: "Impresion de tallas", en: "Size printing", unit: "USD" },
+  { key: "packagingUsd", es: "Bolsas / empaque", en: "Packing bags", unit: "USD" },
+  { key: "discountUsd", es: "Descuento de la factura (se resta)", en: "Invoice discount (subtracted)", unit: "USD" },
+  { key: "invoiceAdjustmentUsd", es: "Ajuste pago/factura", en: "Payment/invoice adjustment", unit: "USD" },
+  { key: "customizationPerPieceUsd", es: "Personalizacion por pieza", en: "Customization per piece", unit: "USD" },
+  { key: "crShippingUsd", es: "Envio CR", en: "CR shipping", unit: "USD", optional: true },
+  { key: "nationalizationCrc", es: "Nacionalizacion", en: "Customs clearance", unit: "CRC", optional: true },
+  { key: "otherImportCrc", es: "Otros de importacion", en: "Other import costs", unit: "CRC", optional: true },
 ];
 
 export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" }) {
@@ -146,6 +160,11 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [view, setView] = useState<View | null>(null);
   const [search, setSearch] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [batchesOpen, setBatchesOpen] = useState(false);
+  const [editBatch, setEditBatch] = useState<Batch | null>(null);
+  const [batchForm] = Form.useForm<BatchForm>();
+  // Name of the purchase created by an invoice import; null when the file is not a supplier invoice.
+  const [importBatchName, setImportBatchName] = useState<string | null>(null);
   const [saleLine, setSaleLine] = useState<Line | null>(null);
   const [saleSaving, setSaleSaving] = useState(false);
   const saleSubmitting = useRef(false);
@@ -186,6 +205,12 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     sell: "Vender", save: "Guardar", cancel: "Cancelar", actions: "Acciones",
     investment: "Inversion total CRC", expected: "Venta esperada CRC", contribution: "Contribucion esperada CRC", units: "Prendas",
     pending: "Pendiente (completa los supuestos de importacion)",
+    batches: "Importaciones", batch: "Importacion", batchesHint: "Los gastos de cada compra (envio, impresion, bolsas, descuento, importacion a Costa Rica) se reparten solo entre las prendas de esa compra.",
+    batchName: "Nombre de la importacion", batchDate: "Fecha de la factura", batchEdit: "Editar importacion", batchSaved: "Importacion guardada.",
+    batchPending: "Faltan costos de Costa Rica", batchReady: "Completa", batchUnits: "Prendas", batchPaid: "Pagado USD", batchCost: "Costo CRC",
+    batchOptionalHint: "Deja vacios los costos de Costa Rica hasta conocerlos; mientras tanto el costo en colones de esta compra queda pendiente.",
+    batchNew: "Se creara como una importacion nueva con estos gastos aparte. Podras completar sus costos en Importaciones.",
+    batchWarning: "Hay importaciones sin costos de Costa Rica: su costo en colones aun no se incluye en los totales.",
     saleTitle: "Registrar venta", size: "Talla", quantity: "Cantidad", unitPrice: "Precio unitario CRC",
     discount: "Descuento total CRC", date: "Fecha", method: "Metodo de pago", note: "Nota",
     required: "Obligatorio", saved: "Guardado.", saleSaved: "Venta registrada.", voided: "Venta anulada.",
@@ -245,6 +270,12 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     sell: "Sell", save: "Save", cancel: "Cancel", actions: "Actions",
     investment: "Total investment CRC", expected: "Expected sales CRC", contribution: "Expected contribution CRC", units: "Units",
     pending: "Pending (complete the import assumptions)",
+    batches: "Imports", batch: "Import", batchesHint: "The costs of each purchase (shipping, printing, bags, discount, import to Costa Rica) are spread only over the garments of that purchase.",
+    batchName: "Import name", batchDate: "Invoice date", batchEdit: "Edit import", batchSaved: "Import saved.",
+    batchPending: "Costa Rica costs missing", batchReady: "Complete", batchUnits: "Units", batchPaid: "Paid USD", batchCost: "Cost CRC",
+    batchOptionalHint: "Leave the Costa Rica costs empty until they are known; the cost in colones of this purchase stays pending meanwhile.",
+    batchNew: "It will be created as a new import with these costs kept apart. You can fill in its costs under Imports.",
+    batchWarning: "Some imports are missing their Costa Rica costs: their cost in colones is not yet included in the totals.",
     saleTitle: "Record sale", size: "Size", quantity: "Quantity", unitPrice: "Unit price CRC",
     discount: "Total discount CRC", date: "Date", method: "Payment method", note: "Note",
     required: "Required", saved: "Saved.", saleSaved: "Sale recorded.", voided: "Sale voided.",
@@ -407,7 +438,12 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     setReading(true);
     try {
       const parsed = await readImportFile(file);
-      const preview = await apiRequest<ImportPreview>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: parsed, mode: importMode }) });
+      // A supplier invoice lists what just arrived, so it adds to the stock instead of replacing it.
+      const isInvoice = file.name.toLowerCase().endsWith(".pdf");
+      const mode = isInvoice ? "add" : importMode;
+      setImportMode(mode);
+      setImportBatchName(isInvoice ? file.name.replace(/\.pdf$/i, "") : null);
+      const preview = await apiRequest<ImportPreview>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: parsed, mode }) });
       if (!preview.summary.errors.length && preview.summary.created + preview.summary.updated === 0) {
         api.info(labels.noChanges);
         return;
@@ -416,10 +452,10 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       setImportPreview(preview);
     } catch (error) {
       if (isApiErrorStatus(error, 401)) setAuthorized(false);
-      else if (error instanceof ApiError) api.error(labels.importErrors[error.message] ?? formatApiError(error, locale, { fallback: labels.importFail }));
+      else if (error instanceof ApiError) api.error({ content: labels.importErrors[error.message] ?? formatApiError(error, locale, { fallback: labels.importFail }), duration: 8 });
       else {
         const [code, detail] = (error instanceof Error ? error.message : "").split(":");
-        api.error(labels.importErrors[code] ? `${labels.importErrors[code]}${detail ?? ""}` : labels.importFail);
+        api.error({ content: labels.importErrors[code] ? `${labels.importErrors[code]}${detail ?? ""}` : labels.importFail, duration: 8 });
       }
     } finally {
       setReading(false);
@@ -466,10 +502,11 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     if (!importLines) return;
     setImporting(true);
     try {
-      setView(await apiRequest<View>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: importLines, apply: true, mode: importMode }) }));
+      setView(await apiRequest<View>("/api/admin/inventory/import", { method: "POST", body: JSON.stringify({ lines: importLines, apply: true, mode: importMode, ...(importBatchName?.trim() ? { batch: { name: importBatchName.trim() } } : {}) }) }));
       api.success(labels.importDone);
       setImportLines(null);
       setImportPreview(null);
+      setImportBatchName(null);
     } catch (error) {
       handleError(error, labels.saveFail);
     } finally {
@@ -488,6 +525,26 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
 
   const saveSettings = async (values: Settings) => {
     if (await mutate("/api/admin/inventory/settings", "PUT", values, labels.saved)) setSettingsOpen(false);
+  };
+
+  const openBatch = (batch: Batch) => {
+    setEditBatch(batch);
+    batchForm.setFieldsValue({
+      ...Object.fromEntries(BATCH_FIELDS.map((field) => [field.key, batch[field.key] as number | null])),
+      name: batch.name,
+      invoiceDate: batch.invoiceDate ? dayjs(batch.invoiceDate) : null,
+    });
+  };
+
+  const saveBatch = async (values: BatchForm) => {
+    if (!editBatch) return;
+    const body = {
+      name: values.name,
+      invoiceDate: values.invoiceDate ? values.invoiceDate.format("YYYY-MM-DD") : null,
+      // An empty Costa Rica cost is sent as null so the purchase goes back to pending.
+      ...Object.fromEntries(BATCH_FIELDS.map((field) => [field.key, values[field.key] ?? (field.optional ? null : 0)])),
+    };
+    if (await mutate(`/api/admin/inventory/batches/${editBatch.id}`, "PATCH", body, labels.batchSaved)) setEditBatch(null);
   };
 
   const openSale = (line: Line) => {
@@ -626,6 +683,12 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     { title: labels.product, dataIndex: "productName", sorter: (a, b) => a.productName.localeCompare(b.productName) },
     { title: labels.color, dataIndex: "color" },
     {
+      title: labels.batch, dataIndex: "batchId", width: 170,
+      filters: (view?.batches ?? []).map((batch) => ({ text: batch.name, value: batch.id })),
+      onFilter: (value, line) => line.batchId === value,
+      render: (id: string | null) => (view?.batches.find((batch) => batch.id === id)?.name ?? "-"),
+    },
+    {
       title: labels.stock,
       render: (_, line) => (
         <Space size={4} wrap>
@@ -750,10 +813,14 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           <Col xs={12} md={6}><Card><Statistic title={labels.expected} value={totals?.expectedSalesCrc == null ? "-" : money(totals.expectedSalesCrc)} /></Card></Col>
           <Col xs={12} md={6}><Card><Statistic title={labels.contribution} value={totals?.totalContributionCrc == null ? "-" : money(totals.totalContributionCrc)} /></Card></Col>
         </Row>
+        {view?.batches?.some((batch) => batch.summary.lineCount > 0 && !batch.summary.crReady) ? (
+          <Alert type="warning" showIcon style={{ marginBottom: 16 }} title={labels.batchWarning} />
+        ) : null}
         <Space wrap style={{ marginBottom: 16 }}>
           <Input.Search allowClear placeholder={labels.search} value={search} onChange={(event) => setSearch(event.target.value)} style={{ minWidth: 300 }} />
           <Button type="primary" icon={<PlusOutlined />} onClick={() => openEdit("new")}>{labels.addLine}</Button>
           <Button icon={<SettingOutlined />} onClick={openSettings}>{labels.settings}</Button>
+          <Button icon={<DollarOutlined />} onClick={() => setBatchesOpen(true)}>{labels.batches}</Button>
           <Button icon={<HistoryOutlined />} onClick={() => void openHistory()}>{labels.history}</Button>
           <Button icon={<DownloadOutlined />} disabled={!view} onClick={() => view && void exportInventoryWorkbook(view as never)}>{labels.exportXlsx}</Button>
           <Upload accept=".xlsx,.pdf" showUploadList={false} beforeUpload={(file) => { void previewImport(file); return false; }}>
@@ -784,6 +851,33 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
             <Button type="primary" htmlType="submit">{labels.save}</Button>
           </Form>
         </Drawer>
+
+        <Drawer title={labels.batches} open={batchesOpen} onClose={() => setBatchesOpen(false)} size="min(96vw, 760px)">
+          <Typography.Paragraph type="secondary">{labels.batchesHint}</Typography.Paragraph>
+          <Table<Batch> rowKey="id" size="small" pagination={false} dataSource={view?.batches ?? []}
+            columns={[
+              { title: labels.batch, dataIndex: "name" },
+              { title: labels.batchDate, dataIndex: "invoiceDate", render: (value: string | null) => value ?? "-" },
+              { title: labels.batchUnits, align: "right", render: (_, batch) => batch.summary.quantity },
+              { title: labels.batchPaid, align: "right", render: (_, batch) => batch.summary.paidInvestmentUsd.toLocaleString(es ? "es-CR" : "en-US", { maximumFractionDigits: 2 }) },
+              { title: labels.batchCost, align: "right", render: (_, batch) => (batch.summary.crReady ? money(batch.summary.totalInventoryCostCrc) : <Tag color="orange">{labels.batchPending}</Tag>) },
+              { title: "", render: (_, batch) => <Button size="small" icon={<EditOutlined />} onClick={() => openBatch(batch)}>{labels.edit}</Button> },
+            ]} />
+        </Drawer>
+
+        <Modal title={labels.batchEdit} open={Boolean(editBatch)} onCancel={() => setEditBatch(null)} okText={labels.save} cancelText={labels.cancel}
+          onOk={() => batchForm.submit()} destroyOnHidden forceRender zIndex={1200}>
+          <Form form={batchForm} layout="vertical" onFinish={(values) => void saveBatch(values)}>
+            <Form.Item name="name" label={labels.batchName} rules={[{ required: true, message: labels.required }]}><Input maxLength={120} /></Form.Item>
+            <Form.Item name="invoiceDate" label={labels.batchDate}><DatePicker style={{ width: "100%" }} /></Form.Item>
+            {BATCH_FIELDS.map((field) => (
+              <Form.Item key={field.key} name={field.key} label={`${es ? field.es : field.en} ${field.unit}`}>
+                <InputNumber min={0} style={{ width: "100%" }} prefix={<DollarOutlined />} />
+              </Form.Item>
+            ))}
+            <Typography.Text type="secondary">{labels.batchOptionalHint}</Typography.Text>
+          </Form>
+        </Modal>
 
         <Modal title={saleLine ? `${labels.saleTitle}: ${saleLine.code} ${saleLine.color}` : labels.saleTitle} open={Boolean(saleLine)}
           onCancel={() => setSaleLine(null)} okText={labels.save} cancelText={labels.cancel} onOk={() => saleForm.submit()} confirmLoading={saleSaving} destroyOnHidden forceRender>
@@ -873,7 +967,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           </Form>
         </Modal>
 
-        <Modal title={labels.importTitle} open={Boolean(importPreview)} onCancel={() => { setImportPreview(null); setImportLines(null); }}
+        <Modal title={labels.importTitle} open={Boolean(importPreview)} onCancel={() => { setImportPreview(null); setImportLines(null); setImportBatchName(null); }}
           okText={labels.importApply} cancelText={labels.cancel} confirmLoading={importing}
           okButtonProps={{ disabled: !importPreview || importPreview.summary.errors.length > 0 || importPreview.summary.created + importPreview.summary.updated === 0 }}
           onOk={() => void applyImport()} width={640}>
@@ -882,6 +976,13 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
               <Radio.Group value={importMode} onChange={(event) => void changeImportMode(event.target.value)} optionType="button" buttonStyle="solid"
                 options={[{ value: "add", label: labels.modeAdd }, { value: "replace", label: labels.modeReplace }]} />
               <Typography.Text type="secondary">{importMode === "add" ? labels.modeAddHint : labels.modeReplaceHint}</Typography.Text>
+              {importBatchName !== null && importPreview.summary.created > 0 ? (
+                <Space orientation="vertical" size={4} style={{ width: "100%" }}>
+                  <Typography.Text strong>{labels.batchName}</Typography.Text>
+                  <Input value={importBatchName} maxLength={120} onChange={(event) => setImportBatchName(event.target.value)} />
+                  <Typography.Text type="secondary">{labels.batchNew}</Typography.Text>
+                </Space>
+              ) : null}
               <Space wrap>
                 <Tag color="green">{labels.created}: {importPreview.summary.created}</Tag>
                 <Tag color="blue">{labels.updated}: {importPreview.summary.updated}</Tag>

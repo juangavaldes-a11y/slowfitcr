@@ -62,3 +62,54 @@ test("handles empty input and missing sale prices", () => {
   assert.equal(unpriced.totals.expectedSalesCrc, null);
   assert.equal(sumSizes({ S: "x", M: 2 }), 2);
 });
+
+test("each purchase spreads its own costs over its own lines only", () => {
+  const lines = [
+    { batchId: "old", sizes: { S: 1, M: 1 }, piecesPerGarment: 1, unitPriceUsd: 10, salePriceCrc: 20000 },
+    { batchId: "new", sizes: { S: 1, M: 1 }, piecesPerGarment: 1, unitPriceUsd: 10, salePriceCrc: 20000 },
+    { batchId: "new", sizes: { M: 2 }, piecesPerGarment: 1, unitPriceUsd: 20, salePriceCrc: 20000 },
+  ];
+  const global = { fxRate: 500, extraUnitCrc: 0, cardCommissionRate: 0 };
+  const old = { id: "old", name: "Old", hkShippingUsd: 10, crShippingUsd: 0, nationalizationCrc: 0, otherImportCrc: 0 };
+  const fresh = { id: "new", name: "New", hkShippingUsd: 30, logoPrintingUsd: 20, sizePrintingUsd: 10, packagingUsd: 5, discountUsd: 5, crShippingUsd: 0, nationalizationCrc: 0, otherImportCrc: 0 };
+
+  const apart = computeInventoryCosts(lines, global, [old, fresh]);
+  // The old purchase carries only its own 10 USD of shipping; the 60 USD of new costs never reach it.
+  assert.equal(apart.lines[0].paidInvestmentUsd, 20 + 10);
+  assert.equal(apart.lines[0].batchExpensesUsd, 0);
+  // New costs: shipping 30 + (20 + 10 + 5 - 5) = 60, split by value (20 USD and 40 USD of goods).
+  assert.equal(Math.round(apart.lines[1].paidInvestmentUsd * 100) / 100, 20 + 20);
+  assert.equal(Math.round(apart.lines[2].paidInvestmentUsd * 100) / 100, 40 + 40);
+  assert.equal(apart.batches.find((batch) => batch.id === "new").paidInvestmentUsd, 120);
+  assert.equal(apart.crReady, true);
+  assert.equal(apart.totals.batchExpensesUsd, 30);
+
+  // Costs of the new purchase leave the old lines exactly as they were before it existed.
+  const before = computeInventoryCosts(lines.slice(0, 1), global, [old]);
+  assert.equal(before.lines[0].totalInventoryCostCrc, apart.lines[0].totalInventoryCostCrc);
+});
+
+test("a purchase still missing its Costa Rica costs stays pending without hiding the others", () => {
+  const lines = [
+    { batchId: "old", sizes: { M: 2 }, piecesPerGarment: 1, unitPriceUsd: 10 },
+    { batchId: "new", sizes: { M: 2 }, piecesPerGarment: 1, unitPriceUsd: 10 },
+  ];
+  const result = computeInventoryCosts(lines, { fxRate: 500 }, [
+    { id: "old", crShippingUsd: 0, nationalizationCrc: 0, otherImportCrc: 0 },
+    { id: "new", hkShippingUsd: 90 },
+  ]);
+  assert.equal(result.crReady, false);
+  assert.notEqual(result.lines[0].totalInventoryCostCrc, null);
+  assert.equal(result.lines[1].totalInventoryCostCrc, null);
+  assert.equal(result.totals.totalInventoryCostCrc, 10000);
+  assert.equal(result.totals.costPerUnitCrc, 5000);
+  assert.equal(result.batches[1].crReady, false);
+  assert.equal(result.totals.paidInvestmentUsd, 20 + 20 + 90);
+});
+
+test("lines without a purchase belong to the oldest one, and an unknown purchase falls back to it", () => {
+  const lines = [{ sizes: { M: 1 }, unitPriceUsd: 10 }, { batchId: "gone", sizes: { M: 1 }, unitPriceUsd: 10 }];
+  const result = computeInventoryCosts(lines, { fxRate: 500 }, [{ id: "a", hkShippingUsd: 20, crShippingUsd: 0, nationalizationCrc: 0, otherImportCrc: 0 }]);
+  assert.deepEqual(result.lines.map((line) => line.hkShippingUsd), [10, 10]);
+  assert.equal(result.batches[0].lineCount, 2);
+});

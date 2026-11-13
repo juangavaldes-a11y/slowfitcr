@@ -16,6 +16,13 @@ const SETTING_FIELDS = [
   "otherImportCrc", "extraUnitCrc", "cardCommissionRate", "customizationPerPieceUsd",
 ];
 
+// Costs that belong to one purchase (batch). The Costa Rica side may stay empty until it is known.
+const BATCH_COST_FIELDS = [
+  "hkShippingUsd", "invoiceAdjustmentUsd", "customizationPerPieceUsd", "logoPrintingUsd", "sizePrintingUsd", "packagingUsd", "discountUsd",
+  "crShippingUsd", "nationalizationCrc", "otherImportCrc",
+];
+const BATCH_NULLABLE_FIELDS = ["crShippingUsd", "nationalizationCrc", "otherImportCrc"];
+
 const num = (value) => (value === null || value === undefined ? null : Number(value));
 
 function parseNonNegative(value, { nullable = false } = {}) {
@@ -77,6 +84,29 @@ export function parseSettingsInput(body) {
   return data;
 }
 
+export function parseBatchInput(body, { partial = false } = {}) {
+  const data = {};
+  if (body.name !== undefined || !partial) {
+    const name = String(body.name ?? "").trim();
+    if (!name || name.length > 120) throw new Error("INVALID_TEXT");
+    data.name = name;
+  }
+  if (body.invoiceDate !== undefined) {
+    if (body.invoiceDate === null || body.invoiceDate === "") {
+      data.invoiceDate = null;
+    } else {
+      const date = new Date(body.invoiceDate);
+      if (Number.isNaN(date.getTime())) throw new Error("INVALID_DATE");
+      data.invoiceDate = date;
+    }
+  }
+  for (const key of BATCH_COST_FIELDS) {
+    if (body[key] === undefined) continue;
+    data[key] = parseNonNegative(body[key], { nullable: BATCH_NULLABLE_FIELDS.includes(key) });
+  }
+  return data;
+}
+
 export function parseSaleInput(body, now = new Date()) {
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000) throw new Error("INVALID_QUANTITY");
@@ -112,17 +142,27 @@ function soldBySize(sales) {
   return map;
 }
 
-export function buildInventoryView(settingsRow, lineRows, sales, layaways = [], now = new Date()) {
+export function buildInventoryView(settingsRow, lineRows, sales, layaways = [], now = new Date(), batchRows = []) {
   const settings = Object.fromEntries(SETTING_FIELDS.map((key) => [key, num(settingsRow?.[key])]));
   const costs = computeInventoryCosts(
     lineRows.map((line) => ({
+      batchId: line.batchId ?? null,
       sizes: line.sizes,
       piecesPerGarment: line.piecesPerGarment,
       unitPriceUsd: num(line.unitPriceUsd),
       salePriceCrc: num(line.salePriceCrc),
     })),
     settings,
+    batchRows,
   );
+  // Purchases as shown on screen: the editable cost fields plus what the calculation says about each one.
+  const batches = batchRows.map((row, index) => ({
+    id: row.id,
+    name: row.name,
+    invoiceDate: row.invoiceDate ? new Date(row.invoiceDate).toISOString().slice(0, 10) : null,
+    ...Object.fromEntries(BATCH_COST_FIELDS.map((key) => [key, num(row[key])])),
+    summary: costs.batches[index],
+  }));
   const sold = soldBySize(sales);
   const held = heldBySize(layaways);
   const lines = lineRows.map((line, index) => {
@@ -135,6 +175,7 @@ export function buildInventoryView(settingsRow, lineRows, sales, layaways = [], 
     const soldQuantity = sumSizes(soldSizes);
     return {
       id: line.id,
+      batchId: line.batchId ?? null,
       code: line.code,
       productName: line.productName,
       color: line.color,
@@ -153,7 +194,7 @@ export function buildInventoryView(settingsRow, lineRows, sales, layaways = [], 
       cost: costs.lines[index],
     };
   });
-  return { settings: costs.settings, crReady: costs.crReady, lines, totals: costs.totals };
+  return { settings: costs.settings, crReady: costs.crReady, lines, totals: costs.totals, batches };
 }
 
 // Mirrors a stock change onto the storefront variant and returns the SKU delta to push to Loyverse.
@@ -288,14 +329,15 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
 
   const loadView = async () => {
     const websiteSync = await syncWebsiteOrders().catch(() => ({ imported: 0, unmatched: 0, failed: true }));
-    const [settings, lines, sales, paymentMethods, layaways] = await Promise.all([
+    const [settings, lines, sales, paymentMethods, layaways, batches] = await Promise.all([
       prisma.inventorySettings.findUnique({ where: { id: "default" } }),
       prisma.inventoryLine.findMany({ orderBy: [{ position: "asc" }, { code: "asc" }, { color: "asc" }] }),
       prisma.inventorySale.findMany({ where: { voidedAt: null }, select: { lineId: true, size: true, quantity: true, restockedQuantity: true, voidedAt: true } }),
       prisma.paymentMethod.findMany({ orderBy: { position: "asc" } }),
       prisma.layaway.findMany({ where: { status: { in: HOLDING_STATUSES } }, orderBy: { createdAt: "asc" } }),
+      prisma.inventoryBatch.findMany({ orderBy: { createdAt: "asc" } }),
     ]);
-    return { ...buildInventoryView(settings, lines, sales, layaways), paymentMethods, websiteSync };
+    return { ...buildInventoryView(settings, lines, sales, layaways, new Date(), batches), paymentMethods, websiteSync };
   };
 
   const getInventory = guard(async () => jsonResponse(await loadView()));
@@ -307,8 +349,32 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     return jsonResponse(await loadView());
   });
 
+  const createBatch = guard(async (request) => {
+    const data = parseBatchInput(await readJson(request));
+    const batch = await prisma.inventoryBatch.create({ data });
+    await appendAudit("inventory.batch.created", { batchId: batch.id, name: batch.name }, "admin");
+    return jsonResponse(await loadView(), 201);
+  });
+
+  const updateBatch = guard(async (request, batchId) => {
+    const data = parseBatchInput(await readJson(request), { partial: true });
+    try {
+      await prisma.inventoryBatch.update({ where: { id: batchId }, data });
+    } catch (error) {
+      if (error?.code === "P2025") throw new Error("NOT_FOUND");
+      throw error;
+    }
+    await appendAudit("inventory.batch.updated", { batchId, fields: Object.keys(data) }, "admin");
+    return jsonResponse(await loadView());
+  });
+
   const createLine = guard(async (request) => {
-    const data = parseLineInput(await readJson(request));
+    const body = await readJson(request);
+    const data = parseLineInput(body);
+    if (body.batchId) {
+      if (!(await prisma.inventoryBatch.findUnique({ where: { id: String(body.batchId) }, select: { id: true } }))) throw new Error("NOT_FOUND");
+      data.batchId = String(body.batchId);
+    }
     const changes = [];
     const line = await prisma.$transaction(async (transaction) => {
       const created = await transaction.inventoryLine.create({ data });
@@ -514,9 +580,12 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     if (diff.errors.length) return jsonResponse({ applied: false, summary, error: "IMPORT_HAS_ERRORS" }, 422);
     const existingById = new Map(existing.map((line) => [line.id, { ...line.sizes }]));
     const changes = [];
+    // A supplier invoice arrives as its own purchase: its costs are spread over its lines only.
+    const batchData = body.batch && typeof body.batch === "object" ? parseBatchInput(body.batch) : null;
     await prisma.$transaction(async (transaction) => {
+      const batch = batchData && diff.created.length ? await transaction.inventoryBatch.create({ data: batchData }) : null;
       for (const data of diff.created) {
-        const created = await transaction.inventoryLine.create({ data });
+        const created = await transaction.inventoryLine.create({ data: batch ? { ...data, batchId: batch.id } : data });
         for (const [size, delta] of sizeDeltas(null, created.sizes)) {
           changes.push(await syncStorefrontStock(transaction, created, size, delta));
         }
@@ -531,7 +600,7 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
       }
     }, { timeout: 30000 });
     await pushInventory(changes.filter(Boolean));
-    await appendAudit("inventory.import.applied", { mode, created: summary.created, updated: summary.updated, unchanged: summary.unchanged }, "admin");
+    await appendAudit("inventory.import.applied", { mode, created: summary.created, updated: summary.updated, unchanged: summary.unchanged, batch: batchData?.name ?? null }, "admin");
     return jsonResponse({ applied: true, summary, ...(await loadView()) });
   });
 
@@ -583,5 +652,5 @@ export function createInventoryHandlers({ prisma, jsonResponse, readJson, isAuth
     });
   });
 
-  return { loadView, getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, updateSale, voidSale, refundSale, listSales, syncCatalogToLoyverse };
+  return { loadView, createBatch, updateBatch, getAnalytics, getExchangeRate, importLines, getInventory, updateSettings, createLine, updateLine, createSale, updateSale, voidSale, refundSale, listSales, syncCatalogToLoyverse };
 }

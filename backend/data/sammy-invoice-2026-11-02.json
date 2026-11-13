@@ -1,0 +1,843 @@
+{
+  "invoiceFile": "Sammy-2026-10-19.pdf",
+  "invoiceDate": "2026-11-02",
+  "invoiceTotalUsd": 3231,
+  "batch": {
+    "name": "Sammy 2026-11-02",
+    "invoiceDate": "2026-11-02",
+    "hkShippingUsd": 90,
+    "logoPrintingUsd": 263,
+    "sizePrintingUsd": 163,
+    "packagingUsd": 50,
+    "discountUsd": 41
+  },
+  "lines": [
+    {
+      "code": "FGBTZ8455",
+      "productName": "3/4 Length sleeves tops & Pants(5529-1)",
+      "color": "Cherry",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 20.2
+    },
+    {
+      "code": "FGBTZ8455",
+      "productName": "3/4 Length sleeves tops & Pants(5529-1)",
+      "color": "Black",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 20.2
+    },
+    {
+      "code": "FGBTZ8455",
+      "productName": "3/4 Length sleeves tops & Pants(5529-1)",
+      "color": "Pink",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 20.2
+    },
+    {
+      "code": "FGBTZ8455",
+      "productName": "3/4 Length sleeves tops & Pants(5529-1)",
+      "color": "Grape",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "M": 1
+      },
+      "unitPriceUsd": 20.2
+    },
+    {
+      "code": "FGBYZW5124",
+      "productName": "Pants",
+      "color": "Navy",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 16.5
+    },
+    {
+      "code": "FGBYZW5124",
+      "productName": "Pants",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 16.5
+    },
+    {
+      "code": "FGBYZW5124",
+      "productName": "Pants",
+      "color": "Grey",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 16.5
+    },
+    {
+      "code": "FGBKD255WCT301",
+      "productName": "Pilates Tops(Tops only)",
+      "color": "Ivory",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 11.5
+    },
+    {
+      "code": "FGBKD255WCT301",
+      "productName": "Pilates Tops(Tops only)",
+      "color": "Lavender",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 11.5
+    },
+    {
+      "code": "FGB62202",
+      "productName": "Jumpsuits - Pockets",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 11.7
+    },
+    {
+      "code": "FGB62202",
+      "productName": "Jumpsuits - Pockets",
+      "color": "Navy",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 11.7
+    },
+    {
+      "code": "FGB62202",
+      "productName": "Jumpsuits - Pockets",
+      "color": "Wine",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 11.7
+    },
+    {
+      "code": "FGB62202",
+      "productName": "Jumpsuits - Pockets",
+      "color": "Dark grey blue",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "M": 1
+      },
+      "unitPriceUsd": 11.7
+    },
+    {
+      "code": "FGBYWX3509+YCK5764",
+      "productName": "Halter bra",
+      "color": "White",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 9.3
+    },
+    {
+      "code": "FGBYWX3509+YCK5764",
+      "productName": "Halter bra",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 9.3
+    },
+    {
+      "code": "FGBLTK4097",
+      "productName": "Jumpsuits(With padding inside)",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 16.5
+    },
+    {
+      "code": "FGB1312",
+      "productName": "Jumpsuit(With padding inside)",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 14.5
+    },
+    {
+      "code": "FGB1312",
+      "productName": "Jumpsuit(With padding inside)",
+      "color": "Navy",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 14.5
+    },
+    {
+      "code": "FGB1312",
+      "productName": "Jumpsuit(With padding inside)",
+      "color": "Red",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 14.5
+    },
+    {
+      "code": "FGB2455-JACKETS",
+      "productName": "Jackets",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 15
+    },
+    {
+      "code": "FGB2455-JACKETS",
+      "productName": "Jackets",
+      "color": "Grey",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 15
+    },
+    {
+      "code": "FGB2455-JACKETS",
+      "productName": "Jackets",
+      "color": "Grey-blue",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 15
+    },
+    {
+      "code": "FGB2455-PANTS",
+      "productName": "Pants - Pockets in both sides",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 15.3
+    },
+    {
+      "code": "FGB2455-PANTS",
+      "productName": "Pants - Pockets in both sides",
+      "color": "Grey",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 15.3
+    },
+    {
+      "code": "FGB2455-PANTS",
+      "productName": "Pants - Pockets in both sides",
+      "color": "Grey-blue",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 15.3
+    },
+    {
+      "code": "FGBTZ2549",
+      "productName": "Jackets & Pants(Pockets) - UPF50+",
+      "color": "Lilac",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 26.7
+    },
+    {
+      "code": "FGBTZ2549",
+      "productName": "Jackets & Pants(Pockets) - UPF50+",
+      "color": "Black",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 26.7
+    },
+    {
+      "code": "FGBTZ2549",
+      "productName": "Jackets & Pants(Pockets) - UPF50+",
+      "color": "Cherry",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 26.7
+    },
+    {
+      "code": "FGBTZ2549",
+      "productName": "Jackets & Pants(Pockets) - UPF50+",
+      "color": "Blue",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "S": 1
+      },
+      "unitPriceUsd": 26.7
+    },
+    {
+      "code": "FGBAG004",
+      "productName": "Shorts - Free size",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "OS": 40
+      },
+      "unitPriceUsd": 5.3
+    },
+    {
+      "code": "FGBYW983L",
+      "productName": "Jumpsuits - Padding inside",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 2,
+        "M": 2,
+        "L": 2
+      },
+      "unitPriceUsd": 14
+    },
+    {
+      "code": "FGBCBX8519",
+      "productName": "Singlets(With padding inside)",
+      "color": "Baby pink",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "M": 2,
+        "L": 2
+      },
+      "unitPriceUsd": 10.3
+    },
+    {
+      "code": "FGBCBX8519",
+      "productName": "Singlets(With padding inside)",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 2,
+        "M": 2
+      },
+      "unitPriceUsd": 10.3
+    },
+    {
+      "code": "FGBCBX8519",
+      "productName": "Singlets(With padding inside)",
+      "color": "Pearl",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 2,
+        "M": 2
+      },
+      "unitPriceUsd": 10.3
+    },
+    {
+      "code": "FGBMGDX-5139",
+      "productName": "Short sleeves tops(With padding inside)",
+      "color": "Baby blue",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 9.5
+    },
+    {
+      "code": "FGBMGDX-5139",
+      "productName": "Short sleeves tops(With padding inside)",
+      "color": "Dusty pink",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 9.5
+    },
+    {
+      "code": "FGBMGDX-5139",
+      "productName": "Short sleeves tops(With padding inside)",
+      "color": "Pink-purple",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 9.5
+    },
+    {
+      "code": "FGBD26087",
+      "productName": "Short sleeves tops",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 2,
+        "L": 1
+      },
+      "unitPriceUsd": 8.4
+    },
+    {
+      "code": "FGBD26087",
+      "productName": "Short sleeves tops",
+      "color": "Light blue",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 8.4
+    },
+    {
+      "code": "FGBD26087",
+      "productName": "Short sleeves tops",
+      "color": "White",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 8.4
+    },
+    {
+      "code": "FGBYEL-12131",
+      "productName": "Tank tops",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 7
+    },
+    {
+      "code": "FGBYEL-12131",
+      "productName": "Tank tops",
+      "color": "White",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 7
+    },
+    {
+      "code": "FGBYEL-12131",
+      "productName": "Tank tops",
+      "color": "Blue",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 7
+    },
+    {
+      "code": "FGBYEL-12131",
+      "productName": "Tank tops",
+      "color": "Purple",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 7
+    },
+    {
+      "code": "FGBYEL-12131",
+      "productName": "Tank tops",
+      "color": "Orange",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 7
+    },
+    {
+      "code": "FGBYC311",
+      "productName": "Jackets - UPF50+",
+      "color": "Pink",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 10.2
+    },
+    {
+      "code": "FGBYC311",
+      "productName": "Jackets - UPF50+",
+      "color": "Violet",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 10.2
+    },
+    {
+      "code": "FGBYC311",
+      "productName": "Jackets - UPF50+",
+      "color": "White",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 10.2
+    },
+    {
+      "code": "FGBYC311",
+      "productName": "Jackets - UPF50+",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 10.2
+    },
+    {
+      "code": "FGBTZ2136",
+      "productName": "Jackets(Pockets) & Shorts",
+      "color": "Indigo",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 25
+    },
+    {
+      "code": "FGBTZ2136",
+      "productName": "Jackets(Pockets) & Shorts",
+      "color": "Black",
+      "piecesPerGarment": 2,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 25
+    },
+    {
+      "code": "FGBFLT4529-1",
+      "productName": "Jumpsuit(With padding inside)",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 17.5
+    },
+    {
+      "code": "FGBFLT4529-1",
+      "productName": "Jumpsuit(With padding inside)",
+      "color": "Navy",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 17.5
+    },
+    {
+      "code": "EFGBYEL-61450",
+      "productName": "Shorts",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 10
+    },
+    {
+      "code": "EFGBYEL-61450",
+      "productName": "Shorts",
+      "color": "Pink",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 10
+    },
+    {
+      "code": "EFGBYEL-61450",
+      "productName": "Shorts",
+      "color": "Cream",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 10
+    },
+    {
+      "code": "EFGBYEL-51140",
+      "productName": "Top",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 8.8
+    },
+    {
+      "code": "EFGBYEL-51140",
+      "productName": "Top",
+      "color": "Blue",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 8.8
+    },
+    {
+      "code": "EFGBYEL-31227",
+      "productName": "T-shirt",
+      "color": "Blue",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 8
+    },
+    {
+      "code": "EFGBYEL-31227",
+      "productName": "T-shirt",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 8
+    },
+    {
+      "code": "EFGBYEL-31518",
+      "productName": "Hoodie",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "M": 1
+      },
+      "unitPriceUsd": 9.5
+    },
+    {
+      "code": "EFGBDD-EDK5086",
+      "productName": "Shorts",
+      "color": "Black",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 13.5
+    },
+    {
+      "code": "EFGBDD-EDK5086",
+      "productName": "Shorts",
+      "color": "Grey",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 13.5
+    },
+    {
+      "code": "EFGBDD-EDK5086",
+      "productName": "Shorts",
+      "color": "Cream",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "M": 1,
+        "L": 1
+      },
+      "unitPriceUsd": 13.5
+    },
+    {
+      "code": "AFGBNY-K2301",
+      "productName": "T-shirt 210GSM - Oversized",
+      "color": "#1",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1
+      },
+      "unitPriceUsd": 4.2
+    },
+    {
+      "code": "AFGBNY-K2301",
+      "productName": "T-shirt 210GSM - Oversized",
+      "color": "#2",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1
+      },
+      "unitPriceUsd": 4.2
+    },
+    {
+      "code": "AFGBNY-K2301",
+      "productName": "T-shirt 210GSM - Oversized",
+      "color": "#3",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1
+      },
+      "unitPriceUsd": 4.2
+    },
+    {
+      "code": "AFGBNY-K2301",
+      "productName": "T-shirt 210GSM - Oversized",
+      "color": "#4",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1
+      },
+      "unitPriceUsd": 4.2
+    },
+    {
+      "code": "AFGBNY-K2301",
+      "productName": "T-shirt 210GSM - Oversized",
+      "color": "#5",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1
+      },
+      "unitPriceUsd": 4.2
+    },
+    {
+      "code": "AFGBNY-K2301",
+      "productName": "T-shirt 210GSM - Oversized",
+      "color": "#6",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1
+      },
+      "unitPriceUsd": 4.2
+    },
+    {
+      "code": "AFGBNY-K2301",
+      "productName": "T-shirt 210GSM - Oversized",
+      "color": "#7",
+      "piecesPerGarment": 1,
+      "sizes": {
+        "S": 1,
+        "M": 1
+      },
+      "unitPriceUsd": 4.2
+    }
+  ]
+}

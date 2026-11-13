@@ -157,6 +157,7 @@ function makeLedger() {
     inventorySettings: { findUnique: async () => null },
     paymentMethod: { findMany: async () => [] },
     layaway: { findMany: async () => [], count: async () => 0 },
+    inventoryBatch: { findMany: async () => [] },
     order: { findMany: async () => [] },
   };
   const prisma = { ...model, $transaction: async (fn) => fn(model) };
@@ -275,10 +276,21 @@ function makeImportLedger() {
     lines: [{ id: "L1", code: "A", color: "Black", productName: "Top", productHandle: "jacket", sizes: { S: 2, M: 1, L: 0, XL: 0, OS: 0 }, piecesPerGarment: 1, unitPriceUsd: "10", salePriceCrc: null, supplierEquivalence: null }],
     sales: [{ id: "s1", lineId: "L1", size: "S", quantity: 2, voidedAt: null, refundedQuantity: 0, restockedQuantity: 0, soldAt: new Date("2026-09-01"), unitPriceCrc: 10000, discountCrc: 0, paymentMethod: "Cash" }],
     variant: { id: "v1", productId: "p1", sku: "SKU-S", inventoryQuantity: 4 },
+    batches: [],
     audits: [],
     pushed: [],
   };
   const model = {
+    inventoryBatch: {
+      findMany: async () => state.batches,
+      findUnique: async ({ where }) => state.batches.find((batch) => batch.id === where.id) ?? null,
+      create: async ({ data }) => { const batch = { id: `B${state.batches.length + 1}`, createdAt: new Date(), ...data }; state.batches.push(batch); return batch; },
+      update: async ({ where, data }) => {
+        const batch = state.batches.find((entry) => entry.id === where.id);
+        if (!batch) throw Object.assign(new Error("missing"), { code: "P2025" });
+        return Object.assign(batch, data);
+      },
+    },
     inventoryLine: {
       findMany: async () => state.lines,
       create: async ({ data }) => { const line = { id: `L${state.lines.length + 1}`, ...data }; state.lines.push(line); return line; },
@@ -413,4 +425,56 @@ test("syncCatalogToLoyverse sends active products with prices, colors, sizes and
     appendAudit: async () => undefined,
   });
   assert.equal((await empty.syncCatalogToLoyverse({})).body.queued, false);
+});
+
+test("an import can create its own purchase and its costs reach only the lines it created", async () => {
+  const { state, handlers } = makeImportLedger();
+  // The existing inventory already belongs to its own purchase.
+  await handlers.createBatch({ body: { name: "Sammy 2026-09-18", hkShippingUsd: 80 } });
+  state.lines[0].batchId = "B1";
+
+  const batch = { name: "Sammy 2026-11-02", hkShippingUsd: 90, logoPrintingUsd: 263, sizePrintingUsd: 163, packagingUsd: 50, discountUsd: 41 };
+  const result = await handlers.importLines({ body: { lines: [importRow({ code: "N", color: "Red", sizes: { S: 2 } })], mode: "add", apply: true, batch } });
+  assert.equal(result.status, 200);
+  assert.equal(state.batches.length, 2);
+  assert.equal(state.lines.find((line) => line.code === "N").batchId, "B2");
+  assert.equal(state.lines.find((line) => line.code === "A").batchId, "B1");
+  const [old, fresh] = result.body.batches;
+  assert.deepEqual([old.summary.lineCount, fresh.summary.lineCount], [1, 1]);
+  // Each purchase keeps its own costs: the new expenses are not spread over the old inventory.
+  assert.ok(!old.logoPrintingUsd);
+  assert.equal(fresh.logoPrintingUsd, 263);
+  assert.equal(fresh.crShippingUsd, null);
+  assert.equal(state.audits.at(-1).details.batch, "Sammy 2026-11-02");
+
+  // Without new lines no empty purchase is created.
+  const again = await handlers.importLines({ body: { lines: [importRow({ code: "N", color: "Red", sizes: { S: 1 } })], mode: "add", apply: true, batch: { name: "Empty" } } });
+  assert.equal(again.status, 200);
+  assert.equal(state.batches.length, 2);
+});
+
+test("purchases can be created and edited, and invalid input is rejected", async () => {
+  const { state, handlers } = makeImportLedger();
+  assert.equal((await handlers.createBatch({ body: { name: "" } })).status, 400);
+  assert.equal((await handlers.createBatch({ body: { name: "Lote", hkShippingUsd: -1 } })).status, 400);
+  const created = await handlers.createBatch({ body: { name: "Lote", hkShippingUsd: 80, crShippingUsd: 10 } });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.batches[0].hkShippingUsd, 80);
+
+  const edited = await handlers.updateBatch({ body: { logoPrintingUsd: 5, crShippingUsd: null, invoiceDate: "2026-11-02" } }, "B1");
+  assert.equal(edited.status, 200);
+  assert.equal(state.batches[0].crShippingUsd, null);
+  assert.equal(state.batches[0].name, "Lote");
+  assert.equal(edited.body.batches[0].invoiceDate, "2026-11-02");
+  assert.equal((await handlers.updateBatch({ body: { invoiceDate: "nope" } }, "B1")).status, 400);
+  assert.equal((await handlers.updateBatch({ body: { name: "x" } }, "missing")).status, 404);
+});
+
+test("a manual line can be assigned to an existing purchase", async () => {
+  const { state, handlers } = makeImportLedger();
+  await handlers.createBatch({ body: { name: "Lote" } });
+  const line = { code: "Z", productName: "Top", color: "Blue", sizes: { S: 1 }, unitPriceUsd: 5 };
+  assert.equal((await handlers.createLine({ body: { ...line, batchId: "nope" } })).status, 404);
+  assert.equal((await handlers.createLine({ body: { ...line, batchId: "B1" } })).status, 201);
+  assert.equal(state.lines.find((entry) => entry.code === "Z").batchId, "B1");
 });
