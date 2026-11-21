@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { niduxRedirects } from "./nidux-redirects";
 
 const developmentScriptSources = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
 const developmentConnectSources = process.env.NODE_ENV === "development" ? " ws: http:" : "";
@@ -40,6 +41,9 @@ const nextConfig: NextConfig = {
       { protocol: "https" as const, hostname: "*.r2.dev" },
       ...(testImageHost ? [{ protocol: "https" as const, hostname: testImageHost }] : []),
     ],
+  },
+  redirects() {
+    return niduxRedirects();
   },
   headers() {
     return [
