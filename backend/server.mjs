@@ -16,6 +16,7 @@ import {
   verifyProviderWebhook,
 } from "./delivery-providers.mjs";
 import { createInventoryHandlers, syncStorefrontStock } from "./inventory-admin.mjs";
+import { createPosHandlers } from "./pos.mjs";
 import { createLayawayHandlers, DEPOSIT_PERCENT } from "./layaways.mjs";
 import { createPettyCashHandlers } from "./petty-cash.mjs";
 import { createLoyverseStockHandler } from "./loyverse-stock.mjs";
@@ -621,6 +622,15 @@ const inventory = createInventoryHandlers({
   appendAudit,
   pushInventory: pushInventoryToLoyverse,
   pushCatalog: pushCatalogToLoyverse,
+});
+
+const pos = createPosHandlers({
+  prisma,
+  jsonResponse,
+  readJson,
+  isAuthorized: (request) => isModeratorAuthorized(request),
+  appendAudit,
+  pushInventory: pushInventoryToLoyverse,
 });
 
 async function createLayawayCheckout({ layaway, variant, customer, locale }) {
@@ -3333,6 +3343,8 @@ export async function route(request) {
   if (inventoryBatchMatch && method === "PATCH") return inventory.updateBatch(request, decodeURIComponent(inventoryBatchMatch[1]));
   const inventoryLineMatch = pathname.match(/^\/api\/admin\/inventory\/lines\/([^/]+)$/);
   if (inventoryLineMatch && method === "PATCH") return inventory.updateLine(request, decodeURIComponent(inventoryLineMatch[1]));
+  if (pathname === "/api/admin/pos/lookup" && method === "GET") return pos.lookup(request);
+  if (pathname === "/api/admin/pos/checkout" && method === "POST") return pos.checkout(request);
   if (pathname === "/api/admin/inventory/sales" && method === "GET") return inventory.listSales(request);
   if (pathname === "/api/admin/inventory/sales" && method === "POST") return inventory.createSale(request);
   const inventoryRefundMatch = pathname.match(/^\/api\/admin\/inventory\/sales\/([^/]+)\/refund$/);
