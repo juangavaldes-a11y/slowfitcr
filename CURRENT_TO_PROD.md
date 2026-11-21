@@ -58,6 +58,7 @@ Backend secrets:
 - `DIDI_DELIVERY_GATEWAY_URL`
 - `DIDI_DELIVERY_GATEWAY_TOKEN`
 - `DIDI_DELIVERY_WEBHOOK_SECRET`
+- `CCR_GUIDE_GATEWAY_URL` / `CCR_GUIDE_GATEWAY_TOKEN` (optional: gateway that creates Correos de Costa Rica guides from the POS; without it guides are stored and the tracking number is entered by hand)
 - `R2_ACCOUNT_ID`
 - `R2_ACCESS_KEY_ID`
 - `R2_SECRET_ACCESS_KEY`
