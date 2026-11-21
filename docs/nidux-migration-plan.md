@@ -75,3 +75,13 @@ Fecha: 2026-11-20. Tienda: https://slow.minidux.com · Admin: https://admin.nidu
 - [ ] Recaptcha en inicio de sesión: el interruptor no quedó activo al intentarlo; revisar si exige claves.
 - [ ] Webhook de órdenes: requiere un secreto en Cloudflare (`wrangler login`) y un endpoint desplegado.
 - [ ] Factura electrónica, PlaceToPay, datos legales: requieren datos del negocio.
+- [x] Tienda Nidux: categorías del menú Tienda con imagen y nombres en español (Colección Performance, Performance para Él, Accesorios) y eslogan "SLOW is smooth, smooth is fast" en el pie de página.
+- [x] Tienda Nidux: precios sin decimales y con tipografía Cormorant (CSS Adicional); diseño móvil de cabecera y hero arreglado.
+- [x] **Carrusel "Conjuntos"** en la home, debajo de "Colecciones": carrusel de productos nativo de Nidux con el mosaico de los 10 conjuntos de 2 piezas (Marea, Aurora, Alba, Armonía, Coral, Duna, Ámbar, Calma, Refugio, Brío), cada slide enlazado a su producto. Para agregar o quitar uno: Tema Phoenix > Secciones > Conjuntos > Configurar Contenido (la imagen que sale es la primera foto del producto; si el selector muestra otra, abrir el producto en el POS y pulsar "Actualizar").
+  - Límites: la sección solo admite nombre (sin subtítulo ni versión en inglés) y los mosaicos traen precio y tallas dibujados, así que se desactualizan si cambian.
+
+## 9. Pendiente para el sitio de SLOW
+
+- [ ] **Carrusel de conjuntos/mosaicos en el sitio propio**: reutilizar los mosaicos del catálogo (`Catalogo_Unificado_Imagenes`, 4:5) como carrusel por conjuntos en la home de `slowfit-site`, con enlace a cada producto y opción de agrupar (conjuntos, mujer, hombre). Idealmente administrable desde el admin de catálogo (elegir qué producto y qué imagen se muestra), reutilizando el orden de imágenes ya disponible.
+- [ ] Decidir si los mosaicos se muestran como imagen completa (con precio y tallas dibujados) o solo como foto, para evitar que queden desactualizados.
+
