@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudUploadOutlined, ClockCircleOutlined, DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, StopOutlined, UploadOutlined } from "@ant-design/icons";
+import { BarcodeOutlined, CloudUploadOutlined, ClockCircleOutlined, DollarOutlined, DownloadOutlined, EditOutlined, HistoryOutlined, LineChartOutlined, PlusOutlined, SettingOutlined, ShoppingCartOutlined, StopOutlined, UploadOutlined } from "@ant-design/icons";
 import {
   Alert, Button, Card, Col, DatePicker, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Radio, Row, Select,
   Space, Statistic, Switch, Table, Tag, Typography, Upload, message,
@@ -10,6 +10,7 @@ import type { ColumnsType } from "antd/es/table";
 import dayjs from "dayjs";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import AdminShell from "./admin-shell";
+import InventoryScanner from "./inventory-scanner";
 import { apiRequest, ApiError, formatApiError, isApiErrorStatus } from "./lib/api-client";
 import { exportInventoryWorkbook, parseInventoryWorkbook, type XlsxLine } from "./lib/inventory-xlsx";
 import { parseInvoicePdf } from "./lib/inventory-pdf";
@@ -161,6 +162,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
   const [search, setSearch] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [batchesOpen, setBatchesOpen] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [editBatch, setEditBatch] = useState<Batch | null>(null);
   const [batchForm] = Form.useForm<BatchForm>();
   // Name of the purchase created by an invoice import; null when the file is not a supplier invoice.
@@ -205,6 +207,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     sell: "Vender", save: "Guardar", cancel: "Cancelar", actions: "Acciones",
     investment: "Inversion total CRC", expected: "Venta esperada CRC", contribution: "Contribucion esperada CRC", units: "Prendas",
     pending: "Pendiente (completa los supuestos de importacion)",
+    scanner: "Escaner",
     batches: "Importaciones", batch: "Importacion", batchesHint: "Los gastos de cada compra (envio, impresion, bolsas, descuento, importacion a Costa Rica) se reparten solo entre las prendas de esa compra.",
     batchName: "Nombre de la importacion", batchDate: "Fecha de la factura", batchEdit: "Editar importacion", batchSaved: "Importacion guardada.",
     batchPending: "Faltan costos de Costa Rica", batchReady: "Completa", batchUnits: "Prendas", batchPaid: "Pagado USD", batchCost: "Costo CRC",
@@ -270,6 +273,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
     sell: "Sell", save: "Save", cancel: "Cancel", actions: "Actions",
     investment: "Total investment CRC", expected: "Expected sales CRC", contribution: "Expected contribution CRC", units: "Units",
     pending: "Pending (complete the import assumptions)",
+    scanner: "Scanner",
     batches: "Imports", batch: "Import", batchesHint: "The costs of each purchase (shipping, printing, bags, discount, import to Costa Rica) are spread only over the garments of that purchase.",
     batchName: "Import name", batchDate: "Invoice date", batchEdit: "Edit import", batchSaved: "Import saved.",
     batchPending: "Costa Rica costs missing", batchReady: "Complete", batchUnits: "Units", batchPaid: "Paid USD", batchCost: "Cost CRC",
@@ -686,7 +690,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
       title: labels.batch, dataIndex: "batchId", width: 170,
       filters: (view?.batches ?? []).map((batch) => ({ text: batch.name, value: batch.id })),
       onFilter: (value, line) => line.batchId === value,
-      render: (id: string | null) => (view?.batches.find((batch) => batch.id === id)?.name ?? "-"),
+      render: (id: string | null) => ((view?.batches ?? []).find((batch) => batch.id === id)?.name ?? "-"),
     },
     {
       title: labels.stock,
@@ -820,6 +824,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           <Input.Search allowClear placeholder={labels.search} value={search} onChange={(event) => setSearch(event.target.value)} style={{ minWidth: 300 }} />
           <Button type="primary" icon={<PlusOutlined />} onClick={() => openEdit("new")}>{labels.addLine}</Button>
           <Button icon={<SettingOutlined />} onClick={openSettings}>{labels.settings}</Button>
+          <Button icon={<BarcodeOutlined />} onClick={() => setScannerOpen(true)} data-testid="open-scanner">{labels.scanner}</Button>
           <Button icon={<DollarOutlined />} onClick={() => setBatchesOpen(true)}>{labels.batches}</Button>
           <Button icon={<HistoryOutlined />} onClick={() => void openHistory()}>{labels.history}</Button>
           <Button icon={<DownloadOutlined />} disabled={!view} onClick={() => view && void exportInventoryWorkbook(view as never)}>{labels.exportXlsx}</Button>
@@ -1043,6 +1048,7 @@ export default function InventoryAdminPanel({ locale }: { locale: "es" | "en" })
           {sales.length === 0 ? <Typography.Text type="secondary">-</Typography.Text> : null}
           <Table<SaleRow> rowKey="id" size="small" columns={saleColumns} dataSource={sales} scroll={{ x: 820 }} pagination={{ pageSize: 15, showSizeChanger: false }} />
         </Drawer>
+      <InventoryScanner open={scannerOpen} locale={locale} onClose={() => setScannerOpen(false)} onApplied={() => void load()} />
       </AdminShell>
     </>
   );

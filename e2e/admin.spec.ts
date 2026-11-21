@@ -161,11 +161,12 @@ test("inventory admin lists costs and records a sale", async ({ page }) => {
   const view = {
     settings: { fxRate: 466, cardCommissionRate: 0.0195 },
     crReady: true,
+    batches: [],
     totals: { quantity: 3, paidInvestmentUsd: 100, totalInventoryCostCrc: 90000, expectedSalesCrc: 150000, totalContributionCrc: 50000, contributionMargin: 0.33 },
     paymentMethods: [{ id: "pm1", name: "Cash", active: true }],
     lines: [{
       id: "line-1", code: "FGB001", productName: "Jackets", color: "Black",
-      sizes: { ...emptySizes, M: 3 }, remaining: { ...emptySizes, M: 3 }, soldQuantity: 0, remainingQuantity: 3,
+      sizes: { ...emptySizes, M: 3 }, remaining: { ...emptySizes, M: 3 }, soldQuantity: 0, remainingQuantity: 3, layaways: [], layawayPhase: null, batchId: null,
       unitPriceUsd: 9.8, piecesPerGarment: 1,
       cost: { paidInvestmentUsd: 30, totalInventoryCostCrc: 30000, costPerUnitCrc: 10000, salePriceCrc: 50000, contributionPerUnitCrc: 39000, contributionMargin: 0.78 },
     }],
@@ -174,7 +175,7 @@ test("inventory admin lists costs and records a sale", async ({ page }) => {
   await page.route("**/api/admin/inventory/exchange-rate", (route) => route.fulfill({ json: { date: "2026-10-02", buyRate: 456, sellRate: 462.29, stale: false } }));
   await page.route("**/api/admin/inventory/sales", (route) => {
     saleBody = route.request().postDataJSON();
-    return route.fulfill({ status: 201, json: { ...view, lines: [{ ...view.lines[0], remainingQuantity: 2, soldQuantity: 1 }] } });
+    return route.fulfill({ status: 201, json: { ...view, lines: [{ ...view.lines[0], remainingQuantity: 2, layaways: [], layawayPhase: null, batchId: null, soldQuantity: 1 }] } });
   });
   await page.route("**/api/admin/inventory", (route) => route.fulfill({ json: view }));
 
@@ -193,11 +194,12 @@ test("inventory admin edits a manual sale and sends the correction", async ({ pa
   const view = {
     settings: { fxRate: 466, cardCommissionRate: 0.0195 },
     crReady: true,
+    batches: [],
     totals: { quantity: 3, paidInvestmentUsd: 100, totalInventoryCostCrc: 90000, expectedSalesCrc: 150000, totalContributionCrc: 50000, contributionMargin: 0.33 },
     paymentMethods: [{ id: "pm1", name: "Cash", active: true }],
     lines: [{
       id: "line-1", code: "FGB001", productName: "Jackets", color: "Black",
-      sizes: { ...emptySizes, M: 3 }, remaining: { ...emptySizes, M: 2 }, soldQuantity: 1, remainingQuantity: 2,
+      sizes: { ...emptySizes, M: 3 }, remaining: { ...emptySizes, M: 2 }, soldQuantity: 1, remainingQuantity: 2, layaways: [], layawayPhase: null, batchId: null,
       unitPriceUsd: 9.8, piecesPerGarment: 1,
       cost: { paidInvestmentUsd: 30, totalInventoryCostCrc: 30000, costPerUnitCrc: 10000, salePriceCrc: 50000, contributionPerUnitCrc: 39000, contributionMargin: 0.78 },
     }],
