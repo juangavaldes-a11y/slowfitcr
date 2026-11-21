@@ -65,6 +65,14 @@ export type Copy = {
       ctaLabel: string;
     }>;
   };
+  sets: {
+    kicker: string;
+    title: string;
+    subtitle: string;
+    previous: string;
+    next: string;
+    viewLabel: string;
+  };
   values: {
     kicker: string;
     title: string;
@@ -212,6 +220,14 @@ const copyByLocale: Record<Locale, Copy> = {
           ctaLabel: "VER",
         },
       ],
+    },
+    sets: {
+      kicker: "Conjuntos",
+      title: "Conjuntos",
+      subtitle: "Combina arriba y abajo en un solo look.",
+      previous: "Conjunto anterior",
+      next: "Siguiente conjunto",
+      viewLabel: "Ver",
     },
     values: {
       kicker: "¿Por qué elegir SLOW?",
@@ -388,6 +404,14 @@ const copyByLocale: Record<Locale, Copy> = {
           ctaLabel: "VIEW",
         },
       ],
+    },
+    sets: {
+      kicker: "Sets",
+      title: "Sets",
+      subtitle: "Mix top and bottom in one look.",
+      previous: "Previous set",
+      next: "Next set",
+      viewLabel: "View",
     },
     values: {
       kicker: "Why choose SLOW?",

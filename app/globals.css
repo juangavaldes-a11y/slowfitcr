@@ -1847,3 +1847,94 @@ a {
 .ant-table-wrapper .ant-table-tbody > tr.slowfit-row-layaway-expired > td.ant-table-cell-fix-left {
   background: #ffd6d2;
 }
+
+/* Sets carousel: native scroll-snap, no library */
+.slowfit-sets {
+  padding: 72px clamp(20px, 5vw, 80px) 80px;
+}
+
+.slowfit-sets-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.slowfit-sets-heading .slowfit-collection-title.ant-typography {
+  margin-bottom: 8px;
+}
+
+.slowfit-sets-heading .slowfit-collection-copy.ant-typography {
+  margin-bottom: 0;
+}
+
+.slowfit-sets-arrows {
+  display: flex;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.slowfit-sets-track {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  padding: 0 0 12px;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.slowfit-sets-slide {
+  flex: 0 0 clamp(240px, 22vw, 320px);
+  scroll-snap-align: start;
+}
+
+.slowfit-sets-slide a {
+  display: block;
+  overflow: hidden;
+  background: #e6dfd3;
+}
+
+.slowfit-sets-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  transition: transform 0.35s ease;
+}
+
+.slowfit-sets-slide a:hover .slowfit-sets-image,
+.slowfit-sets-slide a:focus-visible .slowfit-sets-image {
+  transform: scale(1.03);
+}
+
+@media (max-width: 991px) {
+  .slowfit-sets-slide {
+    flex-basis: clamp(220px, 42vw, 300px);
+  }
+}
+
+@media (max-width: 575px) {
+  .slowfit-sets {
+    padding: 48px 16px 56px;
+  }
+
+  .slowfit-sets-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .slowfit-sets-slide {
+    flex-basis: 78vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slowfit-sets-image {
+    transition: none;
+  }
+}

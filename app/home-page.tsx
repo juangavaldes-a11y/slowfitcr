@@ -9,6 +9,7 @@ import {
 import { Button, Col, Row, Space, Typography } from "antd";
 import Image from "next/image";
 import ContactForm from "./contact-form";
+import SetsCarousel from "./sets-carousel";
 import { trackEvent } from "./lib/analytics";
 import type { Copy, Locale } from "./i18n";
 import { isModuleEnabled, isRuntimeFeatureEnabled } from "../packages/core/config";
@@ -108,6 +109,8 @@ export default function HomePage({ copy, locale }: HomePageProps) {
           </div>
         ))}
       </section>
+
+      <SetsCarousel copy={copy.sets} locale={locale} />
 
       <section id="why-slow" className="slowfit-values">
         <div className="slowfit-shell">
