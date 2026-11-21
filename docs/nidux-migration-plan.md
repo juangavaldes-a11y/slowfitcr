@@ -32,7 +32,7 @@ Fecha: 2026-11-20. Tienda: https://slow.minidux.com · Admin: https://admin.nidu
 - Reseñas con moderación. No se encontró equivalente.
 - Cotización de mensajería Uber Direct y DiDi. Nidux ofrece Correos de Costa Rica (Pymexpress) y tarifas por compra, país, producto, zona y avanzado.
 - Caja chica (`petty-cash`). No aparece en el POS.
-- Webhooks/outbox hacia CRM y analítica. No hay sección de API o webhooks visible; preguntar a soporte de Nidux.
+- Webhooks/outbox hacia CRM y analítica propios. Corrección: Nidux sí ofrece dos webhooks (Admin > Configuración > General > Webhook): "URL para recibir notificaciones de órdenes" y "URL para recibir notificaciones de actividades API". Ambos están sin configurar. También permite claves propias de Google Maps y SendGrid.
 
 ## 4. Funciones nuevas de Nidux por aprovechar
 
@@ -62,4 +62,16 @@ Fecha: 2026-11-20. Tienda: https://slow.minidux.com · Admin: https://admin.nidu
 
 ## 7. Cómo integrar
 
-No hay API visible. Las integraciones serían por importación/exportación de Excel (Admin > Productos > Importar/Exportar; POS > Importar) o automatización de navegador. Confirmar con soporte de Nidux si existe API o webhooks antes de construir nada más.
+- Salida de pedidos: webhook de órdenes de Nidux hacia un endpoint propio (por ejemplo una ruta en el sitio desplegado en Cloudflare que valide un secreto y reenvíe a CRM/analítica). El formato del payload se descubre con un pedido de prueba.
+- Catálogo y costos: importación/exportación de Excel (Admin > Productos > Importar/Exportar; POS > Importar) o automatización de navegador.
+- El webhook "actividades API" sugiere que existe una API de Nidux; pedir la documentación y credenciales a soporte.
+
+## 8. Avance
+
+- [x] Redirección de la raíz `slowfitcr.com/` a la tienda (desplegada al hacer push a `master`).
+- [x] Pruebas: `npm run test:unit` (redirección, corre en CI) y `npm run test:smoke` (6 pruebas de humo sobre la tienda real: redirección, home, enlaces legales, términos con seguridad y políticas al final, categoría con productos, producto con stock/color/talla).
+- [x] SKU del POS alineados con el catálogo (SLW001..SLW027, SLWA01..SLWA25).
+- [x] Lista de deseos ya estaba habilitada.
+- [ ] Recaptcha en inicio de sesión: el interruptor no quedó activo al intentarlo; revisar si exige claves.
+- [ ] Webhook de órdenes: requiere un secreto en Cloudflare (`wrangler login`) y un endpoint desplegado.
+- [ ] Factura electrónica, PlaceToPay, datos legales: requieren datos del negocio.
