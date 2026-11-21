@@ -61,3 +61,55 @@ test("POS: an unknown code reports not found and leaves the cart empty", async (
   await expect(page.getByText("Scan or search a product to start the sale.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Charge" })).toBeDisabled();
 });
+
+test("POS: create a Correos de CR guide for the sale and store its tracking number", async ({ page }) => {
+  await mockPos(page);
+  const created: Array<{ reference: string; recipient: { state: string; postalCode: string }; weightKg: number }> = [];
+  const tracked: Array<{ trackingNumber: string }> = [];
+  await page.route("**/api/admin/pos/shipments", async (route) => {
+    created.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 201,
+      json: {
+        id: "guide-1", reference: "POS-20261120-ABC123", status: "READY_TO_DISPATCH", trackingNumber: null, gatewayConfigured: false,
+        recipient: { name: "Ana Mora", phone: "+50688881234" },
+        address: { streetAddress: ["200 m norte"], city: "Escazú", district: "San Rafael", state: "San José", postalCode: "10201" },
+        parcel: { weightKg: 0.8, pieces: 1, contents: "Sportswear", declaredValueCrc: 39900 }, errorMessage: null,
+      },
+    });
+  });
+  await page.route("**/api/admin/pos/shipments/guide-1/tracking", async (route) => {
+    tracked.push(route.request().postDataJSON());
+    await route.fulfill({ json: { id: "guide-1", reference: "POS-20261120-ABC123", status: "ACTIVE", trackingNumber: "EE123456789CR" } });
+  });
+
+  await page.goto("/en/admin/pos");
+  const search = page.getByPlaceholder("Scan the code or search by name");
+  await search.fill("SLWA17-ROSA-M");
+  await search.press("Enter");
+  await page.getByRole("button", { name: "Charge" }).click();
+  await page.getByRole("button", { name: /Create Correos de CR guide/ }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Correos de Costa Rica guide" });
+  await dialog.getByLabel("Recipient name").fill("Ana Mora");
+  await dialog.getByLabel("Phone").fill("8888 1234");
+  for (const label of ["Province", "Canton", "District"]) {
+    const select = dialog.getByLabel(label, { exact: true });
+    await select.click();
+    await select.press("ArrowDown");
+    await select.press("Enter");
+  }
+  await dialog.getByLabel("Address details").fill("200 m norte de la iglesia");
+  await dialog.getByTestId("guide-create").click();
+
+  await expect(dialog.getByText("Tracking number missing")).toBeVisible();
+  expect(created).toHaveLength(1);
+  expect(created[0].reference).toBe("POS-20261120-ABC123");
+  expect(created[0].recipient.state.length).toBeGreaterThan(2);
+  expect(created[0].recipient.postalCode).toMatch(/^\d{5}$/);
+
+  await dialog.getByPlaceholder("Tracking number").fill("ee123456789cr");
+  await dialog.getByRole("button", { name: "Save number" }).click();
+  await expect(dialog.getByTestId("guide-tracking")).toHaveText("EE123456789CR");
+  expect(tracked).toEqual([{ trackingNumber: "ee123456789cr" }]);
+});

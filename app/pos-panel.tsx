@@ -1,11 +1,12 @@
 "use client";
 
-import { CameraOutlined, DeleteOutlined, LinkOutlined, PrinterOutlined, ShoppingCartOutlined } from "@ant-design/icons";
+import { CameraOutlined, CarOutlined, DeleteOutlined, LinkOutlined, PrinterOutlined, ShoppingCartOutlined } from "@ant-design/icons";
 import { Button, Card, Col, Empty, Input, InputNumber, Modal, Row, Select, Space, Table, Tag, Typography, message } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import AdminShell from "./admin-shell";
 import BarcodeScanner, { cameraScanSupported } from "./barcode-scanner";
+import PosShippingGuide from "./pos-shipping-guide";
 import { apiRequest, formatApiError, isApiErrorStatus } from "./lib/api-client";
 import { addToCart, cartTotals, checkoutBody, lineTotal, looksLikeCode, setDiscount, setQuantity, type CartLine, type SellableVariant } from "./lib/pos-cart";
 import { receiptHtml, type PosReceipt } from "./lib/pos-receipt";
@@ -31,6 +32,7 @@ export default function PosPanel({ locale }: { locale: "es" | "en" }) {
   const [checkingOut, setCheckingOut] = useState(false);
   const [receipt, setReceipt] = useState<PosReceipt | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const es = locale === "es";
   const money = useMemo(() => new Intl.NumberFormat(es ? "es-CR" : "en-US", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }), [es]);
@@ -46,7 +48,7 @@ export default function PosPanel({ locale }: { locale: "es" | "en" }) {
     product: "Producto", qty: "Cant.", price: "Precio", discount: "Desc.", total: "Total", remove: "Quitar",
     stock: "disp.", payment: "Forma de pago", charge: "Cobrar", units: "unidades", subtotal: "Subtotal", discountTotal: "Descuento",
     notFound: "No encontramos ese código.", outOfStock: "Sin existencias.", limit: "No hay más existencias de esa variante.",
-    sold: "Venta registrada", print: "Imprimir comprobante", close: "Cerrar", openLoyverse: "Abrir Loyverse",
+    sold: "Venta registrada", print: "Imprimir comprobante", close: "Cerrar", openLoyverse: "Abrir Loyverse", guide: "Crear guía de Correos de CR",
     noCamera: "La cámara no está disponible en este navegador; usa un lector USB o escribe el código.",
     selectPayment: "Elige la forma de pago.",
   } : {
@@ -60,7 +62,7 @@ export default function PosPanel({ locale }: { locale: "es" | "en" }) {
     product: "Product", qty: "Qty", price: "Price", discount: "Disc.", total: "Total", remove: "Remove",
     stock: "left", payment: "Payment method", charge: "Charge", units: "units", subtotal: "Subtotal", discountTotal: "Discount",
     notFound: "We could not find that code.", outOfStock: "Out of stock.", limit: "No more stock for that variant.",
-    sold: "Sale recorded", print: "Print receipt", close: "Close", openLoyverse: "Open Loyverse",
+    sold: "Sale recorded", print: "Print receipt", close: "Close", openLoyverse: "Open Loyverse", guide: "Create Correos de CR guide",
     noCamera: "The camera is not available in this browser; use a USB scanner or type the code.",
     selectPayment: "Choose a payment method.",
   }, [es]);
@@ -252,9 +254,10 @@ export default function PosPanel({ locale }: { locale: "es" | "en" }) {
         </Row>
         <BarcodeScanner open={scannerOpen} locale={locale} onClose={() => setScannerOpen(false)} onDetect={onCameraCode} />
         <Modal open={Boolean(receipt)} title={labels.sold} onCancel={() => setReceipt(null)}
-          footer={[<Button key="print" type="primary" icon={<PrinterOutlined />} onClick={printReceipt}>{labels.print}</Button>, <Button key="close" onClick={() => setReceipt(null)}>{labels.close}</Button>]}>
+          footer={[<Button key="print" type="primary" icon={<PrinterOutlined />} onClick={printReceipt}>{labels.print}</Button>, <Button key="guide" icon={<CarOutlined />} onClick={() => setGuideOpen(true)}>{labels.guide}</Button>, <Button key="close" onClick={() => setReceipt(null)}>{labels.close}</Button>]}>
           {receipt ? (<><Typography.Paragraph strong>{receipt.receipt}</Typography.Paragraph><Typography.Title level={3}>{money.format(receipt.totalCrc)}</Typography.Title><Typography.Text type="secondary">{receipt.paymentMethod}</Typography.Text></>) : null}
         </Modal>
+        <PosShippingGuide open={guideOpen} locale={locale} receipt={receipt} onClose={() => setGuideOpen(false)} />
       </AdminShell>
     </>
   );

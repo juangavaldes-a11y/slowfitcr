@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:unit": "node --test tests/nidux-redirects.test.ts tests/pos-cart.test.ts tests/pos-receipt.test.ts",
+    "test:unit": "node --test tests/nidux-redirects.test.ts tests/pos-cart.test.ts tests/pos-receipt.test.ts && playwright test -c playwright.unit.config.ts",
     "test:smoke": "node --test tests/nidux-store.smoke.test.ts",
     "test:backend": "npm --prefix backend test",
     "test:e2e": "playwright test",
