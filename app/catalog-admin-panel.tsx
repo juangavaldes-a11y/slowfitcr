@@ -1,11 +1,15 @@
 "use client";
 
 import {
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
   PlusOutlined,
   PrinterOutlined,
+  StarFilled,
+  StarOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import {
@@ -153,6 +157,11 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     quantity: "Cantidad",
     addVariant: "Agregar variante",
     addImage: "Agregar URL",
+    makeMain: "Hacer imagen principal",
+    mainImage: "Principal",
+    moveEarlier: "Mover antes",
+    moveLater: "Mover despues",
+    imagesHint: "La primera imagen es la que se muestra en la tienda y en las tarjetas. Usa las flechas para ordenarlas.",
     save: "Guardar producto",
     cancel: "Cancelar",
     saved: "Producto guardado.",
@@ -215,6 +224,11 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
     quantity: "Quantity",
     addVariant: "Add variant",
     addImage: "Add URL",
+    makeMain: "Make main image",
+    mainImage: "Main",
+    moveEarlier: "Move earlier",
+    moveLater: "Move later",
+    imagesHint: "The first image is the one shown in the shop and on product cards. Use the arrows to reorder them.",
     save: "Save product",
     cancel: "Cancel",
     saved: "Product saved.",
@@ -640,14 +654,31 @@ export default function CatalogAdminPanel({ locale }: { locale: "es" | "en" }) {
           <Upload accept="image/jpeg,image/png,image/webp,image/avif" showUploadList={false} beforeUpload={(file) => { void uploadImage(file); return false; }}>
             <Button icon={<UploadOutlined />} loading={uploading}>{labels.upload}</Button>
           </Upload>
+          <Typography.Paragraph type="secondary">{labels.imagesHint}</Typography.Paragraph>
           <Form.List name="images">
-            {(fields, { add, remove }) => <Space orientation="vertical" className="slowfit-form-list">
-              {fields.map(({ key, name, ...restField }) => <Card key={key} size="small">
+            {(fields, { add, remove, move }) => <Space orientation="vertical" className="slowfit-form-list">
+              {fields.map(({ key, name, ...restField }, index) => <Card key={key} size="small" data-testid={`product-image-${index}`}>
                 <Row gutter={12} align="middle">
-                  <Col xs={24} md={9}><Form.Item {...restField} name={[name, "url"]} label={labels.imageUrl} rules={[{ required: true, type: "url" }]}><Input /></Form.Item></Col>
-                  <Col xs={24} md={6}><Form.Item {...restField} name={[name, "altText"]} label={labels.imageAlt}><Input /></Form.Item></Col>
-                  <Col xs={20} md={6}><Form.Item {...restField} name={[name, "color"]} label={labels.imageColor}><AutoComplete allowClear placeholder={labels.imageColorHint} options={imageColorOptions} /></Form.Item></Col>
-                  <Col xs={4} md={3}><Button danger icon={<DeleteOutlined />} aria-label={labels.remove} onClick={() => remove(name)} /></Col>
+                  <Col xs={24} md={4}>
+                    <Form.Item noStyle shouldUpdate>
+                      {() => {
+                        const url = form.getFieldValue(["images", name, "url"]) as string | undefined;
+                        return url ? <Image src={url} alt="" width={72} height={72} style={{ objectFit: "cover", borderRadius: 6 }} preview={false} /> : null;
+                      }}
+                    </Form.Item>
+                    {index === 0 ? <Tag color="gold" icon={<StarFilled />} style={{ marginTop: 6 }}>{labels.mainImage}</Tag> : null}
+                  </Col>
+                  <Col xs={24} md={7}><Form.Item {...restField} name={[name, "url"]} label={labels.imageUrl} rules={[{ required: true, type: "url" }]}><Input /></Form.Item></Col>
+                  <Col xs={24} md={4}><Form.Item {...restField} name={[name, "altText"]} label={labels.imageAlt}><Input /></Form.Item></Col>
+                  <Col xs={24} md={4}><Form.Item {...restField} name={[name, "color"]} label={labels.imageColor}><AutoComplete allowClear placeholder={labels.imageColorHint} options={imageColorOptions} /></Form.Item></Col>
+                  <Col xs={24} md={5}>
+                    <Space wrap>
+                      <Tooltip title={labels.moveEarlier}><Button aria-label={labels.moveEarlier} icon={<ArrowLeftOutlined />} disabled={index === 0} onClick={() => move(index, index - 1)} /></Tooltip>
+                      <Tooltip title={labels.moveLater}><Button aria-label={labels.moveLater} icon={<ArrowRightOutlined />} disabled={index === fields.length - 1} onClick={() => move(index, index + 1)} /></Tooltip>
+                      <Tooltip title={labels.makeMain}><Button aria-label={labels.makeMain} icon={<StarOutlined />} disabled={index === 0} onClick={() => move(index, 0)} /></Tooltip>
+                      <Button danger icon={<DeleteOutlined />} aria-label={labels.remove} onClick={() => remove(name)} />
+                    </Space>
+                  </Col>
                 </Row>
               </Card>)}
               <Button icon={<PlusOutlined />} onClick={() => add({ url: "", altText: "", color: "" })}>{labels.addImage}</Button>
