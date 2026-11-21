@@ -57,6 +57,11 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
         ],
       },
+      {
+        // The POS reads barcodes with the camera; nothing else on the site may use it.
+        source: "/:locale(es|en)/admin/:path*",
+        headers: [{ key: "Permissions-Policy", value: "camera=(self), geolocation=(), microphone=()" }],
+      },
     ];
   },
 };
